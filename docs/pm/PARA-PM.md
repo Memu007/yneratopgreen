@@ -2,288 +2,177 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-Hay dos entregas esperando tu revisión: REV1-PENDIENTES-1, arriba, y
-PUBLISH-FIELDS-1, abajo, sin cambios desde `c5071fc`.
-
-## REV1-PENDIENTES-1: entrega
+## NOTIF-TEXTOS-1: entrega
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `c5071fc` (la entrega de PUBLISH-FIELDS-1) |
-| código | `74b0666` las páginas y Mercado Pago · `3b66e21` la notificación de cancelación |
-| casos y negativos | `30a513e` |
-| guías | `7fa6316` |
-| no integrado, no desplegado | `main` está en `c92c0d7` (ver «Para que lo sepas») |
+| base | `4a69064` (tu asignación) |
+| código | `3e806de` |
+| casos y negativos | `e912d8f` |
+| no integrado, no desplegado | `main` sigue en `c92c0d7` |
 
 **Resultado.**
 
-- **Inicio ya no muestra publicaciones.** Salieron la sección «Mercado
-  activo» y su encabezado. El único acceso al Mercado de la página es
-  «Ir al Mercado», arriba.
-- **«Lo que muestra cada publicación.»** reemplaza a «Los datos que definen
-  la publicación.». Los tres ítems:
-  - «Precio y modalidad»: el precio, su unidad y, en los servicios, cómo se
-    cobra. Sin precio publicado, se pide cotización.
-  - «Ubicación y alcance»: la localidad, la cobertura de un servicio y el
-    radio de alcance de cada transportista.
-  - «Quién publica y qué se puede hacer»: el nombre y la reputación de quien
-    publica, y la acción disponible (agregar al carrito, contratar o pedir
-    cotización).
+- **Ninguna notificación promete dinero, envíos ni avisos.** El rechazo ya no
+  dice «El monto total será reembolsado.»; el envío ya no dice «Te avisaremos
+  cuando llegue.»; la confirmación ya no dice «Pronto será enviado.».
+- **Todas usan el «vos».** Salieron «Procede» y «Tienes».
+- **La bienvenida** ya no dice «marketplace» ni «productos agrícolas».
+- **Los dos próximos pasos que nombran existen** en «Mis Compras», y el caso
+  los busca: cómo pagar y «Confirmar Recepción».
+- **El comentario de Quiénes somos** dice sólo «salió por ahora (la clienta,
+  20/09)».
+- **El 79 corre solo** sobre una base recién creada.
+- **Las guías no citan ninguna notificación**, así que no cambiaron.
 
-  Sin «honesta». La bajada de Inicio dice ahora «Publicaciones con precio y
-  modalidad, ubicación y quién publica.».
-- **El bloque que se repetía era la invitación del final** (resuelve #6 y
-  #14 juntos):
-  - estaba en Inicio («¿Tenés algo para ofrecer?», con «Publicar una oferta»
-    y «Ver el mercado») y en Quiénes somos («¿Listo para transformar tu
-    producción?», con «Comenzar a Vender» y «Explorar Productos»);
-  - en Contacto no estaba;
-  - es el bloque de la captura de la clienta, sobre el pie.
+**Una pregunta, no bloqueante.** Está abajo, en «Para decidir». Entregué la
+opción A.
 
-  **Quedó sólo en Quiénes somos,** que no tenía otro camino al Mercado. Dice
-  «Publicá o buscá en el Mercado agropecuario», con «Publicá un equipo, un
-  insumo o un servicio, o buscá lo que necesitás.» y dos botones: «Publicar
-  una oferta» e «Ir al Mercado». Inicio no la necesita, porque arriba tiene
-  los mismos dos botones.
-- **Contacto sin preguntas frecuentes.** El formulario y los datos de
-  contacto siguen.
-- **Quiénes somos sin «Nuestro equipo».** Salió también su foto del sitio
-  (`public/MercedesRaiz.jpg`); queda en la historia de Git si vuelve.
-- **Nada visible dice «comisión».**
-  - La vinculación de Mercado Pago decía «no te cobra comisión por vender».
-    Ahora dice «AgroBoeda no los recibe ni los reparte. Mercado Pago
-    descuenta lo que cobra por cada venta, como en cualquier venta tuya.».
-  - Las dos guías decían «no cobra, no recibe ni guarda el dinero»; ahora
-    dicen «no recibe ni guarda».
-  - Se mantienen, como pediste: la plataforma no recibe ni guarda el dinero,
-    y la transferencia la confirma quien vende.
-  - La conducta no cambió: la preferencia sigue sin `marketplace_fee` (caso
-    79 en verde).
-- **Caso 209 en verde y los tres negativos en rojo, cada uno por su
-  motivo.**
-- **Las dos guías coinciden.**
+## Los textos
 
-**Para que lo sepas.**
+Cambiaron seis:
 
-1. **Corregí una «comisión» que el pedido no nombraba.** Quien compra y
-   cancela una orden recibía la notificación «Se te devolverá el 95% del
-   monto (se descuenta la comisión del 5%)». Es falso: AgroBoeda no cobra
-   ese 5 % ni tiene el dinero para devolverlo. Ahora dice «Tu pedido #… fue
-   cancelado.». Es un commit aparte (`3b66e21`); si preferís otro texto, se
-   cambia ahí.
-2. **Dejé en Inicio el total** («N publicaciones disponibles ahora»). Es un
-   número, no son publicaciones. Si lo querés fuera también, es una línea.
-3. **`main` ya no está donde dije.** Está en `c92c0d7`, que integra
-   USER-GUIDE-1 hasta tu aceptación. En el informe de PUBLISH-FIELDS-1
-   escribí que seguía en `238d113` y no lo había verificado. Yo no toqué
-   `main`.
+| notificación | a quién | antes | después | por qué |
+|---|---|---|---|---|
+| Pedido realizado | quien compra | «Tu pedido #N fue creado exitosamente. Procede al pago para continuar.» | «Tu pedido #N fue creado y está pendiente de pago. En Mis Compras tenés cómo pagarlo.» | «Procede» es «tú». El paso existe: Mis Compras muestra la cuenta y «Enviar comprobante» por transferencia, o «Continuar pago» («Preparar pago» si el link no está) por Mercado Pago |
+| Nueva venta recibida | quien vende | «Tienes un nuevo pedido #N pendiente de pago.» | «Tenés un nuevo pedido #N pendiente de pago.» | «Tienes». El título queda: Mis Ventas ya llama «Venta #N» a esa orden |
+| Pedido confirmado | quien compra | «El vendedor confirmó tu pedido #N. Pronto será enviado.» | «El vendedor confirmó tu pedido #N.» | Prometía un envío y un plazo que el producto no controla. En un servicio o un retiro no se envía nada |
+| Pedido enviado | quien compra | «Tu pedido #N está en camino. Te avisaremos cuando llegue.» | «El vendedor marcó tu pedido #N como enviado. Cuando lo recibas, confirmá la recepción en Mis Compras.» | Nadie avisa la llegada: la confirma quien compra, con «Confirmar Recepción». Y el producto no sabe si está «en camino»; sabe que quien vende lo marcó |
+| Pedido rechazado | quien compra | «El vendedor rechazó tu pedido #N. El monto total será reembolsado.» | «El vendedor rechazó tu pedido #N.» | AgroBoeda no tiene ese dinero y no reembolsa nada |
+| Bienvenida | quien se registra | «¡Bienvenido a AgroBoeda!» y «Hola X, tu cuenta fue creada exitosamente. Explorá el marketplace y comenzá a comprar o vender productos agrícolas.» | «¡Bienvenido/a a AgroBoeda!» y «Hola X, tu cuenta fue creada. En el Mercado podés publicar un equipo, un insumo o un servicio, o buscar lo que necesitás.» | La devolución #1 pidió «agropecuario». La frase nueva es la de Quiénes somos. «Bienvenido/a» es la forma del ingreso («¡Bienvenido/a de nuevo!») |
 
-**No toqué**, como pediste: la idea rectora de Inicio (#5), AgroMarket
-(#10), misión y visión (#12), retener fondos o cobrar comisión (#11b) y la
-logística en los filtros.
+Quedan como estaban, porque son ciertas y el caso también las lee:
 
-## Casos
+- quien compra: «Tu pedido #N fue marcado como entregado. ¡Gracias por tu
+  compra!» y «Tu pedido #N fue cancelado.»;
+- quien vende: «El comprador confirmó la recepción del pedido #N. ¡Venta
+  completada!» y «El comprador canceló el pedido #N.».
 
-| caso | qué mira, en escritorio y en celular |
+Hay una que nadie ve: «Pago aprobado» y «¡Venta confirmada!». Ninguna parte
+del producto la manda. Tiene «tú» («Por favor confirma y envía el pedido»).
+No la toqué, porque ningún caso puede dispararla. Si se conecta con el cobro
+confirmado, hay que reescribirla.
+
+## Para decidir (no bloqueante)
+
+**¿Qué lee quien compra sobre su dinero cuando se cae un pedido que ya pagó
+por transferencia?**
+
+- **Por Mercado Pago no pasa.** Una orden cobrada no se rechaza ni se cancela:
+  responde 409 (caso 96).
+- **Por transferencia sí pasa.** Después de «Aprobar comprobante», quien vende
+  puede «Rechazar» o «Cancelar Venta», y quien compra puede «Cancelar
+  Pedido».
+  - El dinero está en la cuenta de quien vende.
+  - La guía ya le dice a quien vende (paso 18): «la devolución la arreglás
+    directamente con quien compró».
+
+Opciones:
+
+- **A, la que entregué.** El aviso dice sólo que el pedido fue rechazado o
+  cancelado. No promete nada, pero quien pagó no sabe qué hacer.
+- **B.** Sólo si la orden estaba pagada, agregar «Si ya transferiste, el
+  reintegro lo arreglás directamente con el vendedor. AgroBoeda no tiene ese
+  dinero.». Hoy, en una orden rechazada, Mis Compras no muestra el contacto de
+  quien vende. Ese paso no tiene camino en el producto hasta que se decida qué
+  datos de contacto ve cada persona, que está pendiente de Emi.
+
+**Recomiendo A ahora, y B junto con la decisión sobre los datos de
+contacto.**
+
+## Caso y negativos
+
+| caso | qué mira |
 |---|---|
-| 209 | Inicio sin tarjetas ni «Publicaciones disponibles», con el total y un solo camino al Mercado («Ir al Mercado», que llega). «Lo que muestra cada publicación.» con sus tres ítems, sin «honesta», «precio o modalidad», «próximo paso» ni «Antes de avanzar». La invitación, una sola vez y sólo en Quiénes somos, con sus dos botones. Contacto sin preguntas frecuentes. Quiénes somos sin «Nuestro equipo» y sin pedir la foto. Nada dice «comisión»: las tres páginas, el Mercado, Mercado Pago sin vincular y vinculado, y la notificación de quien canceló. Ninguna página desborda a lo ancho |
+| 210 | Dispara todas las notificaciones que el producto manda, con dos cuentas nuevas y cinco órdenes por transferencia: una recibida, una enviada, una rechazada después de pagar, una cancelada por quien compra y una sin pagar. Las lee en la API (exactas, ni una de más ni de menos) y en la pestaña «Notificaciones», en escritorio y en celular. Ninguna puede decir reembolso, devolución, porcentaje, «avisaremos», «en camino», «pronto será», «comisión», «marketplace», «agrícola» ni formas del «tú». Además, en «Mis Compras», la orden sin pagar tiene que ofrecer «Enviar comprobante» y la enviada, «Confirmar Recepción» |
 
-**Contra el código de antes** (`c5071fc`), el 209 encuentra 60 problemas:
-todos los puntos, en los dos anchos. Incluye la notificación del 95 %.
+**Contra el código de antes** (`4a69064`), el 210 encuentra 105 problemas: los
+seis textos, en la API y en los dos anchos.
 
-**Casos viejos ajustados**, porque leían lo que se fue: 124 (ahora mira el
-total de Inicio y qué pasa si la API se cae), 139, 140, 147, 148, 155,
-167, 168, 170, 175, 183, 192 y 208. Donde abrían una ficha desde las
-tarjetas de Inicio, la abren desde el Mercado.
+`python3 scripts/sabotajes_notif_textos_1.py` → «todos dieron el rojo esperado» y «src y backend después: como estaban»
 
-## Negativos
-
-`python3 scripts/sabotajes_rev1_pendientes_1.py` → «todos dieron el rojo
-esperado» y «src después: como estaba».
-
-| sabotaje | rojo del 209 |
+| sabotaje | rojo del 210 |
 |---|---|
-| `inicio-con-publicaciones` | «Inicio muestra 1 publicación(es)», en los dos anchos; nada más |
-| `faq-de-vuelta` | «Contacto vuelve a tener «Preguntas Frecuentes»» y la pregunta, en los dos anchos; nada de Inicio ni de comisión |
-| `comision-visible` | «Mercado Pago vinculado dice «comisión»», en los dos anchos; nada más |
+| `reembolso-de-vuelta` | 7 problemas: «promete un reembolso» en la API y en la pestaña de los dos anchos, más el texto esperado que falta; nada de quien vende, del «tú» ni de los avisos |
+| `tuteo-de-vuelta` | 27 problemas, todos de quien vende: «trata de «tú»» en la API y en los dos anchos, y las cinco ventas que no dicen «Tenés»; nada de quien compra |
+| `aviso-de-vuelta` | 12 problemas, todos del envío: «promete un aviso que no existe» en la API y en los dos anchos, y los dos avisos de envío que no dicen el paso; nada de reembolso ni de «tú» |
+| `sin-confirmar-recepcion` | 2 problemas: «el pedido enviado no ofrece «Confirmar Recepción» en Mis Compras», en escritorio y en celular; nada de la API |
+
+## El caso 79
+
+**Causa.** El ayudante que publica leía la localidad que deja el caso 5, y
+el caso publicaba con la sesión de vendedor que dejan los casos anteriores.
+Suelto, no tenía ninguna de las dos.
+
+**Arreglo.**
+
+- Si no hay caso 5, el ayudante usa una localidad del padrón. Ahí se mide
+  dinero, no ubicación.
+- El 79 publica con el token de la cuenta que vinculó, que es la misma
+  (`vendedor@ejemplo.com`).
+
+En la suite no cambia nada.
+
+Sobre una base recién creada: `SMOKE_CASOS=79` → «1/1 pasaron; 0 fallaron». Antes del arreglo, en la misma base, fallaba con «Cannot read properties of undefined (reading 'localityId')».
 
 ## Cómo verificarlo
 
 Con el entorno arriba y la siembra demo:
 
 ```bash
-SMOKE_CASOS=209 node scripts/smoke.mjs
+./scripts/entorno_nativo.sh --recrear && SMOKE_CASOS=79 node scripts/smoke.mjs
 # → 1/1 pasaron; 0 fallaron
 
-python3 scripts/sabotajes_rev1_pendientes_1.py
-# → todos dieron el rojo esperado
+SMOKE_CASOS=210 node scripts/smoke.mjs
+# → 1/1 pasaron; 0 fallaron
 
-node scripts/guia-usuario.mjs
-# → LA GUÍA Y EL SITIO COINCIDEN: 22 pasos en escritorio y celular
+python3 scripts/sabotajes_notif_textos_1.py
+# → todos dieron el rojo esperado
+# → src y backend después: como estaban
 ```
 
-Aviso de entorno: el 209 levanta el doble local de Mercado Pago en el puerto
-8099, como los casos de Mercado Pago (62 a 100). Si ese puerto está ocupado,
-no arranca.
+Aviso de entorno: tres de los cuatro sabotajes cambian la API y la
+reinician con `./scripts/entorno_nativo.sh --reiniciar-api`, antes y después.
+En el entorno Docker, ese paso es el que reinicia el contenedor
+`topgreen-api`.
 
 ## Puertas
 
 | puerta | resultado |
 |---|---|
-| suite completa desde base nueva, sobre `7fa6316` | «208/209 pasaron; 1 fallaron»: sólo el 131, de entorno (el puente no traduce `docker run`). El 79, sin `marketplace_fee`, en verde |
-| tipos, lint, build | verdes |
-| `compileall`, `node --check`, parseo de Python | verdes |
+| suite completa desde base nueva, sobre `e912d8f` | **209/210**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'». Pasan el 79, el 96 y el 210 |
+| tipos, lint, build | verdes (`npm run build` incluye `tsc`; lint sin avisos) |
+| `compileall`, `node --check`, parseo de Python | verdes (26 scripts de Python) |
 | `alembic check` | `No new upgrade operations detected.` |
-| diff-check con `cr-at-eol` y finales de línea | limpios |
-| a11y `--todas` | 80 de 80, sin violaciones bloqueantes |
-| contraste | 88 de 88 |
-| auditoría móvil | 12 de 12 recorridos, 39 pantallas, sin desbordes, controles tapados, errores de consola ni respuestas 4xx/5xx |
+| diff-check con `cr-at-eol` y finales de línea | limpios sobre `4a69064..e912d8f` |
+| a11y `--todas` | 80 de 80 pantallas, 0 violaciones |
+| contraste | 88 de 88, ninguna por debajo del mínimo |
+| auditoría móvil | 12 de 12 recorridos y 39 pantallas: 0 desbordes, 0 controles tapados, 0 errores de consola y 0 respuestas 4xx/5xx |
 | `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular» |
 | `guia-usuario.mjs` | «LA GUÍA Y EL SITIO COINCIDEN: 22 pasos en escritorio y celular» |
 
 ## Riesgos y visto de paso
 
-- **La ficha ya no se abre desde Inicio**, así que su salida «Volver a
-  Inicio» y la tarjeta «compacta» quedaron sin uso. No las saqué: son
-  pocas líneas y vuelven si Inicio vuelve a mostrar algo.
-- **P2, visto de paso:** cuando quien vende rechaza un pedido, quien compra
-  lee «El monto total será reembolsado.». AgroBoeda no reembolsa nada: el
-  dinero, si lo hubo, fue a quien vende. No es «comisión» y no lo toqué. Te
-  recomiendo cambiarlo en una tarea chica, junto con cualquier otro texto de
-  notificaciones que hable de dinero.
+- **P3.** 15 mensajes de error de la API tratan de «tú» («No tienes
+  permiso…», «No puedes desactivar tu propia cuenta»). Al menos el último se
+  ve en el panel, y la guía de admin lo cita en el paso 8. No son
+  notificaciones y no los toqué. Te recomiendo una tarea chica aparte.
+- **Fuera de alcance, porque es cuándo se manda:**
+  - «Rechazar comprobante» deja la orden «Rechazado» sin avisarle a quien
+    compra;
+  - aprobar un pago, por transferencia o por Mercado Pago, no le avisa a
+    nadie.
+- **Comentarios que citan a la clienta.**
+  - En la invitación de Quiénes somos, el comentario le atribuía también «las
+    mejores soluciones tecnológicas». Ahora cita sólo lo que ella nombró en la
+    #14.
+  - En `notifications.py` decía «el tema de la comisión no se anticipa».
+    Ahora dice «cómo se explica la comisión está por decidir», que es lo que
+    ella dijo.
 
-## PUBLISH-FIELDS-1: entrega (sin cambios desde `c5071fc`)
+---
 
-| | |
-|---|---|
-| rama | `claude/dev-role-repo-3l0kp3` |
-| base | `fd22e83` |
-| código | `843126b` |
-| casos y negativos | `c0f44ae` |
-| guía de uso | `78b59a9` |
-| no integrado, no desplegado | `main` está en `c92c0d7` (ver arriba) |
+## PUBLISH-FIELDS-1 y REV1-PENDIENTES-1
 
-**Resultado.**
-
-- **El alta ya no ofrece «Características» ni «Etiquetas»,** ni de producto ni
-  de servicio. Salieron también su estado, sus manejadores, sus estilos y los
-  dos campos del tipo. La edición no los tenía. Nada fuera del alta los usaba.
-- **La ficha muestra «Marca: John Deere»** junto al modelo y el año. Sin
-  marca, no hay fila.
-- **«Editar» cambia la marca** con la misma lista del alta, sólo en las
-  categorías que la usan, y «Sin declarar» la quita.
-- **Inicio, el Mercado y la ficha dicen «publicaciones»**, también en lo que
-  lee el lector de pantalla.
-- **Casos 207 y 208 en verde; los tres negativos, en rojo por su motivo.**
-- **Las dos guías coinciden.**
-
-**Para que lo sepas: una parte del pedido no se puede hacer en «Editar».**
-Pediste que «Editar» suelte la marca «al pasar a Insumos», pero en «Editar»
-la categoría está bloqueada y dice «La categoría no se puede cambiar»: no hay
-cómo pasar a Insumos desde ahí. No la hice editable, porque eso sería producto
-nuevo. Lo comprobé donde sí pasa:
-
-- la API, al pasar la publicación a Insumos, suelta la marca;
-- «Editar» de un insumo no ofrece marca.
-
-Si querés que la categoría se pueda cambiar desde «Editar», es otra tarea.
-
-### Dónde queda «operación», y por qué
-
-Cambié todo lo visible de Inicio, el Mercado y la ficha:
-
-- Inicio: «Explorar publicaciones», «Publicaciones disponibles», el medidor
-  («… publicaciones disponibles ahora»), «Ver todas las publicaciones»,
-  «Todavía no hay publicaciones.», el error de carga, y los títulos para el
-  lector de pantalla;
-- **«Los datos que definen la publicación.»** El título cambia acá; el resto
-  de ese bloque es de REV1-PENDIENTES-1;
-- el Mercado: el conteo («N publicaciones»), «No hay publicaciones con estos
-  filtros.», el paginador («Página siguiente de publicaciones») y su título
-  para el lector de pantalla;
-- la ficha que no está: «Las publicaciones vigentes están en el Mercado.».
-
-**Lo dejé donde sí es una operación concretada:**
-
-- **«Mis Operaciones» del transportista, con «Operación #…»,** su carga y su
-  error. Son los viajes que le asignaron, con orden creada.
-- **El panel de administración:** «no … garantiza la operación», sobre la
-  documentación. Habla de la compraventa.
-
-**Y en un sentido que no es éste:** en «Quiénes somos», «empresas que buscan
-optimizar sus operaciones» habla de las operaciones del productor, no de las
-publicaciones. Lo dejé; si preferís otra palabra, es copy de esa página.
-
-Los nombres internos no cambiaron.
-
-### Casos
-
-| caso | qué mira |
-|---|---|
-| 207 | el alta de producto y de servicio sin «Características» ni «Etiquetas»; la ficha con «Marca: John Deere» justo antes de «Modelo», y sin fila si no hay marca; «Editar» con la lista del alta, que cambia a Case y la quita con «Sin declarar»; en Insumos, la marca se suelta y no se ofrece |
-| 208 | en escritorio y celular: Inicio, el Mercado con y sin resultados, la ficha y la ficha que no está dicen «publicaciones», y ninguna dice «operación», ni en el texto, ni en los nombres accesibles, ni en lo escondido para el lector de pantalla |
-
-### Negativos
-
-`python3 scripts/sabotajes_publish_fields_1.py` → «todos dieron el rojo
-esperado» y «src después: como estaba».
-
-| sabotaje | rojo |
-|---|---|
-| `ficha-sin-marca` | 207: «la ficha con marca dice «Marca: undefined» y no «Marca: John Deere»»; nada de «Editar» |
-| `editar-sin-marca` | 207: ««Editar» no ofrece la marca»; nada de la ficha |
-| `conteo-con-operaciones` | 208: «el conteo del Mercado dice «24 de 241 OPERACIONES»», en escritorio y en celular; nada de Inicio ni de la ficha |
-
-### Las guías
-
-- **`docs/USER_MANUAL.md`:** la ficha nombra «Marca» (paso 7); «Editar» la
-  cambia y «Sin declarar» la quita (paso 16). La lista final ya no tiene el
-  defecto de características y etiquetas. El programa comprueba «Marca: John
-  Deere» en las dos fichas y el cambio a Case y a «Sin declarar».
-- **La guía del panel** no nombraba nada de esto y sigue coincidiendo.
-
-### Cómo verificarlo
-
-Con el entorno arriba y la siembra demo:
-
-```bash
-SMOKE_CASOS=207,208 node scripts/smoke.mjs
-# → 2/2 pasaron; 0 fallaron
-
-python3 scripts/sabotajes_publish_fields_1.py
-# → todos dieron el rojo esperado
-
-node scripts/guia-usuario.mjs
-# → LA GUÍA Y EL SITIO COINCIDEN: 22 pasos en escritorio y celular
-```
-
-### Puertas
-
-| puerta | resultado |
-|---|---|
-| suite completa desde base nueva, sobre `78b59a9` | «207/208 pasaron; 1 fallaron»: sólo el 131, de entorno |
-| tipos, lint, build | verdes |
-| `compileall`, `node --check`, parseo de Python | verdes |
-| `alembic check` | `No new upgrade operations detected.` |
-| diff-check con `cr-at-eol` y finales de línea | limpios |
-| a11y `--todas` | 80 de 80, sin violaciones bloqueantes |
-| contraste | 88 de 88 |
-| auditoría móvil | 12 de 12 recorridos, 39 pantallas, sin desbordes ni controles tapados |
-| `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular» |
-| `guia-usuario.mjs` | «22 pasos, 352 textos citados» y «LA GUÍA Y EL SITIO COINCIDEN: 22 pasos en escritorio y celular» |
-
-### Riesgos y visto de paso
-
-- **El nombre de la marca sale de la lista del alta** (`/catalog/form-options`),
-  en el frontend. Si la administración saca una marca de la lista, las
-  publicaciones que ya la tienen la muestran por su valor
-  (`john-deere`). No toqué la API.
-- **«Editar» manda la marca sólo si cambió.** La API rechaza una marca que ya
-  no está en la lista; reenviarla sin tocarla impediría guardar lo demás de
-  esas publicaciones.
-- **La ficha conserva el código de «Especificaciones declaradas»,** que se
-  alimenta de las características. Nunca se muestra, porque la API no las
-  devuelve. No lo saqué: no es del alta. Si querés, entra en una limpieza.
-- **Inicio cambió otra vez con REV1-PENDIENTES-1,** que sacó sus
-  publicaciones. El 208 ya se ajustó ahí (`30a513e`).
+Aceptadas en `4a69064`. Sin cambios.
