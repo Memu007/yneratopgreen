@@ -15,8 +15,9 @@ Actualizado: 2026-09-27.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
   - publicados: #1, #7, #8 y #9; y el 27/09 (`a7e2237`), #2, #3, #4, #6, #11a, #13, #14 y sin «comisión» visible;
-  - **esperan una charla de Emi con la clienta:** #5 (la idea de Inicio), #10 (AgroMarket como módulo), #12 (misión y visión), #11b (retener fondos y comisión, que chocan con reglas del proyecto) y la logística en los filtros;
-  - **#15, el correo:** Emi lo ve el 28/09. La clienta está armando la casilla en DonWeb.
+  - **respuestas de Emi (27/09, en `DECISIONS.md`):** #5 lo habla Emi con la clienta; #10 no se trabaja por ahora; #12 espera el texto de la clienta; #11b, retener fondos no se hace y ya se le explicó. Cómo se explica que AgroBoeda cobra sigue sin decidir; hoy el sitio no lo menciona;
+  - **logística en los filtros:** Emi quiere mejorarla; la pieza está por definir. Emi propone publicaciones de prueba para verla funcionando. Un transportista sólo se crea registrándose, así que en el sitio publicado depende del correo;
+  - **#15, el correo:** Emi propone empezar con una cuenta de Gmail propia mientras la clienta arma la casilla en DonWeb. El código lo admite sin cambios (SMTP con STARTTLS en el 587). Dos trabas de Railway, que valen también para DonWeb: según su documentación, el SMTP saliente sólo está habilitado en el plan Pro (PM no pudo abrir la página: lo vio en el buscador y en el foro de Railway; Emi no confirmó su plan), y el 13/09 `FRONTEND_URL` apuntaba al dominio viejo, así que el enlace no llevaría al sitio. Según ese inventario el sitio usa `outbox`: dice que mandó el correo y no lo manda. Mientras tanto, una cuenta creada desde el panel entra sin confirmar el correo.
 
   El #3 quedó sin asignar entre el 20/09 y el 27/09 por un descuido de PM.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
@@ -241,9 +242,9 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. **Emi verifica la publicación del 27/09** (`a7e2237`) en incógnito, con la lista del resumen. Railway tarda unos 10 minutos.
-2. Dev trabaja `COBRO-CONCURRENTE-1` (el P1 de Mercado Pago), condición para habilitarlo en la Fase 4. Dependen de Emi: la regla del teléfono, el correo (#15, el 28/09), cuentas de prueba de Mercado Pago, backups, y las decisiones #5, #10, #12, #11b y la logística de la clienta. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
+2. Dev trabaja `COBRO-CONCURRENTE-1` (el P1 de Mercado Pago), condición para habilitarlo en la Fase 4. Dependen de Emi: la regla del teléfono, el correo (#15: primero el plan de Railway), cuentas de prueba de Mercado Pago, backups, la charla de Inicio (#5) con la clienta y cómo se cargan las publicaciones de prueba. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
-6. Los atributos por rubro ya tienen datos y decisión (25/09); Inicio (#5) y la identidad de AgroMarket (#10) esperan decisión de producto; Servicios (#7) quedó decidido el 25/09.
+6. Los atributos por rubro ya tienen datos y decisión (25/09); Inicio (#5) espera la charla de Emi con la clienta; AgroMarket como módulo (#10) no se trabaja por ahora (27/09); Servicios (#7) quedó decidido el 25/09. La mejora de logística está por definir; mientras, la Dev sigue con el P1.
 7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada. Mercado Pago no se habilita sin resolver antes el P1.

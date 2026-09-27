@@ -10,6 +10,26 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-27 — Lo que quedaba de la devolución de la clienta
+
+Emi respondió los puntos que esperaban una charla:
+
+- **#5, para qué es Inicio:** lo habla Emi con la clienta. Hasta entonces,
+  Inicio queda como se publicó el 27/09.
+- **#10, AgroMarket como módulo de algo más grande:** no se trabaja por ahora.
+  Es la visión a futuro de la clienta.
+- **#12, misión y visión:** la clienta va a mandar el texto. Hasta entonces no
+  se toca.
+- **#11b, retener la plata hasta la doble conformidad:** no se hace, y ya se le
+  explicó a la clienta. Sigue la regla de que la plataforma no recibe, no
+  retiene y no administra fondos de terceros. Cómo se explica que AgroBoeda
+  cobra queda sin decidir; hoy el sitio no lo menciona.
+- **Logística en los filtros:** Emi quiere mejorarla. La pieza está por
+  definir.
+
+Motivo: cerrar lo que no es trabajo de Dev, para no arrastrarlo como
+pendiente.
+
 ## 2026-09-27 — «Operaciones» pasa a «publicaciones» en lo visible
 
 Devolución #3 de la clienta (20/09), repetida el 27/09: lo que se ofrece son
