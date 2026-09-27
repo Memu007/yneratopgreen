@@ -50,6 +50,20 @@ dos confunden:
    de «Lo que el programa no comprueba» y comprueba lo nuevo.
    `guia-usuario.mjs` tiene que seguir coincidiendo.
 
+5. **Agregado del 27/09 — «operaciones» pasa a «publicaciones» en todo
+   lo visible.** Es la devolución #3 de la clienta (20/09), que quedó sin
+   asignar: se me pasó a mí. Ella lo repitió hoy: «son publicaciones, no son
+   operaciones; la operación está hecha cuando se concreta».
+   - Cambia sólo el texto que se ve y se lee en voz alta (`aria-label`,
+     `sr-only`): el Mercado («N publicaciones», «No hay publicaciones con estos
+     filtros.», la paginación), Inicio, la ficha y cualquier otro lugar.
+   - «Operación» sigue donde de verdad es una operación concretada, como las
+     órdenes. En esos casos, decí en el informe cuáles dejaste y por qué.
+   - Los nombres internos (variables, casos, `operation_kind`) no se tocan.
+   - Actualizá los casos, las auditorías y las dos guías que lean el texto
+     viejo.
+   - Negativo: devolver «operaciones» al contador del Mercado da rojo.
+
 ### Fuera de alcance
 
 - Guardar características o etiquetas (sería otro hito, con API y base).

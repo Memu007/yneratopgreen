@@ -10,6 +10,14 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-27 — «Operaciones» pasa a «publicaciones» en lo visible
+
+Devolución #3 de la clienta (20/09), repetida el 27/09: lo que se ofrece son
+publicaciones, y la operación es lo que se concreta. Cambia el texto visible y
+el que se lee en voz alta, no los nombres internos. «Operación» queda sólo
+donde es una operación concretada. El punto quedó sin asignar entre el 20/09 y
+el 27/09 por un descuido de PM.
+
 ## 2026-09-26 — El orden del panel de filtros lo deciden PM y Dev
 
 Emi, en el sitio publicado, sintió el panel de filtros desordenado. Delegó la
