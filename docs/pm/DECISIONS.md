@@ -10,6 +10,37 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-27 — Publicaciones de prueba en el sitio publicado, cargadas a mano
+
+Emi eligió cargarlas a mano desde el sitio, sin fotos, con cuentas creadas
+desde el panel. Cada una dice «(prueba)» en el título y «No está a la venta»
+en la descripción, y se pausan al terminar. No se agrega código ni programa, y
+nada se carga por Railway: la siembra sigue sin correr en producción. La lista
+está en `PUBLICACIONES-DE-PRUEBA-2026-09-27.md`.
+
+Motivo: el sitio publicado sólo tiene lo que alguien cargó a mano. Sin
+publicaciones no se ven los filtros ni se puede probar la logística.
+
+## 2026-09-27 — Lo que quedaba de la devolución de la clienta
+
+Emi respondió los puntos que esperaban una charla:
+
+- **#5, para qué es Inicio:** lo habla Emi con la clienta. Hasta entonces,
+  Inicio queda como se publicó el 27/09.
+- **#10, AgroMarket como módulo de algo más grande:** no se trabaja por ahora.
+  Es la visión a futuro de la clienta.
+- **#12, misión y visión:** la clienta va a mandar el texto. Hasta entonces no
+  se toca.
+- **#11b, retener la plata hasta la doble conformidad:** no se hace, y ya se le
+  explicó a la clienta. Sigue la regla de que la plataforma no recibe, no
+  retiene y no administra fondos de terceros. Cómo se explica que AgroBoeda
+  cobra queda sin decidir; hoy el sitio no lo menciona.
+- **Logística en los filtros:** Emi quiere mejorarla. La pieza está por
+  definir.
+
+Motivo: cerrar lo que no es trabajo de Dev, para no arrastrarlo como
+pendiente.
+
 ## 2026-09-27 — «Operaciones» pasa a «publicaciones» en lo visible
 
 Devolución #3 de la clienta (20/09), repetida el 27/09: lo que se ofrece son
