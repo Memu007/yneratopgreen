@@ -53,6 +53,13 @@ despliegues.
 
 ## Tarea activa — PUBLICACIONES-PRUEBA-1
 
+**Sobre tu freno (28/09): bien frenado, las dos veces.** No rodeaste la red,
+y no tocaste la base ni Railway para conseguir una cuenta. Tenés razón en que
+producción no tiene cuenta de administración. Lo resuelve Emi en Railway: se
+registra en el sitio y se da el rol de administración con una consulta. Vos
+no lo hacés. Cuando te pase la contraseña de «AgroBoeda Prueba», seguí desde
+el paso 3. Mientras tanto, esperá.
+
 **Decisión de Emi (28/09):** cargás vos las publicaciones de prueba en el
 sitio publicado, antes de la pieza del pago a una orden cerrada.
 
