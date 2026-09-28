@@ -120,6 +120,11 @@ export function levantarDoble(puerto = 8099) {
   let pausaDeCierre = null;
   let resolverElCierre = null;
   let preferenciaQueSePausa = null;
+  // Cuál de los cierres de esa preferencia se retiene: 1 es el próximo, 2 el
+  // siguiente. Sirve para dejar pasar un primer intento que falla y retener
+  // el reintento.
+  let cierreQueSePausa = 1;
+  let cierresDesdeLaPausa = 0;
 
   // El cuerpo con el que se contesta una preferencia creada.
   const cuerpoDeLaPreferencia = (id, referencia) => ({
@@ -269,9 +274,12 @@ export function levantarDoble(puerto = 8099) {
           responderJson(respuesta, 200, { id, ...(cuerpo || {}) });
         };
         if (pausaDeCierre && (!preferenciaQueSePausa || id === preferenciaQueSePausa)) {
-          pausaDeCierre.then(responderCierre);
-          pausaDeCierre = null;
-          return;
+          cierresDesdeLaPausa += 1;
+          if (cierresDesdeLaPausa === cierreQueSePausa) {
+            pausaDeCierre.then(responderCierre);
+            pausaDeCierre = null;
+            return;
+          }
         }
         responderCierre();
       });
@@ -471,8 +479,10 @@ export function levantarDoble(puerto = 8099) {
         soltarLaPreferencia() { if (resolverLaPreferencia) resolverLaPreferencia(); },
         // Retiene el próximo cierre de un link —el de `preferencia`, si se
         // dice— hasta que lo suelten.
-        pausarElCierre({ preferencia = null } = {}) {
+        pausarElCierre({ preferencia = null, desde = 1 } = {}) {
           preferenciaQueSePausa = preferencia;
+          cierreQueSePausa = desde;
+          cierresDesdeLaPausa = 0;
           pausaDeCierre = new Promise((r) => { resolverElCierre = r; });
         },
         soltarElCierre() { if (resolverElCierre) resolverElCierre(); },

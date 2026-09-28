@@ -36173,7 +36173,19 @@ const AVISO_PROMESAS = [
 // Formas del «tú» que el sitio no usa. Con acento son las del «vos»
 // («confirmá», «enviá»): el límite de palabra no las toma.
 const AVISO_TUTEO = /\b(tienes|puedes|quieres|debes|procede|confirma|env[ií]a|explora|comienza|revisa|contacta|recuerda|ingresa|completa|agrega)\b/i;
-function revisarAviso(problemas, texto, donde) {
+// Lo único que un aviso puede decir de una devolución: que la hace quien vende,
+// desde Mercado Pago. Lo pide PAGO-ORDEN-CERRADA-1 para el pago que llega a una
+// orden cerrada y para el pago de más, que están en la cuenta de quien vende.
+// Cualquier otra forma —«será reembolsado», «te devolvemos»— sigue siendo una
+// promesa que AgroBoeda no puede cumplir, y da rojo.
+const DEVOLUCION_DE_QUIEN_VENDE = [
+  /devolvé el pago desde Mercado Pago/g,
+  /Devolvé el pago de más desde Mercado Pago/g,
+  /si te entrega la compra o te devuelve el pago/g,
+  /para que te devuelva lo que pagaste de más/g,
+];
+function revisarAviso(problemas, textoCompleto, donde) {
+  const texto = DEVOLUCION_DE_QUIEN_VENDE.reduce((resto, frase) => resto.replace(frase, '…'), textoCompleto);
   for (const [patron, que] of AVISO_PROMESAS) {
     const visto = texto.match(new RegExp(`[^\\n]{0,50}${patron.source}[^\\n]{0,30}`, patron.flags));
     if (visto) problemas.push(`${donde} ${que}: «${visto[0].trim()}»`);
@@ -37563,6 +37575,342 @@ await runCase(219, 'Ningún camino de la API espera una fila frenando el proceso
     + `${cuantos('síncrona')} son endpoints síncronos que FastAPI corre en un hilo, y ${cuantos('permitida')} `
     + `tienen su porqué escrito (${filas.filter((f) => f.veredicto.startsWith('permitida'))
       .map((f) => `${f.sitio} ${f.funcion}`).join(', ')})`;
+});
+
+// ---------------------------------------------------------------------------
+// PAGO-ORDEN-CERRADA-1 — los pagos que alguien tiene que revisar se dicen, y
+// se dicen bien.
+//
+// Dos motivos dejan un pago en revisión, y hasta acá los dos se decían igual:
+// «más de un pago». Uno es verdad: dos cobros para una orden (el 98). El otro
+// no: un pago que llega cuando la orden ya estaba cerrada y la mercadería había
+// vuelto al catálogo. Ese además pasaba callado: sólo quedaba en el registro
+// del servidor.
+//
+// Los casos usan cuentas nuevas, las dos: los avisos de un pago a revisar
+// nombran una devolución que hace quien vende, y no tienen que aparecer en la
+// pestaña de otras cuentas que otros casos leen enteras.
+// ---------------------------------------------------------------------------
+
+const TEXTOS_DE_REVISION = {
+  cerrada: {
+    compra: (n) => `Pago en un pedido cerrado | Mercado Pago acreditó un pago de tu pedido #${n} cuando ya estaba `
+      + 'cerrado. La plata está en la cuenta de Mercado Pago del vendedor. Coordiná con el vendedor si te entrega '
+      + 'la compra o te devuelve el pago.',
+    vende: (n) => `Pago en un pedido cerrado | Mercado Pago acreditó un pago del pedido #${n} cuando ya estaba `
+      + 'cerrado, y la plata está en tu cuenta de Mercado Pago. La mercadería había vuelto a tu catálogo y no se '
+      + 'descontó. Si todavía la tenés, podés entregarla; si no, devolvé el pago desde Mercado Pago.',
+  },
+  duplicado: {
+    compra: (n) => `Más de un pago en tu pedido | Mercado Pago acreditó más de un pago de tu pedido #${n}. La `
+      + 'plata está en la cuenta de Mercado Pago del vendedor. Coordiná con el vendedor para que te devuelva lo que '
+      + 'pagaste de más.',
+    vende: (n) => `Más de un pago en un pedido | Mercado Pago acreditó más de un pago del pedido #${n}, y la plata `
+      + 'está en tu cuenta de Mercado Pago. Devolvé el pago de más desde Mercado Pago.',
+  },
+};
+const PANTALLA_ORDEN_CERRADA = 'Mercado Pago acreditó un pago cuando esta orden ya estaba cerrada. La mercadería '
+  + 'había vuelto al catálogo y no se descontó. La plata está en la cuenta de Mercado Pago del vendedor: comprador '
+  + 'y vendedor tienen que acordar si se entrega la compra o si el vendedor devuelve el pago desde Mercado Pago.';
+const PANTALLA_MAS_DE_UN_PAGO = 'Mercado Pago registró más de un pago aprobado para esta orden.';
+const VUELTA_ORDEN_CERRADA = 'Tu pago llegó con la orden ya cerrada';
+
+// Una vendedora y una compradora nuevas, con Mercado Pago vinculado y una
+// publicación con stock. La compradora queda puesta en `state`, que es de
+// donde compran `ordenMercadoPago` y los demás ayudantes; el caso siguiente
+// que la necesite llama a `comprador()` y vuelve la de siempre.
+//
+// La cuenta de Mercado Pago también es nueva en cada corrida: una cuenta se
+// vincula a una sola persona, y la de la corrida anterior sigue vinculada a su
+// vendedora si la corrida se cortó antes de limpiar.
+async function cuentasParaCobrar(etiqueta, stock = 10) {
+  const sello = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const cuenta = String(81_000_000 + (Number(sello) % 9_000_000));
+  const vende = { email: `${etiqueta}.vende.${sello}@example.com`, password: 'cobrovende123', full_name: `Vende ${etiqueta} ${sello}` };
+  const compra = { email: `${etiqueta}.compra.${sello}@example.com`, password: 'cobrocompra123', full_name: `Compra ${etiqueta} ${sello}` };
+  await registrarYVerificar({ ...vende, role: 'user' });
+  await registrarYVerificar({ ...compra, role: 'user' });
+  const vendedor = await ingresarVendedor(vende.email, vende.password);
+  assert((await vincular(vendedor.token, `ok:${cuenta}`)).ok === 'vinculado', 'la vendedora nueva no vinculó');
+  const { data: publicacion } = await apiRequest('/products', {
+    method: 'POST', token: vendedor.token,
+    body: {
+      name: `Semilla ${etiqueta} ${sello}`, description: `Publicación del caso ${etiqueta}, para cobrar por Mercado Pago.`,
+      category_id: queryRows("SELECT id, 'fin' FROM categories WHERE slug = 'insumos-agricolas'")[0][0],
+      price: 2100, stock, unit: 'kg', locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+      publication_type: 'producto', operation_kind: 'insumo',
+    },
+  });
+  const { data } = await apiRequest('/auth/login', { method: 'POST', body: { email: compra.email, password: compra.password } });
+  state.buyerToken = data.access_token;
+  state.buyerRefreshToken = data.refresh_token;
+  state.buyerId = data.user.id;
+  state.buyerCredentials = { email: compra.email, password: compra.password };
+  return { vendedor, vende, compra, cuenta, producto: publicacion.id };
+}
+
+// Los avisos de una orden, por parte, como «título | mensaje».
+async function avisosDeLaOrden(orden, vendedor) {
+  const clave = (n) => `${n.title} | ${n.message}`;
+  const de = async (token) => (await apiRequest('/notifications', { token })).data.notifications
+    .filter((n) => n.order_id === orden.order_id);
+  return { compra: (await de(state.buyerToken)).map(clave), vende: (await de(vendedor.token)).map(clave) };
+}
+
+// Lo que dice, en la tarjeta de Mis Compras o Mis Ventas, el pago de una orden.
+async function textoDelPagoEnElPanel(page, pestana, titulo) {
+  await abrirPestanaDeCuenta(page, pestana, pestana);
+  const tarjeta = page.locator('main [class*="_orderCard_"]')
+    .filter({ has: page.getByRole('heading', { name: titulo, exact: true }) });
+  const estado = tarjeta.locator('[class*="_estadoDePago_"]');
+  await estado.first().waitFor({ state: 'visible', timeout: 20_000 });
+  return (await estado.first().innerText()).trim();
+}
+
+// 220. El pago que llega con la orden ya cerrada, en las tres formas de cerrar.
+await runCase(220, 'Un pago a una orden ya cerrada se avisa una vez y la pantalla dice lo que pasó', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const browser = await chromium.launch({ headless: true });
+  let cuentas = null;
+  try {
+    cuentas = await cuentasParaCobrar('ordencerrada');
+    const { vendedor, producto, cuenta: CUENTA } = cuentas;
+    const problemas = [];
+    const hechas = [];
+    const cerrar = {
+      'cancelada por quien compra': async (orden) => {
+        const r = await pedirCrudo(`/orders/${orden.order_id}/cancel`, { method: 'POST', header: state.buyerToken, body: {} });
+        assert(r.status === 200, `cancelar respondió ${r.status}`);
+      },
+      'rechazada por quien vende': async (orden) => {
+        const r = await pedirCrudo(`/orders/${orden.order_id}/cancel`, { method: 'POST', header: vendedor.token, body: {} });
+        assert(r.status === 200, `rechazar respondió ${r.status}`);
+      },
+      'vencida por el reconciliador': async (orden) => {
+        vencerElLink(orden.order_id);
+        await reconciliar();
+      },
+    };
+    const ordenes = [];
+    for (const [escena, cerrarla] of Object.entries(cerrar)) {
+      const orden = await ordenMercadoPago(vendedor, { producto });
+      await cerrarla(orden);
+      const cerrada = ordenEnLaBase(orden.order_id).estado;
+      assert(['cancelled', 'rejected'].includes(cerrada) && reservaDe(orden.order_id) === 'liberada',
+        `${escena}: la orden no quedó cerrada con la reserva liberada (${cerrada}, ${reservaDe(orden.order_id)})`);
+      const stockCerrada = stockDe(producto);
+      const reservadoCerrada = reservadoDe(producto);
+
+      // El pago que venía en vuelo se acredita ahora. Y llega repetido: dos
+      // avisos y dos vueltas de quien compra.
+      const pago = pagarEnElDoble(doble, orden, CUENTA);
+      const respuestas = [
+        await avisar({ dataId: pago.id, cuenta: CUENTA }),
+        await volverDeMercadoPago(orden),
+        await avisar({ dataId: pago.id, cuenta: CUENTA }),
+        await volverDeMercadoPago(orden),
+      ];
+      const [primero, vuelta] = respuestas;
+      if (primero.status !== 200 || primero.resultado !== 'aplicado') {
+        problemas.push(`${escena}: el aviso respondió ${primero.status} ${primero.resultado}`);
+      }
+      if (vuelta.datos?.payment_state !== 'pago_tras_cierre') {
+        problemas.push(`${escena}: la vuelta dijo «${vuelta.datos?.payment_state}»`);
+      }
+
+      // La orden queda como hoy: pagada, en revisión y sin volver a tomar stock.
+      const estado = ordenEnLaBase(orden.order_id).estado;
+      if (estado !== 'paid') problemas.push(`${escena}: la orden quedó «${estado}»`);
+      if (reservaDe(orden.order_id) !== 'liberada') problemas.push(`${escena}: la reserva quedó «${reservaDe(orden.order_id)}»`);
+      if (pagosDe(orden.order_id)[0][4] !== 'EN_REVISION') problemas.push(`${escena}: la intención quedó ${pagosDe(orden.order_id)[0][4]}`);
+      if (stockDe(producto) !== stockCerrada || reservadoDe(producto) !== reservadoCerrada) {
+        problemas.push(`${escena}: el stock se volvió a tomar (${stockCerrada}/${reservadoCerrada} → `
+          + `${stockDe(producto)}/${reservadoDe(producto)})`);
+      }
+      for (const [token, rol] of [[state.buyerToken, 'buyer'], [vendedor.token, 'seller']]) {
+        const vista = await comoLoVe(token, rol, orden.order_number);
+        if (vista.payment_state !== 'pago_tras_cierre') {
+          problemas.push(`${escena}: ${rol === 'buyer' ? 'quien compra' : 'quien vende'} ve «${vista.payment_state}»`);
+        }
+      }
+
+      // Un aviso a cada parte, una sola vez, y ningún «Pago aprobado».
+      const avisos = await avisosDeLaOrden(orden, vendedor);
+      for (const quien of ['compra', 'vende']) {
+        const esperado = TEXTOS_DE_REVISION.cerrada[quien](orden.order_number);
+        const cuantos = avisos[quien].filter((a) => a === esperado).length;
+        if (cuantos !== 1) problemas.push(`${escena}, quien ${quien}: tiene ${cuantos} veces el aviso del pago en un pedido cerrado`);
+        const otros = avisos[quien].filter((a) => /^(Pago aprobado|Venta pagada|Más de un pago|Pago en un pedido cerrado) \|/.test(a) && a !== esperado);
+        if (otros.length) problemas.push(`${escena}, quien ${quien}: además tiene ${JSON.stringify(otros)}`);
+        for (const a of avisos[quien]) revisarAviso(problemas, a, `${escena}, quien ${quien}:`);
+      }
+      ordenes.push([escena, orden]);
+      hechas.push(escena);
+    }
+
+    // --- Donde lo leen las dos partes: el panel, la pestaña y la vuelta ---------
+    const [, orden] = ordenes[0];
+    for (const [ancho, viewport] of [['escritorio', { width: 1440, height: 900 }], ['celular', { width: 390, height: 844 }]]) {
+      for (const [quien, datos, pestana, titulo] of [
+        ['compra', state.buyerCredentials, 'Mis Compras', `Pedido #${orden.order_number}`],
+        ['vende', { email: cuentas.vende.email, password: cuentas.vende.password }, 'Mis Ventas', `Venta #${orden.order_number}`],
+      ]) {
+        const contexto = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+        await entrarConSesion(contexto, datos);
+        const page = await contexto.newPage();
+        const texto = await textoDelPagoEnElPanel(page, pestana, titulo)
+          .catch((e) => `(no se vio: ${e.message.split('\n')[0]})`);
+        if (texto !== PANTALLA_ORDEN_CERRADA) problemas.push(`${ancho}, ${pestana}: dice «${texto}»`);
+        if (texto.includes(PANTALLA_MAS_DE_UN_PAGO)) problemas.push(`${ancho}, ${pestana}: dice «más de un pago»`);
+        await abrirPestanaDeCuenta(page, 'Notificaciones', /Notificaciones/);
+        await avisosALaVista(page, [TEXTOS_DE_REVISION.cerrada[quien](orden.order_number).split(' | ')[1]],
+          `${ancho}: quien ${quien}`, problemas);
+        await contexto.close();
+      }
+    }
+    const contexto = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await entrarConSesion(contexto, state.buyerCredentials);
+    const page = await contexto.newPage();
+    await page.goto(`${FRONTEND_URL}/payment/success?orden=${orden.order_number}`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: VUELTA_ORDEN_CERRADA }).waitFor({ timeout: 30_000 })
+      .catch(async () => problemas.push(`la vuelta de Mercado Pago no dice «${VUELTA_ORDEN_CERRADA}»: `
+        + `«${(await page.locator('h1').first().innerText().catch(() => '')).trim()}»`));
+    if (/más de un pago/i.test(await page.locator('main, body').first().innerText())) {
+      problemas.push('la vuelta de Mercado Pago dice «más de un pago»');
+    }
+    await contexto.close();
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return `las tres órdenes cerradas —${hechas.join(', ')}— quedaron pagadas, en revisión y sin volver a tomar stock `
+      + 'después de dos avisos y dos vueltas; cada parte tiene un solo aviso de pago en un pedido cerrado y ningún '
+      + '«Pago aprobado»; el panel de las dos partes, en escritorio y celular, y la vuelta de Mercado Pago dicen el '
+      + 'texto nuevo y no el de «más de un pago»';
+  } finally {
+    await browser.close();
+    await doble.cerrar();
+    if (cuentas) await desvincular(cuentas.vendedor.token).catch(() => {});
+    await comprador().catch(() => {});
+  }
+});
+
+// 221. Dos cobros para una orden: la pantalla sigue diciendo «más de un pago», y
+// ahora las dos partes se enteran, una vez.
+await runCase(221, 'Dos cobros para una orden se avisan una vez a cada parte', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let cuentas = null;
+  try {
+    cuentas = await cuentasParaCobrar('doscobros');
+    const { vendedor, producto, cuenta: CUENTA } = cuentas;
+    const problemas = [];
+    const orden = await ordenMercadoPago(vendedor, { producto });
+    const uno = pagarEnElDoble(doble, orden, CUENTA);
+    await avisar({ dataId: uno.id, cuenta: CUENTA });
+    const stockCobrado = stockDe(producto);
+    const dos = pagarEnElDoble(doble, orden, CUENTA);
+    await avisar({ dataId: dos.id, cuenta: CUENTA });
+    await volverDeMercadoPago(orden);
+    await avisar({ dataId: dos.id, cuenta: CUENTA });
+    await volverDeMercadoPago(orden);
+
+    for (const [token, rol] of [[state.buyerToken, 'buyer'], [vendedor.token, 'seller']]) {
+      const vista = await comoLoVe(token, rol, orden.order_number);
+      if (vista.payment_state !== 'en_revision') problemas.push(`${rol} ve «${vista.payment_state}»`);
+    }
+    if (stockDe(producto) !== stockCobrado) problemas.push(`el stock se descontó otra vez: ${stockCobrado} → ${stockDe(producto)}`);
+    const avisos = await avisosDeLaOrden(orden, vendedor);
+    for (const quien of ['compra', 'vende']) {
+      const esperado = TEXTOS_DE_REVISION.duplicado[quien](orden.order_number);
+      const cuantos = avisos[quien].filter((a) => a === esperado).length;
+      if (cuantos !== 1) problemas.push(`quien ${quien}: tiene ${cuantos} veces el aviso de más de un pago`);
+      const aprobados = avisos[quien].filter((a) => /^(Pago aprobado|Venta pagada) \|/.test(a)).length;
+      if (aprobados !== 1) problemas.push(`quien ${quien}: tiene ${aprobados} avisos del primer pago, y era uno`);
+      if (avisos[quien].some((a) => a.startsWith('Pago en un pedido cerrado |'))) {
+        problemas.push(`quien ${quien}: tiene el aviso de la orden cerrada, y la orden no se cerró`);
+      }
+      for (const a of avisos[quien]) revisarAviso(problemas, a, `quien ${quien}:`);
+    }
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'con dos cobros, las dos partes ven «en revisión» y tienen un aviso de más de un pago cada una, además del '
+      + 'del primer pago, después de dos avisos y dos vueltas del segundo; el stock no se volvió a descontar';
+  } finally {
+    await doble.cerrar();
+    if (cuentas) await desvincular(cuentas.vendedor.token).catch(() => {});
+    await comprador().catch(() => {});
+  }
+});
+
+// 222. El reconciliador no espera a Mercado Pago con la fila de una publicación
+// tomada. Encuentra una orden cobrada sin aviso; apagar el link falla, y el
+// reintento —si lo hubiera— tarda. Mientras tanto se confirma otra compra de
+// la misma publicación.
+await runCase(222, 'El reconciliador no reintenta apagar el link con la publicación tomada', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let barrido = null;
+  let cuentas = null;
+  try {
+    return await sinDejarLaApiColgada(async () => {
+      cuentas = await cuentasParaCobrar('reconciliador');
+      const { vendedor, producto, cuenta: CUENTA } = cuentas;
+      const cobrada = await ordenMercadoPago(vendedor, { producto });
+      const otra = await ordenMercadoPago(vendedor, { producto });
+      const stockAntes = stockDe(producto);
+      pagarEnElDoble(doble, cobrada, CUENTA);
+      const pagoOtra = pagarEnElDoble(doble, otra, CUENTA);
+      vencerElLink(cobrada.order_id);
+
+      // Apagar el link de la cobrada falla una vez. Si hubiera un segundo
+      // intento en el mismo barrido, se retiene: es Mercado Pago tardando.
+      doble.fallarElCierre(1);
+      doble.pausarElCierre({ preferencia: cobrada.preferencia, desde: 2 });
+      let termino = false;
+      barrido = reconciliar().then((r) => { termino = true; return r; });
+      await esperarA(() => termino || doble.cierres(cobrada.preferencia) >= 2,
+        'que el reconciliador terminara o llegara a reintentar el cierre', 60_000);
+      const reintentos = doble.cierres(cobrada.preferencia);
+
+      // Otra compra de la misma publicación se confirma en ese momento.
+      const salud = vigilarLaSalud();
+      const aviso = await conTope(avisar({ dataId: pagoOtra.id, cuenta: CUENTA }), 10_000);
+      await salud.otras(3);
+      const medida = await salud.terminar();
+      doble.soltarElCierre();
+      const primero = await conTope(barrido, 60_000);
+
+      const problemas = [];
+      if (reintentos > 1) problemas.push(`el reconciliador intentó apagar el link ${reintentos} veces en el mismo barrido`);
+      if (medida.lentas) {
+        problemas.push(`con el reconciliador en la cobrada, la API dejó de responder (${medida.lentas} de `
+          + `${medida.consultas} consultas de salud tardaron 2 s o más)`);
+      }
+      if (!aviso || aviso.status !== 200 || aviso.resultado !== 'aplicado') {
+        problemas.push(`la otra compra de la publicación no se confirmó: ${aviso ? `${aviso.status} ${aviso.resultado}` : 'no terminó en 10 s'}`);
+      }
+      assert(problemas.length === 0 && primero, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+
+      if (ordenEnLaBase(cobrada.order_id).estado !== 'paid') problemas.push('la cobrada no quedó pagada');
+      if (ordenEnLaBase(otra.order_id).estado !== 'paid') problemas.push('la otra compra no quedó pagada');
+      if (stockDe(producto) !== stockAntes - 2) problemas.push(`el stock pasó de ${stockAntes} a ${stockDe(producto)}: tenía que bajar dos`);
+      if (linkCerrado(cobrada.order_id) || doble.vencida(cobrada.preferencia)) {
+        problemas.push('el link quedó apagado en el barrido en el que falló: el caso no probó el reintento');
+      }
+
+      // El barrido siguiente lo apaga.
+      const segundo = await reconciliar();
+      if (!linkCerrado(cobrada.order_id) || !doble.vencida(cobrada.preferencia)) {
+        problemas.push(`el barrido siguiente no apagó el link (${JSON.stringify(segundo)})`);
+      }
+      assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+      return `el reconciliador intentó apagar el link una vez y lo dejó para el barrido siguiente; mientras tanto la otra `
+        + `compra de la publicación se confirmó y la salud contestó ${medida.consultas} veces (la peor en ${medida.peor} ms); `
+        + `el barrido siguiente apagó el link (${JSON.stringify(primero)} → ${JSON.stringify(segundo)})`;
+    });
+  } finally {
+    doble.soltarElCierre();
+    if (barrido) await conTope(barrido.catch(() => null), 60_000);
+    await doble.cerrar();
+    if (cuentas) await desvincular(cuentas.vendedor.token).catch(() => {});
+    await comprador().catch(() => {});
+  }
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
