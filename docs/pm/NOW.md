@@ -8,9 +8,9 @@ Actualizado: 2026-09-27.
 
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `58bb62b`, publicado el 28/09 con autorización de Emi («publicá y A»), por fast-forward desde `a7e2237`. Suma `COBRO-CONCURRENTE-1` y documentos de PM. Sin migraciones. La verificación previa fue sobre el mismo código (`599dded`, que difiere sólo en `docs/pm`): suite 218/219 (131 de entorno), puertas y las dos guías verdes, sin secretos ni archivos prohibidos. La red de PM no llega a `railway.app`. **No cambia nada visible: Emi comprueba en incógnito que el sitio sigue andando** (Inicio, el Mercado, una ficha e ingresar). Siguen pendientes de verificar la publicación del 27/09 (`a7e2237`, la lista de la devolución de la clienta) y la del 26/09 (`c92c0d7`: modelo, año y origen).
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`a7e2237`) tiene todo lo aceptado salvo `COBRO-CONCURRENTE-1`, publicada en `58bb62b` el 28/09. `PUBLICACIONES-PRUEBA-1` está asignada.
-- **Última decisión PM:** `COBRO-CONCURRENTE-1` **ACEPTADA EN RAMA** (`599dded`, producto en `5893d19`; el informe `94e333d` difiere sólo en `docs/pm`). Resuelve el P1: ningún camino de la API espera una fila tomada frenando el proceso, y al tope de 10 s cada uno contesta algo que se puede reintentar. Casos 213 a 219 en 7/7; 17 negativos en rojo, dos de PM; suite 218/219 (131 de entorno); puertas y guías verdes. **Publicada en `58bb62b` el 28/09.** Queda un P2 en el reconciliador para la pieza del pago a una orden cerrada. Evidencia en `REPRODUCCION-COBRO-CONCURRENTE-1-2026-09-28.md`.
-- **Tarea activa:** `PUBLICACIONES-PRUEBA-1`, **destrabada el 28/09**. La Dev corre desde la terminal de la Mac de Emi, porque desde su entorno en la nube el proxy contesta 403 a `railway.app`. Producción no tenía ninguna cuenta de administración. Emi creó su cuenta de administración y la de prueba, `prueba@example.com`, ya confirmada, con un programa en la consola del Backend de Railway que PM probó antes en local. Las dos contraseñas quedaron escritas en el chat de PM. **Cambiarlas queda pendiente por decisión de Emi (28/09, «dejala por ahora»):** la suya con otro programa en la consola, y la de prueba desde el panel. Se la pasa Emi a la Dev por su chat, porque PM no llega a esa sesión y el único canal de PM es el repositorio. Nada de eso va al repositorio. La Dev sigue desde el paso 3. Después va el pago a una orden cerrada.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`58bb62b`) tiene todo lo aceptado. Sin tarea activa.
+- **Última decisión PM:** `PUBLICACIONES-PRUEBA-1` **ACEPTADA** (28/09, informe `c635acb`). Las 16 publicaciones de prueba están cargadas en el sitio publicado con la cuenta `prueba@example.com`. Los filtros y la ficha de la 1 coinciden con lo esperado **por la API pública**; la pantalla no se miró. La Dev trabajó desde la terminal de la Mac de Emi, sin base, Railway ni cuenta de administración, y el programa no está en el repositorio. PM comprobó que ninguna contraseña está en la historia del repositorio. PM no puede reproducirlo, porque su red no llega a `railway.app`: **la pantalla la mira Emi.** Las 16 quedan publicadas hasta que Emi pida pausarlas. Antes: `COBRO-CONCURRENTE-1`, aceptada y publicada en `58bb62b`.
+- **Tarea activa:** ninguna. La próxima, el pago que llega a una orden cerrada con el P2 del reconciliador (condición para habilitar Mercado Pago), espera que Emi la confirme.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
@@ -157,6 +157,11 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   mismo barrido, el reconciliador reintenta apagar el link con la fila de la
   publicación tomada, y una compra de esa publicación puede frenar la API
   hasta 15 s. Va con la pieza del pago a una orden cerrada.
+- **Seguridad — contraseñas escritas en chats (28/09):** la de administración
+  de Emi y la de `prueba@example.com` quedaron en el chat de PM y en el de la
+  Dev. Cambiarlas queda pendiente por decisión de Emi: la suya con el programa
+  de la consola que PM probó en local, y la de prueba desde el panel con
+  «Restablecer contraseña».
 - **P3 — contraseñas (PM, 28/09):**
   - ingresar con una contraseña de más de 72 bytes da un error 500 en vez de
     «contraseña incorrecta», porque bcrypt no acepta más;
@@ -171,6 +176,17 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   usa lectura y escritura en Python. Dev no reprodujo pérdida en 6 rondas porque
   esos endpoints hoy se ejecutan sin intercalarse; queda como riesgo de diseño,
   no como bug confirmado ni tarea abierta.
+
+## Producción — cuentas (28/09)
+
+- La primera cuenta de administración la creó Emi el 28/09, con un programa en
+  la consola del Backend que PM probó antes en local. En la misma pasada creó
+  la cuenta de prueba `prueba@example.com`, rol usuario y ya confirmada.
+- Con la cuenta de administración, Emi puede crear cuentas desde el panel, y
+  esas cuentas entran sin confirmar el correo. Así la clienta puede hacer su
+  segunda revisión sin esperar al #15.
+- La Dev vio producción respondiendo `revision 58bb62b` el 28/09: el
+  despliegue de `COBRO-CONCURRENTE-1` llegó.
 
 ## Railway — inventario actualizado 2026-09-13 y deuda viva
 
@@ -241,8 +257,8 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. **Emi verifica en incógnito** la publicación del 28/09 (`58bb62b`: que el sitio siga andando), la del 27/09 (`a7e2237`, con la lista del resumen) y la del 26/09 (`c92c0d7`: modelo, año y origen). Railway tarda unos 10 minutos.
-2. Dev trabaja `PUBLICACIONES-PRUEBA-1`; después, el pago a una orden cerrada con el P2 del reconciliador, condición para habilitar Mercado Pago en la Fase 4. Emi crea la cuenta «AgroBoeda Prueba» desde el panel y le pasa la contraseña a la Dev por su chat. Dependen de Emi: la regla del teléfono, el correo (#15), cuentas de prueba de Mercado Pago, backups y la charla de Inicio (#5) con la clienta. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
+1. **Emi verifica en incógnito** la ficha de la 1 (`https://yneratopgreen-production.up.railway.app/?section=product&id=5553bdcd-3804-4dd7-937a-97f7c9876ab0`): marca John Deere, modelo 5090E, año 2018, 90 HP, usado y origen «Dueño directo». En el Mercado, con «prueba» en el buscador, aparecen las 16, y con «Servicios», 5. Eso verifica también lo publicado el 26 y el 27/09 (modelo, año, origen y marca en la ficha). Queda la lista de la devolución de la clienta del 27/09.
+2. Dev sin tarea. La próxima es el pago a una orden cerrada con el P2 del reconciliador, cuando Emi la confirme. Dependen de Emi: cambiar las dos contraseñas, crearle la cuenta a la clienta desde el panel, la regla del teléfono, el correo (#15), cuentas de prueba de Mercado Pago, backups y la charla de Inicio (#5) con la clienta. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
