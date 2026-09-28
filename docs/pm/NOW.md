@@ -16,7 +16,7 @@ Actualizado: 2026-09-27.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
   - publicados: #1, #7, #8 y #9; y el 27/09 (`a7e2237`), #2, #3, #4, #6, #11a, #13, #14 y sin «comisión» visible;
   - **respuestas de Emi (27/09, en `DECISIONS.md`):** #5 lo habla Emi con la clienta; #10 no se trabaja por ahora; #12 espera el texto de la clienta; #11b, retener fondos no se hace y ya se le explicó. Cómo se explica que AgroBoeda cobra sigue sin decidir; hoy el sitio no lo menciona;
-  - **logística en los filtros:** Emi quiere mejorarla; la pieza está por definir. Emi propone publicaciones de prueba para verla funcionando. Un transportista sólo se crea registrándose, así que en el sitio publicado depende del correo;
+  - **logística en los filtros:** Emi quiere mejorarla; la pieza está por definir. **Publicaciones de prueba (opción 1, Emi, 27/09):** se cargan a mano en el sitio publicado, sin fotos, con cuentas creadas desde el panel. La lista y lo que tiene que mostrar cada filtro están en `PUBLICACIONES-DE-PRUEBA-2026-09-27.md`. La parte del transportista espera el correo, porque un transportista sólo se crea registrándose. Hoy la logística vive en dos lugares que no se conectan: la publicación de logística y la cuenta de transportista que se elige al comprar;
   - **#15, el correo:** Emi propone empezar con una cuenta de Gmail propia mientras la clienta arma la casilla en DonWeb. El código lo admite sin cambios (SMTP con STARTTLS en el 587). Dos trabas de Railway, que valen también para DonWeb: según su documentación, el SMTP saliente sólo está habilitado en el plan Pro (PM no pudo abrir la página: lo vio en el buscador y en el foro de Railway). Emi dice que su plan es el de unos 20 USD, que es el Pro; la prueba de registro lo confirma, y el 13/09 `FRONTEND_URL` apuntaba al dominio viejo, así que el enlace no llevaría al sitio. Según ese inventario el sitio usa `outbox`: dice que mandó el correo y no lo manda. Mientras tanto, una cuenta creada desde el panel entra sin confirmar el correo.
 
   El #3 quedó sin asignar entre el 20/09 y el 27/09 por un descuido de PM.
@@ -242,7 +242,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. **Emi verifica la publicación del 27/09** (`a7e2237`) en incógnito, con la lista del resumen. Railway tarda unos 10 minutos.
-2. Dev trabaja `COBRO-CONCURRENTE-1` (el P1 de Mercado Pago), condición para habilitarlo en la Fase 4. Dependen de Emi: la regla del teléfono, el correo (#15: primero el plan de Railway), cuentas de prueba de Mercado Pago, backups, la charla de Inicio (#5) con la clienta y cómo se cargan las publicaciones de prueba. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
+2. Dev trabaja `COBRO-CONCURRENTE-1` (el P1 de Mercado Pago), condición para habilitarlo en la Fase 4. Dependen de Emi: la regla del teléfono, el correo (#15: primero el plan de Railway), cuentas de prueba de Mercado Pago, backups, la charla de Inicio (#5) con la clienta y cargar las publicaciones de prueba (`PUBLICACIONES-DE-PRUEBA-2026-09-27.md`). Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.

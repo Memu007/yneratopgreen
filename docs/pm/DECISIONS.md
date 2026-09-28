@@ -10,6 +10,17 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-27 — Publicaciones de prueba en el sitio publicado, cargadas a mano
+
+Emi eligió cargarlas a mano desde el sitio, sin fotos, con cuentas creadas
+desde el panel. Cada una dice «(prueba)» en el título y «No está a la venta»
+en la descripción, y se pausan al terminar. No se agrega código ni programa, y
+nada se carga por Railway: la siembra sigue sin correr en producción. La lista
+está en `PUBLICACIONES-DE-PRUEBA-2026-09-27.md`.
+
+Motivo: el sitio publicado sólo tiene lo que alguien cargó a mano. Sin
+publicaciones no se ven los filtros ni se puede probar la logística.
+
 ## 2026-09-27 — Lo que quedaba de la devolución de la clienta
 
 Emi respondió los puntos que esperaban una charla:
