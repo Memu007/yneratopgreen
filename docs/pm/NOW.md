@@ -8,9 +8,9 @@ Actualizado: 2026-09-27.
 
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `a7e2237`, publicado el 27/09 con autorización de Emi («dale 1 y publicá»), por fast-forward desde `c92c0d7`. Suma `PUBLISH-FIELDS-1`, `REV1-PENDIENTES-1`, `NOTIF-TEXTOS-1` y `AVISOS-DE-PAGO-1`. Sin migraciones. La verificación previa fue sobre el mismo código (`c6792ff`, que difiere sólo en `docs/pm`): suite 211/212 (131 de entorno), puertas y las dos guías verdes, sin secretos ni archivos prohibidos. La red de PM no llega a `railway.app`. **Pendiente: Emi verifica en incógnito** Inicio sin publicaciones ni «Mercado activo», «publicaciones» en vez de «operaciones», Quiénes somos sin «Nuestro equipo» ni «¿Listo para transformar…?», Contacto sin preguntas frecuentes, el alta sin «Características» ni «Etiquetas» y la marca en la ficha y en «Editar». Sigue pendiente de la publicación anterior (`c92c0d7`): modelo, año y origen en el alta y el panel nuevo.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. Todo lo aceptado está en `main` (`a7e2237`). `COBRO-CONCURRENTE-1` está asignada.
-- **Última decisión PM:** `AVISOS-DE-PAGO-1` **ACEPTADA EN RAMA** (`c6792ff`, producto en `a97911b`). Rechazar una transferencia avisa a quien compra; aprobarla, o que Mercado Pago acredite, avisa a las dos partes, una sola vez por orden. Seis negativos en rojo, dos de PM. Suite 211/212 (131 de entorno), puertas y guías verdes. **P1 confirmado por PM y previo a la pieza:** tres confirmaciones a la vez del mismo pago de Mercado Pago cuelgan la API. Bloquea habilitar Mercado Pago. Evidencia en `REPRODUCCION-AVISOS-DE-PAGO-1-2026-09-27.md`.
-- **Tarea activa:** `COBRO-CONCURRENTE-1`: que confirmaciones de Mercado Pago a la vez no cuelguen la API (el P1). Asignada el 27/09 por decisión de Emi («dale 1»).
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`a7e2237`) tiene todo lo aceptado salvo `COBRO-CONCURRENTE-1`, aceptada en rama el 28/09. Sin tarea activa.
+- **Última decisión PM:** `COBRO-CONCURRENTE-1` **ACEPTADA EN RAMA** (`599dded`, producto en `5893d19`; el informe `94e333d` difiere sólo en `docs/pm`). Resuelve el P1: ningún camino de la API espera una fila tomada frenando el proceso, y al tope de 10 s cada uno contesta algo que se puede reintentar. Casos 213 a 219 en 7/7; 17 negativos en rojo, dos de PM; suite 218/219 (131 de entorno); puertas y guías verdes. **Sin publicar.** Queda un P2 en el reconciliador para la pieza del pago a una orden cerrada. Evidencia en `REPRODUCCION-COBRO-CONCURRENTE-1-2026-09-28.md`.
+- **Tarea activa:** ninguna. La próxima la ordena Emi: el pago que llega a una orden cerrada (con el P2 del reconciliador), o cargar las publicaciones de prueba en el sitio publicado.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
@@ -22,28 +22,19 @@ Actualizado: 2026-09-27.
   El #3 quedó sin asignar entre el 20/09 y el 27/09 por un descuido de PM.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
-## Última aceptación PM — AVISOS-DE-PAGO-1
+## Última aceptación PM — COBRO-CONCURRENTE-1
+
+Ninguna confirmación de Mercado Pago, «Cancelar», «Rechazar», edición de una
+publicación, foto o documentación espera una fila tomada frenando la API.
+Si la fila no se suelta en 10 s, cada camino contesta algo que se puede
+reintentar. El link se apaga antes de consolidar el stock, siempre con la fila
+de la orden tomada. Aceptada en rama sobre `599dded`, **sin publicar**.
+
+## Aceptación anterior — AVISOS-DE-PAGO-1
 
 Quien compra se entera cuando le rechazan o le aprueban la transferencia, y
 las dos partes cuando Mercado Pago acredita el pago, una sola vez por orden.
-«¡Venta confirmada!» pasa a «Venta pagada». Si escribir el aviso falla, se
-pierde el aviso y no el pago. Aceptada en rama sobre `c6792ff`, **sin
-publicar**.
-
-## Aceptación anterior — PUBLISH-FIELDS-1 y REV1-PENDIENTES-1
-
-El alta ya no ofrece lo que no se guardaba, y la marca se ve en la ficha y se
-cambia en «Editar». El sitio dice «publicaciones» en vez de «operaciones».
-Además, se resuelve lo que la devolución de la clienta del 20/09 pedía sin
-decisiones pendientes:
-
-- Inicio sin publicaciones;
-- «Precio y modalidad»;
-- el radio del transportista;
-- una sola invitación;
-- sin preguntas frecuentes, sin «Nuestro equipo» y sin «comisión».
-
-Aceptadas en rama sobre `4d5e409`, **sin publicar**.
+Publicada en `a7e2237`.
 
 ## Aceptaciones anteriores
 
@@ -53,6 +44,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `COBRO-CONCURRENTE-1` | aceptada en rama (`599dded`), sin publicar | `REPRODUCCION-COBRO-CONCURRENTE-1-2026-09-28.md` |
 | `AVISOS-DE-PAGO-1` | publicada en `a7e2237` | `REPRODUCCION-AVISOS-DE-PAGO-1-2026-09-27.md` |
 | `NOTIF-TEXTOS-1` | publicada en `a7e2237` | `REPRODUCCION-NOTIF-TEXTOS-1-2026-09-27.md` |
 | `PUBLISH-FIELDS-1` y `REV1-PENDIENTES-1` | publicadas en `a7e2237` | `REPRODUCCION-PUBLISH-FIELDS-1-Y-REV1-PENDIENTES-1-2026-09-27.md` |
@@ -160,13 +152,15 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   `FOR UPDATE` y esperan a Mercado Pago con la fila tomada; otra confirmación
   pide la misma fila con una llamada síncrona y frena el único proceso de la
   API. PM lo reprodujo sobre `c6792ff` y sobre el producto de `2e86854`
-  (caso 213, fuera de la suite). **Bloquea habilitar Mercado Pago.** Puede
-  pasar también en «Rechazar» o «Cancelar» una orden de Mercado Pago (sin
-  reproducir). **Tarea activa: `COBRO-CONCURRENTE-1`.**
+  (caso 213). **Resuelto en rama por `COBRO-CONCURRENTE-1`, aceptada el
+  28/09, sin publicar.** Queda un P2: si Mercado Pago falla dos veces en el
+  mismo barrido, el reconciliador reintenta apagar el link con la fila de la
+  publicación tomada, y una compra de esa publicación puede frenar la API
+  hasta 15 s. Va con la pieza del pago a una orden cerrada.
 - **Pago que llega a una orden ya cerrada:** no avisa (decisión PM del
   27/09), porque «Pago aprobado» sería falso. Hoy sólo queda en el registro
-  del servidor y nadie se entera. Pieza propia después del P1, también antes
-  de habilitar Mercado Pago.
+  del servidor y nadie se entera. Es la próxima pieza del cobro, con el P2 del
+  reconciliador, antes de habilitar Mercado Pago.
 - **Devolución concurrente de stock:** cancelar o rechazar una orden pagada aún
   usa lectura y escritura en Python. Dev no reprodujo pérdida en 6 rondas porque
   esos endpoints hoy se ejecutan sin intercalarse; queda como riesgo de diseño,
@@ -242,9 +236,9 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. **Emi verifica la publicación del 27/09** (`a7e2237`) en incógnito, con la lista del resumen. Railway tarda unos 10 minutos.
-2. Dev trabaja `COBRO-CONCURRENTE-1` (el P1 de Mercado Pago), condición para habilitarlo en la Fase 4. Dependen de Emi: la regla del teléfono, el correo (#15: primero el plan de Railway), cuentas de prueba de Mercado Pago, backups, la charla de Inicio (#5) con la clienta y cargar las publicaciones de prueba (`PUBLICACIONES-DE-PRUEBA-2026-09-27.md`). Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
+2. **Emi decide** si se publica `COBRO-CONCURRENTE-1` (no cambia nada visible y no tiene migraciones) y cuál es la próxima tarea de la Dev: el pago a una orden cerrada (condición para habilitar Mercado Pago en la Fase 4) o cargar las publicaciones de prueba (`PUBLICACIONES-DE-PRUEBA-2026-09-27.md`). Dependen de Emi: la regla del teléfono, el correo (#15), cuentas de prueba de Mercado Pago, backups y la charla de Inicio (#5) con la clienta. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
-6. Los atributos por rubro ya tienen datos y decisión (25/09); Inicio (#5) espera la charla de Emi con la clienta; AgroMarket como módulo (#10) no se trabaja por ahora (27/09); Servicios (#7) quedó decidido el 25/09. La mejora de logística está por definir; mientras, la Dev sigue con el P1.
-7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada. Mercado Pago no se habilita sin resolver antes el P1.
+6. Los atributos por rubro ya tienen datos y decisión (25/09); Inicio (#5) espera la charla de Emi con la clienta; AgroMarket como módulo (#10) no se trabaja por ahora (27/09); Servicios (#7) quedó decidido el 25/09. La mejora de logística está por definir.
+7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada. Mercado Pago no se habilita sin publicar antes el arreglo del P1 y sin la pieza del pago a una orden cerrada.
