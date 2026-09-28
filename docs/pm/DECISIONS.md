@@ -10,6 +10,16 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-28 — PM y Dev siguen con Opus
+
+Salió Claude Sonnet 5.5. Para programar queda cerca de Opus 5.5, pero no por
+encima, y cuesta la mitad por token nuevo; releer lo que está en caché cuesta
+lo mismo en los dos. Emi decidió seguir con Opus en las dos sesiones, por las
+dudas: la pieza en curso es de pagos, y lo caro en este proyecto son los
+errores que se escapan. Si se vuelve a evaluar, la propuesta de PM es probar
+Sonnet sólo en la Dev, en una pieza que no sea de plata, y medir cuánto trabajo
+devuelve la revisión.
+
 ## 2026-09-28 — Las publicaciones de prueba las carga la Dev
 
 Emi decidió que las cargue la Dev (`PUBLICACIONES-PRUEBA-1`), antes de la pieza
