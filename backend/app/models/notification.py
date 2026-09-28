@@ -22,6 +22,10 @@ class NotificationType(str, enum.Enum):
     PAYMENT_APPROVED = "payment_approved"   # Pago aprobado
     PAYMENT_FAILED = "payment_failed"       # Pago fallido
     PRODUCT_SOLD = "product_sold"           # Producto vendido
+    # Pagos que alguien tiene que revisar. Uno por motivo, así cada aviso sale
+    # una sola vez por orden y por motivo.
+    PAYMENT_CLOSED_ORDER = "payment_closed_order"  # Pago a una orden ya cerrada
+    PAYMENT_DUPLICATED = "payment_duplicated"      # Más de un pago en una orden
     WELCOME = "welcome"                     # Bienvenida al registrarse
     SYSTEM = "system"                       # Notificación del sistema
 

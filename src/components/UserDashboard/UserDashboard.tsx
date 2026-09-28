@@ -202,6 +202,15 @@ const TEXTO_DEL_PAGO: Record<string, { texto: string; problema?: boolean }> = {
       + 'falta revisar los pagos antes de seguir.',
     problema: true,
   },
+  pago_tras_cierre: {
+    texto:
+      'Mercado Pago acreditó un pago cuando esta orden ya estaba cerrada. La '
+      + 'mercadería había vuelto al catálogo y no se descontó. La plata está en '
+      + 'la cuenta de Mercado Pago del vendedor: comprador y vendedor tienen que '
+      + 'acordar si se entrega la compra o si el vendedor devuelve el pago desde '
+      + 'Mercado Pago.',
+    problema: true,
+  },
   rechazado: {
     texto:
       'El último intento de pago fue rechazado. Se puede volver a intentar con '
@@ -1497,6 +1506,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       'payment_approved': 'Pago',
       'payment_failed': 'Pago fallido',
       'product_sold': 'Vendido',
+      'payment_closed_order': 'Pago a revisar',
+      'payment_duplicated': 'Pago a revisar',
       'welcome': 'Bienvenida',
       'system': 'Aviso',
     };

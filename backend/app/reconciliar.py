@@ -41,8 +41,7 @@ from app.core.config import settings
 from app.db.base import SessionLocal
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentStatus
-from app.models.user import User
-from app.services import candado, cobro, mp_pagos, mp_preferencia, mp_vinculo, stock
+from app.services import candado, cobro, mp_pagos, stock
 from app.services.checkout import MEDIO_MERCADO_PAGO
 
 logger = logging.getLogger(__name__)
@@ -147,16 +146,15 @@ async def _una(db: Session, orden: Order) -> str:
     db.refresh(orden)
 
     if cobro.hay_cobro(db, orden):
-        # Cobrada. Lo único que puede faltar acá es apagar el link: si al
-        # acreditarse el pago la llamada a Mercado Pago falló, la preferencia
-        # sigue viva y se puede volver a pagar una orden ya cobrada. Este es el
-        # reintento de eso, y por eso la orden entra al barrido aunque su
-        # reserva ya esté consolidada.
-        pago = mp_preferencia.pago_de(db, orden)
-        if pago is not None and not pago.link_cerrado:
-            vendedor = db.query(User).filter(User.id == orden.seller_id).first()
-            token = mp_vinculo.access_token_de(db, vendedor) if vendedor else None
-            await cobro.apagar_link(db, orden, pago, token)
+        # Cobrada. Lo único que puede faltar es apagar el link, y eso ya lo
+        # intentó `sincronizar` en este mismo barrido: con cobro, apaga antes
+        # de aplicar. Si falló, el reintento queda para el próximo barrido —la
+        # orden vuelve a entrar mientras el link siga abierto— y no se hace acá.
+        #
+        # Acá se reintentaba, y era esperar a Mercado Pago con la fila de la
+        # publicación tomada: aplicar ya había consolidado el stock. Si Mercado
+        # Pago tardaba, cualquier compra de esa publicación que se confirmara
+        # en la API esperaba esa fila frenando el proceso, hasta 15 s.
         db.commit()
         return COBRADA
     if cobro.hay_intento_en_curso(db, orden):

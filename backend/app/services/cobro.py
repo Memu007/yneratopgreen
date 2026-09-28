@@ -39,7 +39,11 @@ from typing import List, Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.notifications import notify_payment_approved
+from app.api.notifications import (
+    notify_payment_approved,
+    notify_payment_duplicated,
+    notify_payment_on_closed_order,
+)
 from app.models.mp_intento import MPIntentoDePago
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentStatus
@@ -91,7 +95,11 @@ VISIBLE_RECHAZADO = "rechazado"
 VISIBLE_DEVUELTO = "devuelto"
 VISIBLE_CONTRACARGO = "contracargo"
 VISIBLE_CANCELADO = "cancelado"
+# Los dos motivos de revisión se dicen distinto, porque lo que pasó es
+# distinto: más de un pago sobre una venta hecha, o un pago que llegó con la
+# orden ya cerrada y la mercadería de vuelta en el catálogo.
 VISIBLE_EN_REVISION = "en_revision"
+VISIBLE_PAGO_TRAS_CIERRE = "pago_tras_cierre"
 
 # Los estados de la intención que significan que hubo plata. Se agrupan porque
 # los tres disparan lo mismo: la mercadería reservada sale, y sale una vez.
@@ -439,6 +447,12 @@ def aplicar(db: Session, orden: Order, pago: Payment) -> PaymentStatus:
                 orden.status = OrderStatus.PAID
                 orden.updated_at = datetime.utcnow()
                 db.add(orden)
+            # Y se avisa, sin decir «Pago aprobado»: la venta no está hecha.
+            # Hasta el 27/09 esto quedaba sólo en el registro y nadie se
+            # enteraba. Si además hay más de un pago, se avisa también eso.
+            notify_payment_on_closed_order(db, orden)
+            if resumen == PaymentStatus.EN_REVISION:
+                notify_payment_duplicated(db, orden)
             return PaymentStatus.EN_REVISION
 
         # Hubo cobro: la mercadería reservada sale. Una devolución posterior
@@ -455,6 +469,10 @@ def aplicar(db: Session, orden: Order, pago: Payment) -> PaymentStatus:
             # avisos del mismo pago pasan por acá una sola vez, porque desde
             # la segunda la orden ya no está «colocada».
             notify_payment_approved(db, orden)
+        # Más de un pago: quien vende tiene que devolver el de más, y las dos
+        # partes se enteran. Una vez por orden, lo decide el aviso ya escrito.
+        if resumen == PaymentStatus.EN_REVISION:
+            notify_payment_duplicated(db, orden)
 
     return resumen
 
@@ -704,6 +722,11 @@ def estado_visible(db: Session, orden: Order) -> Optional[str]:
         return VISIBLE_PENDIENTE
 
     if pago.status == PaymentStatus.EN_REVISION:
+        # Con la reserva liberada, el pago llegó con la orden ya cerrada: la
+        # mercadería volvió al catálogo y no se descontó. Decir «más de un
+        # pago» ahí sería falso, aunque además haya habido más de uno.
+        if orden.stock_reserva == stock.LIBERADA:
+            return VISIBLE_PAGO_TRAS_CIERRE
         return VISIBLE_EN_REVISION
     if pago.status == PaymentStatus.CHARGED_BACK:
         return VISIBLE_CONTRACARGO

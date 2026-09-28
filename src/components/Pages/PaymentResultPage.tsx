@@ -50,6 +50,14 @@ const TEXTO_DEL_ESTADO: Record<string, { titulo: string; detalle: string }> = {
       + 'pagada y la mercadería se descontó una sola vez; los pagos los tiene '
       + 'que revisar el vendedor antes de seguir.',
   },
+  pago_tras_cierre: {
+    titulo: 'Tu pago llegó con la orden ya cerrada',
+    detalle:
+      'Mercado Pago acreditó el pago, pero esta orden ya estaba cerrada y la '
+      + 'mercadería había vuelto al catálogo. La plata está en la cuenta de '
+      + 'Mercado Pago del vendedor: coordiná con el vendedor si te entrega la '
+      + 'compra o te devuelve el pago.',
+  },
   en_proceso: {
     titulo: 'Mercado Pago está procesando el pago',
     detalle:

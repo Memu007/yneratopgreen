@@ -249,6 +249,103 @@ def notify_payment_approved(db: Session, order):
         logger.warning("No se pudo avisar el pago de %s: %s", order.order_number, error)
 
 
+def _avisar_una_vez(db: Session, order, tipo: NotificationType, avisos) -> None:
+    """Escribe los avisos de un pago a revisar, si esta orden no los tiene.
+
+    Una sola vez por orden y por motivo, y eso lo decide lo que ya está escrito,
+    no por dónde se llegó: el aviso de Mercado Pago, la vuelta de quien compra
+    y el reconciliador aplican el mismo pago muchas veces. Quien llama tiene la
+    fila de la orden tomada, así que dos confirmaciones no pueden pasar las dos
+    por acá sin ver la otra.
+
+    Con la misma mecánica que `notify_payment_approved`: en la transacción de
+    quien aplica el pago y en un savepoint. Si escribir el aviso falla, se
+    pierde el aviso y no el pago.
+    """
+    db.flush()
+    try:
+        with db.begin_nested():
+            ya = (
+                db.query(Notification.id)
+                .filter(Notification.order_id == order.id, Notification.type == tipo.value)
+                .first()
+            )
+            if ya is not None:
+                return
+            for user_id, title, message in avisos:
+                create_notification(
+                    db=db,
+                    user_id=user_id,
+                    notification_type=tipo,
+                    title=title,
+                    message=message,
+                    order_id=order.id,
+                    confirmar=False,
+                )
+            db.flush()
+    except Exception as error:  # noqa: BLE001
+        logger.warning(
+            "No se pudo avisar el pago a revisar de %s: %s", order.order_number, error
+        )
+
+
+def notify_payment_on_closed_order(db: Session, order):
+    """Mercado Pago acreditó un pago cuando la orden ya estaba cerrada.
+
+    Pasa con un pago que venía en vuelo cuando se apagó el link: se acredita
+    después de que la mercadería volvió al catálogo. La orden vuelve a pagada,
+    la intención queda en revisión y el stock no se vuelve a tomar.
+
+    No dice «Pago aprobado» ni «Venta pagada»: la venta no está hecha. Dice
+    dónde está la plata y qué puede hacer cada parte. AgroBoeda no tiene esa
+    plata y no devuelve nada.
+    """
+    numero = order.order_number
+    _avisar_una_vez(db, order, NotificationType.PAYMENT_CLOSED_ORDER, [
+        (
+            order.buyer_id,
+            "Pago en un pedido cerrado",
+            f"Mercado Pago acreditó un pago de tu pedido #{numero} cuando ya estaba "
+            "cerrado. La plata está en la cuenta de Mercado Pago del vendedor. "
+            "Coordiná con el vendedor si te entrega la compra o te devuelve el pago.",
+        ),
+        (
+            order.seller_id,
+            "Pago en un pedido cerrado",
+            f"Mercado Pago acreditó un pago del pedido #{numero} cuando ya estaba "
+            "cerrado, y la plata está en tu cuenta de Mercado Pago. La mercadería "
+            "había vuelto a tu catálogo y no se descontó. Si todavía la tenés, podés "
+            "entregarla; si no, devolvé el pago desde Mercado Pago.",
+        ),
+    ])
+
+
+def notify_payment_duplicated(db: Session, order):
+    """Mercado Pago acreditó más de un pago para la misma orden.
+
+    Pasa con dos intentos que venían en vuelo: el link se apaga al primer cobro,
+    pero el segundo se puede acreditar igual. Quien vende tiene que devolver el
+    de más, desde Mercado Pago: AgroBoeda no tiene esa plata.
+    """
+    numero = order.order_number
+    _avisar_una_vez(db, order, NotificationType.PAYMENT_DUPLICATED, [
+        (
+            order.buyer_id,
+            "Más de un pago en tu pedido",
+            f"Mercado Pago acreditó más de un pago de tu pedido #{numero}. La plata "
+            "está en la cuenta de Mercado Pago del vendedor. Coordiná con el vendedor "
+            "para que te devuelva lo que pagaste de más.",
+        ),
+        (
+            order.seller_id,
+            "Más de un pago en un pedido",
+            f"Mercado Pago acreditó más de un pago del pedido #{numero}, y la plata "
+            "está en tu cuenta de Mercado Pago. Devolvé el pago de más desde Mercado "
+            "Pago.",
+        ),
+    ])
+
+
 def notify_transfer_approved(db: Session, order):
     """Quien vende aprobó la transferencia: se avisa a las dos partes."""
     create_notification(
