@@ -10,6 +10,21 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-28 — Las publicaciones de prueba las carga la Dev
+
+Emi decidió que las cargue la Dev (`PUBLICACIONES-PRUEBA-1`), antes de la pieza
+del pago a una orden cerrada. Cambia la decisión del 27/09 en quién las carga,
+no en cómo quedan: «(prueba)» en el título, «No está a la venta» en la
+descripción, sin fotos, y se pausan al terminar.
+
+- **La cuenta la crea Emi** desde el panel, y la contraseña va por el chat de
+  la Dev. Nunca al repositorio, a un informe, a un script o a un log.
+- **La Dev usa el sitio como quien vende:** la pantalla o la API pública con
+  esa cuenta. Sin base, sin Railway, sin cuenta de administración, sin
+  siembra y sin código.
+- **Si su red no llega a `railway.app`, frena**, y la carga vuelve a Emi.
+- **Ningún programa que escriba en producción se sube al repositorio.**
+
 ## 2026-09-27 — Publicaciones de prueba en el sitio publicado, cargadas a mano
 
 Emi eligió cargarlas a mano desde el sitio, sin fotos, con cuentas creadas
