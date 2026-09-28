@@ -30,6 +30,7 @@ from app.core.dependencies import get_current_user, require_admin
 from app.models.audit import AuditLog
 from app.models.documentacion import DocumentacionDeVendedor, EstadoDeDocumentacion
 from app.models.user import User
+from app.services import candado
 from app.services import documentacion as servicio
 
 logger = logging.getLogger(__name__)
@@ -252,12 +253,20 @@ async def presentar_documentacion(
     except servicio.DocumentoInvalido as error:
         raise HTTPException(status_code=400, detail=str(error))
 
-    documentacion = (
-        db.query(DocumentacionDeVendedor)
-        .filter(DocumentacionDeVendedor.user_id == current_user.id)
-        .with_for_update()
-        .first()
-    )
+    # La fila se toma sin frenar a la API mientras se espera: con un
+    # `FOR UPDATE` común, si otra transacción la tenía —una decisión del panel
+    # en curso—, nadie más era atendido hasta que la soltara. Ver `candado`.
+    try:
+        documentacion = await candado.tomar(
+            db,
+            db.query(DocumentacionDeVendedor)
+            .filter(DocumentacionDeVendedor.user_id == current_user.id),
+        )
+    except candado.FilaOcupada:
+        raise HTTPException(
+            status_code=409,
+            detail="Tu documentación se está actualizando en este momento. Probá de nuevo en unos segundos.",
+        )
 
     # Recién acá se escribe: todo lo que podía rechazar ya rechazó, así que no
     # queda un archivo de una fila que nunca existió.

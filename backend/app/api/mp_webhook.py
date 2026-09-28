@@ -26,6 +26,9 @@ Sobre los códigos que devuelve, que también son una decisión:
 - **503** cuando no pudimos saber: Mercado Pago no contestó, el token no sirve,
   la cuenta no está vinculada acá, falta el secreto. El aviso **no se pierde**,
   se reintenta. Devolver 200 ahí sería tragarse un pago.
+- **503** también cuando otra operación sobre la misma orden la tenía tomada y
+  no la soltó a tiempo (`orden_ocupada`): no se aplicó nada, y el reintento la
+  va a encontrar libre.
 """
 from __future__ import annotations
 
@@ -38,7 +41,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.base import get_db
 from app.models.user import User
-from app.services import cobro, mp_firma, mp_pagos
+from app.services import candado, cobro, mp_firma, mp_pagos
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,7 @@ TOPICO_PAGO = ("payment", "payment.created", "payment.updated")
 
 SIN_DESTINATARIO = "sin_destinatario"
 OTRO_TOPICO = "otro_topico"
+ORDEN_OCUPADA = "orden_ocupada"
 
 
 def _dato(pedido: Request) -> Optional[str]:
@@ -146,6 +150,13 @@ async def webhook(
             return {"resultado": fallo.motivo}
         logger.warning("No se pudo consultar el pago avisado: %s", fallo.motivo)
         return {"resultado": fallo.motivo}
+    except candado.FilaOcupada:
+        # Otra confirmación, una cancelación o el reconciliador tenían la
+        # orden y no la soltaron antes del tope. No se aplicó nada: que
+        # Mercado Pago vuelva, que para entonces va a estar libre.
+        logger.warning("La orden del pago avisado estaba tomada: se pide reintento")
+        respuesta.status_code = 503
+        return {"resultado": ORDEN_OCUPADA}
     except cobro.NoCorresponde as fallo:
         # Firmado, consultado y aun así no es de esta orden: cobrador ajeno,
         # referencia cruzada, importe o moneda distintos. No se mueve nada y no

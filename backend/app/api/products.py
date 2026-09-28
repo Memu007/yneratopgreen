@@ -23,7 +23,7 @@ from app.schemas.products import ProductCreateRequest, ProductUpdateRequest, Pro
 from app.core.config import settings
 from app.services.storage import get_storage
 from app.models.form_option import FormOption
-from app.services import anatomia, atributos, tipos
+from app.services import anatomia, atributos, candado, tipos
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -36,6 +36,27 @@ router = APIRouter(prefix="/products", tags=["products"])
 # 409 y no 404: la publicación existe y es suya; lo que no se puede es
 # tocarla en el estado en que está.
 ELIMINADA_NO_SE_MODIFICA = "La publicación fue eliminada y ya no se puede modificar."
+
+# Otra operación sobre la misma publicación la tiene tomada y no la soltó antes
+# del tope. No se cambió nada: se puede volver a probar.
+PUBLICACION_OCUPADA = (
+    "Esta publicación se está actualizando en este momento. Probá de nuevo en "
+    "unos segundos."
+)
+
+
+async def _tomar_la_publicacion(db: Session, product_id: str) -> Optional[Product]:
+    """La publicación, con su fila tomada y releída.
+
+    Con un `FOR UPDATE` común la espera frenaba el único proceso de la API: si
+    la fila la tenía otra transacción que tardaba —otro proceso, o una petición
+    esperando algo con la fila tomada—, nadie más era atendido hasta que la
+    soltara. Acá se espera sin frenar a nadie, y con tope. Ver `candado`.
+    """
+    try:
+        return await candado.tomar(db, db.query(Product).filter(Product.id == product_id))
+    except candado.FilaOcupada:
+        raise HTTPException(status_code=409, detail=PUBLICACION_OCUPADA)
 
 
 def exigir_que_se_pueda_modificar(product: Product, user: User, verbo: str = "modificar") -> None:
@@ -442,7 +463,7 @@ async def upload_product_images(
     # esperas: si manana alguien agrega una, la regla sigue en pie. El indice
     # unico parcial es la ultima palabra; esto evita que la ultima palabra sea
     # un 500 en la cara de quien sube una foto.
-    db.query(Product).filter(Product.id == product_id).with_for_update().first()
+    await _tomar_la_publicacion(db, product_id)
 
     ya_hay = db.query(ProductImage).filter(
         ProductImage.product_id == product_id
@@ -503,9 +524,7 @@ async def update_product(
     # entra antes y la edicion la ve, o la edicion entra antes y la reserva se
     # calcula sobre el stock nuevo. Sin candado, las dos leen el mismo numero y
     # la ultima en escribir borra a la otra.
-    product = db.query(Product).filter(
-        Product.id == product_id
-    ).with_for_update().first()
+    product = await _tomar_la_publicacion(db, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
@@ -761,7 +780,7 @@ async def delete_product_image(
 
     # Misma fila tomada que en la carga, y por lo mismo: borrar y promover son
     # un solo acto sobre las imagenes de esta publicacion.
-    db.query(Product).filter(Product.id == product_id).with_for_update().first()
+    await _tomar_la_publicacion(db, product_id)
 
     # Eliminar de la base de datos
     db.delete(image)

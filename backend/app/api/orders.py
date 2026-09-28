@@ -31,7 +31,7 @@ from app.schemas.orders import (
     OrderItemResponse,
     OrderResponse,
 )
-from app.services import cargas, cobro, mp_pagos, mp_preferencia, propiedad, stock
+from app.services import candado, cargas, cobro, mp_pagos, mp_preferencia, propiedad, stock
 from app.services.checkout import (
     LISTA,
     MEDIO_MERCADO_PAGO,
@@ -204,6 +204,11 @@ async def estado_del_pago(
 
     Si Mercado Pago no contesta, devuelve lo último que sabíamos y lo dice con
     `verificado: false`. Inventar un estado sería peor que no tener uno.
+
+    Si otra confirmación de la misma orden la tiene tomada y no la suelta a
+    tiempo, dice «en proceso», también sin verificar: el pago de esa orden se
+    está procesando en ese momento, y la pantalla no tiene que esperar a que
+    termine.
     """
     orden = db.query(Order).filter(
         ((Order.id == order_id) | (Order.order_number == order_id)),
@@ -213,6 +218,7 @@ async def estado_del_pago(
         raise HTTPException(status_code=404, detail="Orden no encontrada")
 
     verificado = True
+    ocupada = False
     if orden.payment_method == MEDIO_MERCADO_PAGO:
         try:
             await cobro.sincronizar(db, orden)
@@ -222,12 +228,22 @@ async def estado_del_pago(
             )
             db.rollback()
             verificado = False
+        except candado.FilaOcupada:
+            logger.warning(
+                "Otra confirmación tenía la orden %s: la vuelta dice «en proceso»",
+                orden.order_number,
+            )
+            db.rollback()
+            verificado = False
+            ocupada = True
         db.refresh(orden)
 
     return EstadoDePago(
         order_number=orden.order_number,
         status=orden.status.value,
-        payment_state=cobro.estado_visible(db, orden),
+        payment_state=(
+            cobro.VISIBLE_EN_PROCESO if ocupada else cobro.estado_visible(db, orden)
+        ),
         verificado=verificado,
         **_pago_del_comprador(db, orden),
     )
@@ -641,6 +657,31 @@ ORDEN_YA_COBRADA = (
     "cancela. Actualizá la pantalla para verla al día."
 )
 
+# Otra operación sobre la misma orden —un pago que se está confirmando, otra
+# cancelación— la tiene tomada y no la soltó antes del tope. No se decidió
+# nada: se puede volver a probar.
+ORDEN_OCUPADA = (
+    "Esta orden se está actualizando en este momento. Probá de nuevo en unos "
+    "segundos."
+)
+
+
+async def _tomar_la_orden(db: Session, order_id: str) -> Optional[Order]:
+    """La orden, por UUID o por número, con su fila tomada.
+
+    Por acá se llega a un estado terminal, y terminar compite con el aviso de
+    Mercado Pago, la vuelta de quien compra y el reconciliador sobre la misma
+    orden. Esos caminos esperan a Mercado Pago con la fila tomada, así que la
+    espera no puede frenar a la API: con un `FOR UPDATE` común, «Cancelar»
+    contra una confirmación en curso la dejaba colgada. Ver `candado`.
+    """
+    try:
+        return await candado.tomar(db, db.query(Order).filter(
+            (Order.id == order_id) | (Order.order_number == order_id)
+        ))
+    except candado.FilaOcupada:
+        raise HTTPException(status_code=409, detail=ORDEN_OCUPADA)
+
 
 async def _terminar_el_cobro(db: Session, order: Order) -> None:
     """Cierra el cobro de una orden que termina, antes de darla por terminada.
@@ -707,9 +748,7 @@ async def update_order_status(
     # Buscar por UUID o por order_number, con la fila bloqueada: por acá se
     # llega a un estado terminal, y terminar compite con el aviso de Mercado
     # Pago y con el reconciliador sobre la misma orden.
-    order = db.query(Order).filter(
-        (Order.id == order_id) | (Order.order_number == order_id)
-    ).with_for_update().first()
+    order = await _tomar_la_orden(db, order_id)
     
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
@@ -846,9 +885,7 @@ async def cancel_order(
     """Cancelar una orden (comprador o vendedor según el estado)"""
     # Buscar por UUID o por order_number, con bloqueo de fila para que dos
     # cancelaciones simultáneas no dejen estados incompatibles.
-    order = db.query(Order).filter(
-        (Order.id == order_id) | (Order.order_number == order_id)
-    ).with_for_update().first()
+    order = await _tomar_la_orden(db, order_id)
 
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")

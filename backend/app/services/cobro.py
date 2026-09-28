@@ -44,7 +44,7 @@ from app.models.mp_intento import MPIntentoDePago
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
-from app.services import mp_pagos, mp_preferencia, mp_vinculo, stock
+from app.services import candado, mp_pagos, mp_preferencia, mp_vinculo, stock
 from app.services.checkout import MEDIO_MERCADO_PAGO
 
 logger = logging.getLogger(__name__)
@@ -488,6 +488,49 @@ async def apagar_link(db: Session, orden: Order, pago: Payment, token: Optional[
     return True
 
 
+async def _tomar_la_orden(db: Session, orden: Order, pago: Payment) -> None:
+    """Toma la fila de la orden sin frenar al resto de la API, y relee lo que
+    se leyó antes de tenerla.
+
+    Esperar la fila con un `FOR UPDATE` común frenaba el único proceso de la
+    API mientras quien la tenía esperaba a Mercado Pago: tres confirmaciones a
+    la vez del mismo pago la dejaban colgada. Ver `candado`.
+
+    Y lo leído antes puede estar viejo: mientras se esperaba, otra confirmación
+    de la misma orden pudo terminar. Decidir con la orden o la intención de
+    antes repetiría lo que esa ya hizo —otro «Pago aprobado», otro pedido para
+    apagar un link ya apagado—. La orden vuelve releída al tomarla; la
+    intención se relee acá.
+    """
+    await candado.tomar(db, db.query(Order).filter(Order.id == orden.id))
+    db.refresh(pago)
+
+
+async def _apagar_y_aplicar(
+    db: Session, orden: Order, pago: Payment, token: Optional[str]
+) -> PaymentStatus:
+    """Si hubo cobro apaga el link, y después lleva la orden a lo que dicen
+    los intentos.
+
+    Las dos cosas van con la fila de la orden tomada, y el link se apaga antes
+    de confirmar: si se soltara el candado para hacerlo, otro pago podría
+    entrar por el mismo link justo mientras lo estamos apagando.
+
+    Y se apaga **antes** de aplicar, no después. Aplicar consolida el stock, y
+    consolidar toma la fila de la publicación hasta el `commit`. Con el orden
+    al revés, esa fila quedaba tomada mientras se esperaba a Mercado Pago, y
+    otra compra de la misma publicación que se confirmaba en ese momento la
+    esperaba frenando la API entera. Medido: la API quedaba colgada.
+
+    `hay_cobro` es la condición que antes se leía en lo que devolvía aplicar:
+    con intentos guardados, aplicar devuelve un estado con cobro si y sólo si
+    alguno se cobró; sin intentos no aplica nada.
+    """
+    if hay_cobro(db, orden):
+        await apagar_link(db, orden, pago, token)
+    return aplicar(db, orden, pago)
+
+
 async def procesar_pago(db: Session, mp_payment_id: str, vendedor: User) -> str:
     """El camino completo de un aviso: consultar, comprobar, aplicar.
 
@@ -503,17 +546,11 @@ async def procesar_pago(db: Session, mp_payment_id: str, vendedor: User) -> str:
 
     # A partir de acá se escribe, así que la orden se bloquea: webhook,
     # cancelación y reconciliación no se pisan sobre la misma compra.
-    db.query(Order).filter(Order.id == orden.id).with_for_update().first()
+    await _tomar_la_orden(db, orden, pago)
 
     resultado = _guardar_intento(db, orden, pago, intento)
     if resultado == APLICADO:
-        resumen = aplicar(db, orden, pago)
-        if resumen in CON_COBRO:
-            # Cobrada: se apaga el link antes de confirmar. La llamada va con
-            # la fila bloqueada, y es a propósito: si se soltara el candado
-            # para hacerla, otro pago podría entrar por el mismo link justo
-            # mientras lo estamos apagando.
-            await apagar_link(db, orden, pago, token)
+        await _apagar_y_aplicar(db, orden, pago, token)
         db.commit()
     else:
         db.rollback()
@@ -550,7 +587,7 @@ async def sincronizar(db: Session, orden: Order, confirmar: bool = True) -> str:
         token, mp_preferencia.referencia_de(orden)
     )
 
-    db.query(Order).filter(Order.id == orden.id).with_for_update().first()
+    await _tomar_la_orden(db, orden, pago)
 
     hubo = False
     for datos in encontrados:
@@ -570,9 +607,7 @@ async def sincronizar(db: Session, orden: Order, confirmar: bool = True) -> str:
         if _guardar_intento(db, orden, pago, intento) == APLICADO:
             hubo = True
 
-    resumen = aplicar(db, orden, pago)
-    if resumen in CON_COBRO:
-        await apagar_link(db, orden, pago, token)
+    await _apagar_y_aplicar(db, orden, pago, token)
     if confirmar:
         db.commit()
     return APLICADO if hubo else REPETIDO

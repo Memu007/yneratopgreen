@@ -42,7 +42,7 @@ from app.db.base import SessionLocal
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
-from app.services import cobro, mp_pagos, mp_preferencia, mp_vinculo, stock
+from app.services import candado, cobro, mp_pagos, mp_preferencia, mp_vinculo, stock
 from app.services.checkout import MEDIO_MERCADO_PAGO
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,7 @@ VENCIDA = "vencida"            # nadie pagó y el link está cerrado: se cerró 
 LIBERADA = "liberada"          # la orden ya estaba terminada; sólo faltaba soltar el stock
 DIFERIDA = "diferida"          # no se pudo cerrar el link; queda para la próxima
 SIN_RESPUESTA = "sin_respuesta"  # Mercado Pago no contestó
+OCUPADA = "ocupada"            # la API tenía la orden y no la soltó a tiempo; queda para la próxima
 
 
 def _candidatas(db: Session) -> List[Order]:
@@ -120,6 +121,12 @@ async def _una(db: Session, orden: Order) -> str:
             "No se pudo consultar %s: %s", orden.order_number, fallo.motivo
         )
         return SIN_RESPUESTA
+    except candado.FilaOcupada:
+        # Una confirmación o una cancelación de la API la tenía tomada y no la
+        # soltó antes del tope. No se decidió nada; el próximo barrido vuelve.
+        db.rollback()
+        logger.warning("La orden %s estaba tomada: queda para el próximo barrido", orden.order_number)
+        return OCUPADA
 
     # Lo que `sincronizar` decidió, escrito antes de volver a leer.
     #
