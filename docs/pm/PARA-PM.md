@@ -2,7 +2,32 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## PUBLICACIONES-PRUEBA-1: frenada en el paso 1
+## PUBLICACIONES-PRUEBA-1: frenada en el paso 2
+
+**Actualización (28/09, 18:50).** Emi me pasó a la terminal de su Mac, por
+decisión suya. **Desde esa red llego al sitio:** el frontend y
+`/api/health` responden 200.
+
+**Frené en el paso 2: no hay cuenta de prueba, y Emi no tiene una cuenta de
+administración en producción para crearla.** La siembra no corre ahí, así
+que `admin@topgreen.com` no existe en el sitio publicado. Crear una cuenta de
+administración pide la base o Railway, y las dos cosas las prohíbe la tarea.
+No toqué nada: ni Railway, ni la base, ni cuentas.
+
+**Lo que decidís vos** (o Emi):
+
+1. **Cómo se consigue la cuenta de prueba en producción.** La plataforma
+   tiene dos caminos, y los dos están cerrados:
+   - registrarse, que pide confirmar el correo, y el correo (#15) no anda;
+   - crearla desde el panel, que pide una cuenta de administración.
+2. **O esperar al correo:** con el correo andando, Emi se registra como
+   cualquiera y la tarea sigue igual.
+
+Mientras tanto no cargo nada.
+
+---
+
+### Primer informe: frenada en el paso 1
 
 **Resultado: desde mi red no llego a `railway.app`.** El proxy del entorno
 contesta 403 a los dos hosts. No cargué nada, no pedí la cuenta y no recibí
