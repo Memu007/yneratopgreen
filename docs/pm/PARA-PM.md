@@ -2,180 +2,177 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## AVISOS-DE-PAGO-1: entrega
+## COBRO-CONCURRENTE-1: entrega
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `2e86854` (tu asignación) |
-| código | `efb743c` |
-| casos y negativos | `a97911b` |
-| no integrado, no desplegado | `main` sigue en `c92c0d7` |
+| base | `704c70e` (tu último commit al asignar; la asignación es `a7e2237`) |
+| producto | `5893d19` |
+| casos y negativos | `a6dbdb7` y `599dded` |
+| tus commits de `docs/pm` | `08d8ef2`, traídos con un merge (`15d37b9`); no tocan código |
+| no integrado, no desplegado | `main` sigue en `a7e2237` |
 
 **Resultado.**
 
-- **Rechazar la transferencia le avisa a quien compra.** Pasa con comprobante
-  y sin él.
-- **Aprobarla les avisa a las dos partes.**
-- **El pago acreditado por Mercado Pago les avisa a las dos partes, una sola
-  vez por orden.** Da igual cómo se confirme primero: por el aviso de Mercado
-  Pago, por la vuelta de quien compra o por el reconciliador. Las
-  confirmaciones repetidas no suman avisos.
-- **«Pago aprobado» y «¡Venta confirmada!» se reescribieron:** en «vos» y
-  sin prometer envío. «¡Venta confirmada!» pasa a llamarse «Venta pagada»,
-  porque confirmar es un paso que todavía falta.
-- **El 210 sigue pasando.** Sus cuentas exactas suman los avisos de las tres
-  transferencias que aprueba.
+- **Ningún camino de la API espera una fila tomada frenando el proceso.**
+  Ocho lo hacían. Los ocho esperan ahora con `candado.tomar`: `NOWAIT` en un
+  savepoint, reintento con `await asyncio.sleep` y un tope de 10 s. Es la
+  dirección que aceptaste.
+- **El 213 entra a la suite y corre siempre.** Si una carrera vuelve a colgar
+  la API, el caso la destraba antes de irse y el resto sigue.
+- **Las reglas se mantienen**, y ahora las mira un caso:
+  - el link se apaga con la fila tomada (el 214 la ve tomada mientras el
+    cierre está retenido);
+  - el stock se consolida una vez;
+  - sale un solo par de avisos, y el link se apaga una sola vez.
+- **Al tope, nadie queda colgado:**
+  - el aviso recibe 503 `orden_ocupada`, y Mercado Pago lo reintenta;
+  - la vuelta recibe «en proceso», con `verificado: false`;
+  - «Cancelar» y «Rechazar» reciben un 409: «Esta orden se está actualizando
+    en este momento. Probá de nuevo en unos segundos.»;
+  - el reconciliador anota `ocupada` y sigue con la próxima orden.
+- **Suite completa desde base nueva, sobre `599dded`: 218/219.** Sólo cae
+  el 131, de entorno.
 
-**Encontré un P1 que ya existía. No lo arreglé porque está fuera de
-alcance.** Tres confirmaciones del mismo pago de Mercado Pago a la vez
-cuelgan la API entera: no vuelve a atender a nadie hasta que se la reinicia.
-Está abajo, en «Encontrado», con evidencia y recomendación. **Bloquea
-habilitar Mercado Pago.** Hoy el sitio publicado no lo tiene habilitado, así
-que no está pasando.
+**Dos cosas que cambian más allá de «esperar sin frenar». Las cuento para que
+las revises; ninguna suelta la fila.**
 
-**Una pregunta, no bloqueante.** Está en «Para decidir».
+1. **El link se apaga antes de aplicar, no después.** Sigue con la fila de la
+   orden tomada y en la misma transacción. Aplicar consolida el stock, y eso
+   toma la fila de la publicación hasta el `commit`. Con el orden de antes,
+   esa fila quedaba tomada mientras se esperaba a Mercado Pago. Medido: otra
+   compra de la misma publicación que se confirmaba en ese momento colgaba la
+   API (218, primera parte). La condición para apagar es la misma: con
+   intentos guardados, `hay_cobro` es verdadero si y sólo si aplicar iba a
+   devolver un estado con cobro.
+2. **Después de conseguir la fila se relee lo que se leyó antes.** Mientras se
+   esperaba, otra confirmación pudo terminar. Sin releer, la ráfaga dejaba
+   cuatro pares de avisos (negativo `orden-vieja`) o apagaba el link cuatro
+   veces (negativo `intencion-vieja`).
 
-## Los avisos
+**Fuera del cobro, el mismo arreglo, chico.** El inventario encontró cuatro
+lugares más con el mismo patrón: editar una publicación, subirle fotos,
+borrarle una foto y presentar la documentación. Usan el mismo
+`candado.tomar`, y al tope responden un 409 que pide probar de nuevo. Cada
+uno tiene su negativo.
 
-| cuándo | a quién | título | texto |
-|---|---|---|---|
-| quien vende rechaza el comprobante o la transferencia | quien compra | Transferencia rechazada | «El vendedor rechazó la transferencia de tu pedido #N y el pedido quedó rechazado. El motivo está en Mis Compras.» |
-| quien vende aprueba el comprobante o la transferencia | quien compra | Pago aprobado | «El vendedor aprobó la transferencia de tu pedido #N.» |
-| lo mismo | quien vende | Venta pagada | «Aprobaste la transferencia del pedido #N. Ya podés confirmar el pedido en Mis Ventas.» |
-| Mercado Pago acredita el pago y el producto lo confirma | quien compra | Pago aprobado | «Mercado Pago acreditó el pago de tu pedido #N.» |
-| lo mismo | quien vende | Venta pagada | «Mercado Pago acreditó el pago del pedido #N. Ya podés confirmar el pedido en Mis Ventas.» |
+**Lo que decidís vos:** nada bloqueante. Hay dos propuestas en «Riesgos»: el
+toast genérico de «Cancelar» y el reintento del reconciliador.
 
-**Por qué estos textos.**
+## El inventario
 
-- **El rechazo no ofrece mandar el comprobante otra vez.** La orden queda
-  rechazada y el producto no lo permite. El motivo lo escribe quien vende, y
-  Mis Compras lo muestra; el 211 lo mira.
-- **«Ya podés confirmar el pedido en Mis Ventas»** nombra un paso que existe:
-  con la orden pagada, Mis Ventas ofrece «Confirmar Pedido». El 211 y el 212
-  lo miran.
-- **«Acreditó»** es la palabra que el panel ya usa para Mercado Pago («Pago
-  acreditado en Mercado Pago.»).
+**Comando.** Recorre `backend/app` con el AST de Python, y es el 219:
 
-**Dónde sale cada uno. No cambia el orden de lo que hace la API.**
+```bash
+SMOKE_CASOS=219 node scripts/smoke.mjs
+```
 
-- **Transferencia:** después del `commit` de la decisión, como los demás
-  avisos. Si el aviso falla, la decisión queda escrita.
-- **Mercado Pago:** en `cobro.aplicar`, en la línea donde la orden pasa de
-  «colocada» a «pagada». Es el único lugar donde una orden de Mercado Pago
-  queda pagada; lo dice el módulo y lo comprobé.
-  - Desde la segunda confirmación, la orden ya no está «colocada» y el aviso
-    no sale.
-  - El aviso se escribe en la misma transacción, sin `commit`: el webhook y
-    el reconciliador tienen la fila bloqueada y deciden cuándo soltarla. Así
-    el aviso existe si la transición quedó escrita, y sólo entonces.
-  - Va en un savepoint: si escribir el aviso falla, se pierde el aviso y no
-    el pago. Lo prueba el negativo `aviso-que-falla`.
-  - Lo único nuevo en ese camino es un `flush` antes del savepoint. Escribe
-    antes, dentro de la misma transacción, lo que ya se iba a escribir.
+Busca todo `with_for_update()` y toda llamada a `candado.tomar`. Anota en
+qué función está, si es `async` y qué `async def` la llaman. Da rojo si alguno
+espera con el bloqueo de siempre desde un camino `async`, salvo que tenga su
+porqué escrito en el caso. El negativo `inventario-ve-el-bloqueo` lo prueba.
 
-## Encontrado: tres confirmaciones a la vez cuelgan la API (P1, ya existía)
+**Sobre la base** (el mismo guion del 219 contra `git archive 704c70e backend/app`):
 
-**Qué pasa.**
+| lugar | función | qué hice |
+|---|---|---|
+| `services/cobro.py:506` | `async procesar_pago` (el aviso) | `candado.tomar`, y relee la intención |
+| `services/cobro.py:553` | `async sincronizar` (la vuelta y el reconciliador) | lo mismo |
+| `api/orders.py:710` | `async update_order_status` («Rechazar» por estado) | `candado.tomar`; 409 al tope |
+| `api/orders.py:849` | `async cancel_order` («Cancelar», y el «Rechazar» de la pantalla) | lo mismo |
+| `api/products.py:445` | `async upload_product_images` | `candado.tomar`; 409 al tope |
+| `api/products.py:506` | `async update_product` | lo mismo |
+| `api/products.py:764` | `async delete_product_image` | lo mismo |
+| `api/documentacion.py:256` | `async presentar_documentacion` | lo mismo |
+| `services/cobro.py:244` | `_guardar_intento` (síncrona, la llaman las tres de arriba y `cerrar_cobro`) | nada: se llama con la fila de la orden ya tomada, y el intento de un pago es de esa orden |
+| `reconciliar.py:139` | `async _una` | nada: corre en otro proceso, una orden a la vez; su espera no frena a la API |
+| `api/orders.py:371` | `decide_transfer_receipt` | nada: endpoint síncrono, FastAPI lo corre en un hilo aparte |
+| `api/documentacion.py:446` | `decidir` | lo mismo |
 
-1. El webhook (`procesar_pago`) y la vuelta de quien compra (`sincronizar`)
-   toman la fila de la orden con `FOR UPDATE` (`cobro.py:506` y `:553`).
-2. Con la fila tomada, esperan a Mercado Pago para apagar el link
-   (`await apagar_link`, `:516` y `:575`).
-3. Si en ese momento llega otra confirmación, pide la misma fila con una
-   llamada síncrona. Esa llamada frena el único bucle de eventos del proceso.
-4. La primera ya no puede terminar, y la API no atiende ninguna otra
-   petición.
+**Hoy el 219 dice:** «9 lugares toman una fila: 5 esperan sin frenar, 2 son
+endpoints síncronos que FastAPI corre en un hilo, y 2 tienen su porqué escrito
+(reconciliar.py:146 _una, services/cobro.py:244 _guardar_intento)». Los 5 son
+las cuatro llamadas a `candado.tomar` y el `NOWAIT` de adentro.
 
-Producción corre un solo proceso de uvicorn (`backend/railway-entrypoint.sh`).
+## Casos
 
-**Evidencia.**
+Todos retienen en el doble la espera a Mercado Pago que se hace con la fila
+tomada: el cierre del link o la búsqueda del reconciliador. Recién entonces
+mandan lo demás, así la carrera no depende de que dos pedidos caigan en el
+mismo instante. Mientras está retenida, la salud tiene que contestar en menos
+de 2 s, una consulta tras otra.
 
-- Reproducido 4 de 4 veces con el backend de antes de esta pieza
-  (`2e86854`), y 2 de 2 con el nuevo. `main` tiene el mismo código.
-- A los 43 segundos, la base mostraba esto:
+| caso | qué mira | contra el backend de la base |
+|---|---|---|
+| 213 | Tu P1: dos avisos y una vuelta del mismo pago a la vez | rojo: «la API dejó de responder: 21 de 23 consultas de salud tardaron 2 s o más» |
+| 214 | Ráfaga: tres avisos y tres vueltas a la vez. Terminan todas con 200; una transición, el stock y lo reservado bajan uno, las ventas suben una, un «Pago aprobado» y un «Venta pagada», el link apagado **una** vez y con la fila tomada, un solo intento guardado | rojo: la API se cuelga y nada queda escrito (11 problemas) |
+| 215 | «Cancelar» y «Rechazar» contra una confirmación, en los dos órdenes de llegada (cuatro órdenes). La orden cobrada queda pagada, con su reserva consolidada y un par de avisos. Quien cancela o rechaza recibe el 409 de orden cobrada, o el 400 de «paid → rejected» si llega por estado después del pago | rojo en la primera escena: «Cancelar» con el aviso esperando cuelga la API |
+| 216 | El reconciliador sostiene la fila (búsqueda retenida) y llega un aviso. La salud y el catálogo responden. Al soltarlo, el aviso da 200 y la orden queda pagada | rojo: «4 de 20 consultas de salud tardaron 2 s o más» y el catálogo no respondió en 2 s |
+| 217 | El tope: con la fila tomada más de 10 s, lo que recibe cada camino (arriba). Reintentar el aviso da «repetido», y la vuelta dice «aprobado» | rojo: la API se cuelga |
+| 218 | Otra compra de la misma publicación se confirma entera mientras la primera espera a Mercado Pago. Con la publicación y la documentación tomadas por otro proceso, editar, subir y borrar una foto, y presentar la documentación esperan sin frenar y terminan con 200 o 201 | rojo: la segunda compra cuelga la API y la fila de la publicación está tomada |
+| 219 | El inventario, por código | rojo: 8 lugares frenan |
 
-  | pid | estado | espera | consulta |
-  |---|---|---|---|
-  | 2465 | idle in transaction | Client / ClientRead | `UPDATE products SET stock=…` (la primera, parada en el `await`) |
-  | 2492 | active | Lock / transactionid | `SELECT orders… FOR UPDATE` (la segunda, frenando el proceso) |
+El 212 dejó de decir que las simultáneas cuelgan la API: ahora remite al 213.
 
-- Con dos confirmaciones a la vez no se colgó en 9 intentos (6 con el
-  backend viejo y 3 con el nuevo). Con tres, sí.
-- Lo mismo puede pasar en «Rechazar» o «Cancelar» de una orden de Mercado
-  Pago (`orders.py:712` y `:851`): toman la fila y esperan a Mercado Pago en
-  `_terminar_el_cobro`. No lo reproduje.
+## Negativos
 
-**Cómo verlo:** `SMOKE_CASOS=213 node scripts/smoke.mjs` da rojo en 30
-segundos y deja la API colgada. Después hay que reiniciarla. El 213 no es
-parte de la suite: corre sólo si se lo pide.
+`python3 scripts/sabotajes_cobro_concurrente_1.py` rompe un solo lugar,
+reinicia la API con `REINICIAR_API`, corre el caso y restaura. Los 15 dan su
+rojo, y «src y backend después: como estaban».
 
-**Recomendación: una tarea aparte, antes de habilitar Mercado Pago.** Tomar
-la fila sin frenar el proceso:
-
-- `FOR UPDATE NOWAIT` dentro de un savepoint;
-- si está tomada, esperar con `await asyncio.sleep` y reintentar, con tope;
-- en los cuatro caminos que toman la fila y después esperan a Mercado Pago.
-
-Se mantiene la regla de que el link se apaga con la fila tomada, y el 213
-pasa a la suite.
-
-**Mientras tanto**, el 212 confirma de a una por vez. Cubre la repetición,
-no la simultaneidad.
-
-## Para decidir (no bloqueante)
-
-**¿Qué avisa un pago que llega a una orden ya cerrada?** `cobro.aplicar`
-tiene un segundo camino a «pagada»:
-
-- un pago que ya estaba en vuelo cuando se apagó el link se acredita después
-  de que la mercadería volvió al catálogo;
-- la orden vuelve a «pagada», con el pago «en revisión»;
-- hace falta que una persona decida.
-
-Ese camino **no avisa**. «Pago aprobado» diría algo que no es cierto: la
-venta no está confirmada.
-
-**Recomiendo dejarlo sin aviso** hasta que se diseñe quién revisa esos pagos.
-El aviso se escribe con esa decisión.
-
-## Casos y negativos
-
-| caso | qué mira |
-|---|---|
-| 211 | Con cuentas nuevas y cinco transferencias: un comprobante rechazado con motivo, una transferencia rechazada sin comprobante, una aprobada, decidir otra vez (400, sin avisos nuevos) y aprobar y rechazar a la vez (pasa una sola, con su aviso). Cuenta los avisos exactos de cada orden, para las dos cuentas, en la API. Los lee en «Notificaciones» en escritorio y en celular. En Mis Compras está el motivo y no se ofrece reenviar; en Mis Ventas está «Confirmar Pedido» |
-| 212 | Con el doble local de Mercado Pago, tres órdenes. La primera se confirma por el aviso, que llega tres veces, y después vuelve quien compra dos veces. La segunda, primero por la vuelta y después por dos avisos. La tercera, primero por el reconciliador y después por un aviso tardío. Cada orden tiene exactamente un «Pago aprobado» y un «Venta pagada». Se leen en la pestaña en los dos anchos, y en Mis Ventas está «Confirmar Pedido» |
-| 213 | Sólo con `SMOKE_CASOS=213`. Hoy da rojo: es el P1 de arriba |
-| 210 | Suma «Pago aprobado» y «Venta pagada» de las tres transferencias que aprueba |
-
-**Contra el backend de antes** (`2e86854`):
-
-- el 211 encuentra 18 problemas;
-- el 212 encuentra 10;
-- todos son avisos que faltan.
-
-`python3 scripts/sabotajes_avisos_de_pago_1.py` → «todos dieron el rojo esperado» y «src y backend después: como estaban»
+- **13 en la corrida completa**, sobre `a6dbdb7`.
+- **Los otros 2 fallaban por mis expectativas, no por el producto.** En el
+  216, el catálogo sin respuesta es el mismo cuelgue. Sin tope, quienes
+  esperan no quedan colgados: pasan el tope. Corregí lo que esperaba el
+  script, y el 217 ahora dice cuándo se esperó más que el tope (`599dded`).
+  Corridos de nuevo esos dos: «todos dieron el rojo esperado».
 
 | sabotaje | rojo |
 |---|---|
-| `sin-aviso-de-rechazo` | 211: 6 problemas. En la API, las dos órdenes rechazadas no tienen «Transferencia rechazada», y en los dos anchos quien compra no la lee. Nada de la aprobada ni de quien vende |
-| `aviso-duplicado` | 212: 2 problemas. La orden que se volvió a consultar tiene tres «Pago aprobado» y tres «Venta pagada». Las tres órdenes quedan pagadas |
-| `sin-aviso-de-mercado-pago` | 212: 10 problemas. Faltan los dos avisos en las tres órdenes, en la API, y no se leen en los dos anchos. Las órdenes quedan pagadas |
-| `aviso-que-falla` | 212: los mismos 10, avisos que faltan. **Ninguna orden deja de quedar pagada**: el savepoint salva el pago |
+| `aviso-sin-espera` | 213: «la API dejó de responder: 21 de 23 consultas de salud tardaron 2 s o más» |
+| `aviso-contra-el-reconciliador` | 216: la API sin responder (5 de 9 consultas) y el catálogo sin respuesta en 2 s |
+| `vuelta-sin-espera` | 214: «la API dejó de responder durante la ráfaga: 20 de 24…», y nada queda escrito |
+| `cancelar-sin-espera` | 215: «el aviso, y llega «Rechazar» (la cancelación de quien vende): la API dejó de responder». Las escenas anteriores pasan |
+| `rechazar-sin-espera` | 215: «la vuelta, y llega «Rechazar» por estado: la API dejó de responder». Las anteriores pasan |
+| `link-con-la-fila-suelta` | 214: «mientras se apagaba el link, la fila de la orden estaba suelta», y el link se apagó 4 veces |
+| `stock-tomado-en-la-espera` (el orden de antes: aplicar y después apagar) | 218: la segunda compra no se confirma en 10 s, la fila de la publicación está tomada y la API se cuelga |
+| `intencion-vieja` (sin releer la intención) | 214: «el link se apagó 4 veces» |
+| `orden-vieja` (sin releer la orden) | 214: cuatro «Pago aprobado» y cuatro «Venta pagada» |
+| `sin-tope` (tope de una hora) | 217: los que esperaban pasan el tope («esperaron 15577 ms») y reciben «repetido», «aprobado», el 409 de orden cobrada y el 400 en vez de lo que se puede reintentar |
+| `editar-sin-espera` | 218: «con la publicación tomada por otro proceso, editar la publicación congeló la API» |
+| `subir-foto-sin-espera` | 218: «…subirle una foto congeló la API» |
+| `borrar-foto-sin-espera` | 218: «…borrarle una foto congeló la API» |
+| `documentacion-sin-espera` | 218: «con la documentación tomada por otro proceso, presentarla de nuevo congeló la API» |
+| `inventario-ve-el-bloqueo` | 219: «1 lugar(es) esperan la fila con el bloqueo que frena la API: api/products.py:527 async update_product» |
 
-**Aviso de entorno.** El script reinicia la API con `REINICIAR_API`, como
-pediste. Por omisión usa `./scripts/entorno_nativo.sh --reiniciar-api`. En
-tu entorno, por ejemplo: `REINICIAR_API="docker restart topgreen-api"`.
+`sin-tope` muestra algo que conviene saber: **sin tope, nadie queda colgado
+para siempre.** Esperan hasta que al que tenía la fila se le vence la llamada
+a Mercado Pago (15 s), y entonces siguen. El tope es para que cada camino
+conteste antes, y con algo que se pueda reintentar.
+
+**Avisos de entorno, antes de que los encuentres:**
+
+- los sabotajes que cuelgan la API tardan unos 50 s cada uno, y todo el
+  script tardó 8 minutos acá;
+- `REINICIAR_API` también lo usa el caso, como último recurso, si no puede
+  destrabar la API cortando las esperas en la base. En tu entorno:
+  `REINICIAR_API="docker restart topgreen-api"`;
+- el 218 sostiene filas desde otro proceso con
+  `docker exec -i topgreen-api python`, como ya hace el reconciliador;
+- la línea `ERROR: could not obtain lock on row in relation …` en la salida
+  es de `ordenBloqueada` y `filaTomada`, que preguntan con `NOWAIT`, igual
+  que el 99. No es un rojo.
 
 ## Cómo verificarlo
 
 Con el entorno arriba y la siembra demo:
 
 ```bash
-SMOKE_CASOS=210,211,212 node scripts/smoke.mjs
-# → 3/3 pasaron; 0 fallaron
+SMOKE_CASOS=213,214,215,216,217,218,219 node scripts/smoke.mjs
+# → 7/7 pasaron; 0 fallaron   (40 s acá; el 217 espera el tope a propósito)
 
-REINICIAR_API="<tu reinicio>" python3 scripts/sabotajes_avisos_de_pago_1.py
+REINICIAR_API="docker restart topgreen-api" python3 scripts/sabotajes_cobro_concurrente_1.py
 # → todos dieron el rojo esperado
 # → src y backend después: como estaban
 ```
@@ -184,31 +181,47 @@ REINICIAR_API="<tu reinicio>" python3 scripts/sabotajes_avisos_de_pago_1.py
 
 | puerta | resultado |
 |---|---|
-| suite completa desde base nueva, sobre `a97911b` | **211/212**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'». Pasan el 79, el 96, el 210, el 211 y el 212. El 213 no corre en la suite |
-| tipos, lint, build | verdes (`npm run build` incluye `tsc`; lint sin avisos) |
-| `compileall`, `node --check`, parseo de Python | verdes (27 scripts de Python) |
-| `alembic check` | `No new upgrade operations detected.` |
-| diff-check con `cr-at-eol` y finales de línea | limpios sobre `2e86854..a97911b` |
-| a11y `--todas` | 80 de 80 pantallas, 0 violaciones |
-| contraste | 88 de 88, ninguna por debajo del mínimo |
-| auditoría móvil | 12 de 12 recorridos y 39 pantallas: 0 desbordes, 0 controles tapados, 0 errores de consola y 0 respuestas 4xx/5xx |
-| `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular» |
-| `guia-usuario.mjs` | «LA GUÍA Y EL SITIO COINCIDEN: 22 pasos en escritorio y celular» |
+| suite completa desde base nueva, sobre `599dded` | **218/219**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'». Pasan del 213 al 219, y el 96, el 98, el 99, el 100 y el 212 |
+| lint, `tsc --noEmit`, build | verdes (lint sin avisos) |
+| `compileall`, `pip check`, `node --check` | verdes; «No broken requirements found.» |
+| `alembic check` | «No new upgrade operations detected.» Sin migraciones |
+| diff-check con `cr-at-eol` | limpio sobre `704c70e..599dded`. Se respetaron los CRLF de `orders.py` y `products.py` |
+| a11y, contraste, auditoría móvil, guías | **no corridas**: no cambia nada visible. `src/` no se tocó, y los textos nuevos son de la API |
 
 ## Riesgos
 
-- **El P1 de arriba**, y lo que no sé de él: cuántas confirmaciones a la vez
-  hacen falta en producción. Mercado Pago suele mandar el aviso justo cuando
-  quien compra vuelve.
-- **Quien vende recibe un aviso de algo que hizo.** Al aprobar la
-  transferencia le llega «Aprobaste la transferencia…». Lo pediste así; el
-  aviso le sirve porque dice el paso siguiente.
-- **Las guías no nombran los avisos nuevos.** La de uso dice que no mira
-  «Notificaciones». Agregarlos pide pasos nuevos en `guia-usuario.mjs`; no
-  lo hice.
+- **Esperas implícitas.** El inventario mira `with_for_update()`. Un `UPDATE`
+  también espera una fila tomada, y hay dos que corren en el proceso de la API
+  sobre la fila de la publicación: la reserva del checkout y la consolidación
+  del cobro. No cuelgan porque ningún camino de la API tiene esa fila tomada
+  mientras espera algo: eso es lo que arregló el cambio de orden, y el 218 lo
+  mira.
+  - **Queda un borde, sin reproducir.** El reconciliador (otro proceso), si no
+    pudo apagar el link, lo reintenta en `_una` después de consolidar, y lo
+    hace con la fila de la publicación tomada. Si Mercado Pago falla dos
+    veces seguidas en ese barrido, una compra de esa publicación podría frenar
+    la API hasta 15 s.
+  - **Propuesta:** en `_una`, no reintentar si `sincronizar` ya lo intentó en
+    ese barrido; queda para el próximo. No lo hice: cambia el reconciliador.
+- **Conexiones.** Quien espera la fila conserva su conexión a la base (pool
+  de 10 + 20). Más de 30 esperando la misma fila a la vez agotaría el pool, y
+  la petición siguiente esperaría hasta 30 s por una conexión. Mercado Pago
+  no manda tantos avisos del mismo pago. Sin reproducir.
+- **La pantalla no muestra el 409 nuevo.** «Cancelar» y «Rechazar» en Mis
+  Compras y Mis Ventas muestran «Error al cancelar el pedido» o «Error al
+  rechazar el pedido» ante cualquier error. Pasa lo mismo hoy con el 409 de
+  orden cobrada. **Propuesta (P3):** mostrar el mensaje de la API.
+- **La vuelta al tope** dice «Mercado Pago está procesando el pago» y deja de
+  preguntar, como con cualquier estado que no sea «pendiente». Debajo sale
+  «No pudimos confirmarlo con Mercado Pago recién», porque no está verificado.
+  Es lo que pediste.
+- **El tope (10 s) es menor que lo que puede tardar quien tiene la fila:**
+  hasta 15 s por llamada a Mercado Pago, y «Cancelar» hace dos. Con Mercado
+  Pago lento, quien espera recibe la respuesta de tope y reintenta. Es a
+  propósito.
 
 ---
 
-## NOTIF-TEXTOS-1
+## AVISOS-DE-PAGO-1
 
-Aceptada en `2e86854`. Sin cambios.
+Aceptada en rama sobre `c6792ff` y publicada en `a7e2237`. Sin cambios.
