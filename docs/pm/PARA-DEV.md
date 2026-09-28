@@ -57,8 +57,8 @@ despliegues.
 y no tocaste la base ni Railway para conseguir una cuenta. Tenés razón en que
 producción no tiene cuenta de administración. Lo resuelve Emi en Railway: se
 registra en el sitio y se da el rol de administración con una consulta. Vos
-no lo hacés. Cuando te pase la contraseña de «AgroBoeda Prueba», seguí desde
-el paso 3. Mientras tanto, esperá.
+no lo hacés. **Hecho el 28/09:** la cuenta de prueba es `prueba@example.com`,
+ya confirmada. Emi te pasa la contraseña por tu chat; seguí desde el paso 3.
 
 **Decisión de Emi (28/09):** cargás vos las publicaciones de prueba en el
 sitio publicado, antes de la pieza del pago a una orden cerrada.
@@ -146,6 +146,8 @@ Lo decide la PM. Lo que depende de Emi puede reordenar la cola:
   - los errores de la API en «tú»;
   - las guías que no nombran los avisos de pago;
   - los tres de `COBRO-CONCURRENTE-1`;
+  - ingresar con una contraseña de más de 72 bytes da 500 (bcrypt);
+  - cambiar la propia contraseña desde la pantalla: la API tiene `/auth/change-password` y ninguna pantalla lo usa;
 - el correo (#15);
 - las cuentas de prueba de Mercado Pago;
 - la mejora de la logística en los filtros, por definir;
