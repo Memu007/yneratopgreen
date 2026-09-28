@@ -33,8 +33,8 @@ sólo por él. Si la API queda colgada, el caso la destraba antes de irse.
   orden-vieja               La fila se toma sin releer la orden. El 214 tiene
                             que contar avisos de pago de más.
   sin-tope                  La espera tiene un tope de una hora, que es no tener
-                            tope. El 217 tiene que ver que los que esperan no
-                            responden.
+                            tope. El 217 tiene que ver que los que esperan pasan
+                            el tope y no reciben lo que se puede reintentar.
   editar-sin-espera         Editar la publicación vuelve al bloqueo síncrono.
                             El 218, en su segunda parte.
   subir-foto-sin-espera     Subir fotos, igual. El 218.
@@ -93,8 +93,8 @@ SABOTAJES = {
           "    # cancelación y reconciliación no se pisan sobre la misma compra.\n"
           + ORDEN_SINCRONICA)],
         216,
-        ["con el reconciliador sosteniendo la fila, " + CONGELADA],
-        ["el catálogo respondió", "el aviso respondió", "cerró una orden", "no terminó"],
+        ["con el reconciliador sosteniendo la fila, " + CONGELADA, "el catálogo respondió nada en 2 s"],
+        ["el aviso respondió", "cerró una orden", "no terminó"],
     ),
     "vuelta-sin-espera": (
         COBRO,
@@ -178,8 +178,8 @@ SABOTAJES = {
         CANDADO,
         [("SEGUNDOS_DE_TOPE = 10.0\n", "SEGUNDOS_DE_TOPE = 3600.0\n")],
         217,
-        ["las cuatro que esperaban no respondieron"],
-        [CONGELADA],
+        ["más que el tope de 10000 ms", "el aviso respondió 200 repetido: tenía que ser 503"],
+        [CONGELADA, "no esperaron el tope"],
     ),
     "editar-sin-espera": (
         PUBLICACIONES,

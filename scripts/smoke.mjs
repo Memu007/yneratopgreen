@@ -37281,6 +37281,7 @@ await runCase(217, 'Si la fila no se suelta a tiempo, cada camino responde algo 
           }
         }
         if (tardaron < TOPE - 1000) problemas.push(`respondieron a los ${tardaron} ms: no esperaron el tope`);
+        if (tardaron > TOPE + 3000) problemas.push(`esperaron ${tardaron} ms: más que el tope de ${TOPE} ms`);
       }
       // Con la API colgada, reintentar no mediría nada: se corta acá.
       assert(!medida.lentas && respuestas, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
