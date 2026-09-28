@@ -36570,9 +36570,8 @@ await runCase(211, 'La transferencia rechazada le avisa a quien compra, y la apr
 // otras —el aviso, la vuelta, el reconciliador—, y cuenta: un aviso para cada
 // parte, por orden.
 //
-// Las confirmaciones van seguidas y no a la vez: tres a la vez sobre un pago
-// recién acreditado cuelgan la API entera, desde antes de esta pieza. Ese
-// defecto está en el 213, que sólo corre si se lo pide.
+// Las confirmaciones van seguidas y no a la vez: las simultáneas son del 213
+// en adelante (COBRO-CONCURRENTE-1).
 await runCase(212, 'El pago acreditado por Mercado Pago avisa a las dos partes, una sola vez', async () => {
   const problemas = [];
   const CUENTA = '900721';
@@ -36686,44 +36685,884 @@ await runCase(212, 'El pago acreditado por Mercado Pago avisa a las dos partes, 
     + '«Confirmar Pedido» está en Mis Ventas';
 });
 
-// 213. Tres confirmaciones a la vez del mismo pago no cuelgan la API.
+// ---------------------------------------------------------------------------
+// COBRO-CONCURRENTE-1 — confirmaciones a la vez no cuelgan la API.
 //
-// HOY FALLA, y desde antes de AVISOS-DE-PAGO-1: por eso no es parte de la
-// suite y corre sólo con SMOKE_CASOS=213. Al terminar, la API queda colgada y
-// hay que reiniciarla.
+// El defecto: el aviso de Mercado Pago, la vuelta de quien compra, «Cancelar»
+// y «Rechazar» toman la fila de la orden con FOR UPDATE y, con la fila tomada,
+// esperan a Mercado Pago. Otra petición que pedía la misma fila la esperaba con
+// una llamada síncrona, y esa llamada frena el único bucle de eventos de la
+// API: la primera ya no podía terminar su espera y nadie más era atendido.
 //
-// Qué pasa: el webhook y la vuelta de quien compra toman la fila de la orden
-// con `FOR UPDATE` y, con la fila tomada, esperan a Mercado Pago para apagar
-// el link (`await apagar_link`). Una segunda confirmación que llega en ese
-// momento pide la misma fila con una llamada síncrona, que frena el único
-// bucle de eventos del proceso: la primera ya no puede terminar y ninguna
-// otra petición se atiende.
-if (CASOS_PEDIDOS.includes(213)) {
-  await runCase(213, 'Tres confirmaciones a la vez del mismo pago no cuelgan la API', async () => {
-    const CUENTA = '900722';
-    const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
-    const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
-    await comprador();
-    await desvincular(vendedor.token);
-    assert((await vincular(vendedor.token, `ok:${CUENTA}`)).ok === 'vinculado', 'el vendedor no vinculó');
-    const orden = await ordenMercadoPago(vendedor);
-    const pago = doble.crearPago({
-      referencia: `topgreen-${orden.order_number}`, preferencia: orden.preferencia, cuenta: CUENTA,
-      monto: orden.amount, ordenId: orden.order_id, ordenNumero: orden.order_number, estado: 'approved',
+// Los casos no dependen de que dos pedidos caigan en el mismo instante:
+// retienen en el doble la espera a Mercado Pago que se hace con la fila tomada
+// —apagar el link, o la búsqueda del reconciliador— y recién entonces mandan
+// lo demás. Mientras está retenida, la salud de la API tiene que contestar en
+// menos de 2 s, una consulta tras otra.
+//
+// Si alguna vez la API se vuelve a colgar, el caso la destraba antes de irse
+// (`recuperarLaApi`): el rojo queda en el caso que lo encontró y el resto de la
+// suite sigue.
+// ---------------------------------------------------------------------------
+
+const TOPE_DE_LA_SALUD = 2000;
+
+async function saludable(tope = TOPE_DE_LA_SALUD) {
+  try {
+    const respuesta = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(tope) });
+    return respuesta.ok;
+  } catch {
+    return false;
+  }
+}
+
+// La salud de la API mientras dura una carrera: una consulta tras otra, cada
+// una con 2 s de tope. `otras(n)` espera a que se hagan `n` consultas más, así
+// la ventana que se mira es una cantidad de respuestas y no un rato dormido.
+function vigilarLaSalud() {
+  let seguir = true;
+  const demoras = [];
+  let lentas = 0;
+  const bucle = (async () => {
+    while (seguir) {
+      const desde = Date.now();
+      const bien = await saludable();
+      const demora = Date.now() - desde;
+      demoras.push(demora);
+      if (!bien || demora >= TOPE_DE_LA_SALUD) lentas += 1;
+      await new Promise((seguirDespues) => { setTimeout(seguirDespues, 100); });
+    }
+  })();
+  let medida = null;
+  return {
+    async otras(n) {
+      const meta = demoras.length + n;
+      while (demoras.length < meta) await new Promise((s) => { setTimeout(s, 50); });
+    },
+    lentas: () => lentas,
+    async terminar() {
+      if (!medida) {
+        seguir = false;
+        await bucle;
+        medida = { consultas: demoras.length, peor: Math.max(0, ...demoras), lentas };
+      }
+      return medida;
+    },
+  };
+}
+
+// Espera una promesa hasta `ms`. Si no llegó, devuelve `vencida` en vez de
+// quedarse colgada con la API.
+function conTope(promesa, ms, vencida = null) {
+  let reloj = null;
+  return Promise.race([
+    promesa.finally(() => clearTimeout(reloj)),
+    new Promise((seguir) => { reloj = setTimeout(() => seguir(vencida), ms); }),
+  ]);
+}
+
+// Si una carrera vuelve a colgar la API, se la destraba desde la base: se cortan
+// las conexiones que esperan un candado. La que tenía la fila termina sola y la
+// API vuelve a atender. No alcanza con que conteste una vez: cortada una
+// espera, la siguiente petición trabada puede volver a pedir la fila antes de
+// que la primera la suelte, y la API se cuelga de nuevo. Así que se insiste
+// hasta que no quede ninguna espera de candado y la salud conteste tres veces
+// seguidas. Si con eso no alcanza, se la reinicia con REINICIAR_API (por
+// omisión, el entorno nativo). Devuelve qué hizo falta.
+function esperasDeCandado() {
+  return Number(queryRows(`
+    SELECT count(*) FROM pg_stat_activity
+    WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock'
+  `)[0][0]);
+}
+
+async function recuperarLaApi() {
+  let cortes = 0;
+  let seguidas = 0;
+  const hasta = Date.now() + 90_000;
+  while (Date.now() < hasta) {
+    if (esperasDeCandado() > 0) {
+      querySql(`
+        SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid()
+          AND wait_event_type = 'Lock'
+      `);
+      cortes += 1;
+      seguidas = 0;
+      continue;
+    }
+    seguidas = (await saludable()) ? seguidas + 1 : 0;
+    if (seguidas >= 3) {
+      return cortes ? `se destrabó cortando ${cortes} vez/veces las esperas en la base` : 'respondía';
+    }
+    await new Promise((seguir) => { setTimeout(seguir, 300); });
+  }
+  const reiniciar = process.env.REINICIAR_API || './scripts/entorno_nativo.sh --reiniciar-api';
+  spawnSync('sh', ['-c', reiniciar], { stdio: 'ignore' });
+  for (let vuelta = 0; vuelta < 30; vuelta += 1) {
+    if (await saludable()) return `hubo que reiniciarla (${reiniciar})`;
+  }
+  return 'no volvió ni reiniciándola';
+}
+
+// Corre el cuerpo de un caso de esta pieza. Si falla, primero destraba la API
+// y después dice qué hizo falta, junto con el motivo del rojo.
+async function sinDejarLaApiColgada(cuerpo) {
+  try {
+    return await cuerpo();
+  } catch (error) {
+    const como = await recuperarLaApi();
+    throw new Error(`${error.message}\n  (la API después del rojo: ${como})`);
+  }
+}
+
+// Sostiene una fila con FOR UPDATE desde OTRO proceso, que es como la sostiene
+// el reconciliador mientras le pregunta a Mercado Pago. `tomada` se cumple
+// cuando ya la tiene; `soltar()` la libera y espera a que termine.
+function sostenerFila(tabla, id) {
+  const guion = [
+    'import sys',
+    'from sqlalchemy import text',
+    'from app.db.base import SessionLocal',
+    'db = SessionLocal()',
+    `fila = db.execute(text("SELECT id FROM ${tabla} WHERE id = :id FOR UPDATE"), {"id": ${JSON.stringify(id)}}).first()`,
+    'print("TOMADA" if fila else "NO EXISTE", flush=True)',
+    'sys.stdin.read()',
+    'db.commit()',
+  ].join('\n');
+  const hijo = spawn('docker', ['exec', '-i', 'topgreen-api', 'python', '-c', guion]);
+  let salida = '';
+  let error = '';
+  const terminada = new Promise((seguir) => { hijo.on('close', seguir); });
+  const tomada = new Promise((resolver, rechazar) => {
+    hijo.stdout.on('data', (trozo) => {
+      salida += trozo;
+      if (salida.includes('TOMADA')) resolver();
+      if (salida.includes('NO EXISTE')) rechazar(new Error(`no hay fila ${id} en ${tabla} para sostener`));
     });
-    const carrera = Promise.all([
-      avisar({ dataId: pago.id, cuenta: CUENTA }),
-      avisar({ dataId: pago.id, cuenta: CUENTA }),
-      pedirCrudo(`/orders/${orden.order_id}/payment-state`, { method: 'POST', header: state.buyerToken, body: {} }),
-    ]).then(() => 'terminaron');
-    const reloj = new Promise((seguir) => { setTimeout(() => seguir('colgada'), 30_000); });
-    const resultado = await Promise.race([carrera, reloj]);
-    doble.cerrar();
-    assert(resultado === 'terminaron',
-      `las tres confirmaciones de ${orden.order_number} no terminaron en 30 s y la API dejó de responder`);
-    return `las tres confirmaciones de ${orden.order_number} terminaron`;
+    hijo.stderr.on('data', (trozo) => { error += trozo; });
+    hijo.on('error', rechazar);
+    terminada.then((codigo) => rechazar(new Error(
+      `quien sostenía ${tabla} terminó (${codigo}) antes de tomarla: ${error.slice(-300)}`)));
+  });
+  let soltada = false;
+  return {
+    tomada,
+    async soltar() {
+      if (!soltada) hijo.stdin.end();
+      soltada = true;
+      await conTope(terminada, 20_000);
+    },
+  };
+}
+
+// ¿La fila está tomada por otra transacción? Lo mismo que `ordenBloqueada`, para
+// cualquier tabla.
+function filaTomada(tabla, id) {
+  try {
+    querySql(`SELECT 1 FROM ${tabla} WHERE id = ${sqlLiteral(id)} FOR UPDATE NOWAIT`);
+    return false;
+  } catch (error) {
+    const texto = `${error}${error?.stderr || ''}${error?.stdout || ''}`;
+    if (/could not obtain lock|no se pudo obtener el bloqueo|lock.*NOWAIT/i.test(texto)) return true;
+    throw error;
+  }
+}
+
+// Los avisos de pago que dejó una orden, por destinatario.
+function avisosDePagoDe(orden) {
+  return queryRows(`
+    SELECT CASE WHEN n.user_id = o.buyer_id THEN 'compra' ELSE 'vende' END, n.title
+    FROM notifications n JOIN orders o ON o.id = n.order_id
+    WHERE n.order_id = ${sqlLiteral(orden.order_id)}
+      AND n.title IN ('Pago aprobado', 'Venta pagada')
+    ORDER BY 1, 2
+  `).map(([quien, titulo]) => `${quien}: ${titulo}`);
+}
+
+function linkCerrado(ordenId) {
+  const [[cerrado]] = queryRows(
+    `SELECT link_cerrado FROM payments WHERE order_id = ${sqlLiteral(ordenId)}`);
+  return cerrado === 't';
+}
+
+// Quién paga y quién cobra en estos casos. Cada uno con su cuenta de Mercado
+// Pago, para que los pagos de un caso no se mezclen con los de otro.
+async function preparaElCobro(cuenta) {
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  await comprador();
+  await desvincular(vendedor.token);
+  assert((await vincular(vendedor.token, `ok:${cuenta}`)).ok === 'vinculado', 'el vendedor no vinculó');
+  return vendedor;
+}
+
+function pagarEnElDoble(doble, orden, cuenta) {
+  return doble.crearPago({
+    referencia: `topgreen-${orden.order_number}`, preferencia: orden.preferencia, cuenta,
+    monto: orden.amount, ordenId: orden.order_id, ordenNumero: orden.order_number, estado: 'approved',
   });
 }
+
+function volverDeMercadoPago(orden) {
+  return pedirCrudo(`/orders/${orden.order_id}/payment-state`, {
+    method: 'POST', header: state.buyerToken, body: {},
+  });
+}
+
+async function limpiarElCobro(doble, vendedor) {
+  doble.soltarElCierre();
+  doble.soltarLaBusqueda();
+  await doble.cerrar();
+  try {
+    if (vendedor) await desvincular(vendedor.token);
+    await apiRequest('/cart', { method: 'DELETE', token: state.buyerToken });
+  } catch { /* la limpieza no tapa el motivo real */ }
+}
+
+// 213. El P1 tal como se encontró: dos avisos y una vuelta del mismo pago a la
+// vez. Antes de COBRO-CONCURRENTE-1 colgaba la API entera.
+await runCase(213, 'Tres confirmaciones a la vez del mismo pago no cuelgan la API', async () => {
+  const CUENTA = '900722';
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    return await sinDejarLaApiColgada(async () => {
+      vendedor = await preparaElCobro(CUENTA);
+      const orden = await ordenMercadoPago(vendedor);
+      const pago = pagarEnElDoble(doble, orden, CUENTA);
+
+      // La primera que toma la fila se queda esperando a Mercado Pago para
+      // apagar el link. Las otras dos llegan en ese momento.
+      //
+      // La salud se mira desde antes de mandarlas: sin el arreglo, la API se
+      // cuelga antes de que el pedido para apagar el link llegue a salir.
+      doble.pausarElCierre({ preferencia: orden.preferencia });
+      const salud = vigilarLaSalud();
+      const tres = Promise.all([
+        avisar({ dataId: pago.id, cuenta: CUENTA }),
+        avisar({ dataId: pago.id, cuenta: CUENTA }),
+        volverDeMercadoPago(orden),
+      ]);
+      await esperarA(() => doble.cierres(orden.preferencia) >= 1 || salud.lentas() > 0,
+        'que alguna de las tres llegara a apagar el link');
+      await salud.otras(5);
+      doble.soltarElCierre();
+      const terminaron = await conTope(tres, 30_000);
+      const medida = await salud.terminar();
+
+      assert(medida.lentas === 0,
+        `con una confirmación esperando a Mercado Pago, la API dejó de responder: ${medida.lentas} de `
+        + `${medida.consultas} consultas de salud tardaron 2 s o más`);
+      assert(terminaron, `las tres confirmaciones de ${orden.order_number} no terminaron en 30 s`);
+      const [primero, segundo, vuelta] = terminaron;
+      assert(primero.status === 200 && segundo.status === 200 && vuelta.status === 200,
+        `respondieron ${primero.status}, ${segundo.status} y ${vuelta.status}`);
+      assert(ordenEnLaBase(orden.order_id).estado === 'paid', 'la orden no quedó pagada');
+      return `las tres confirmaciones de ${orden.order_number} terminaron con 200 y la salud contestó `
+        + `${medida.consultas} veces, la peor en ${medida.peor} ms, mientras una esperaba a Mercado Pago`;
+    });
+  } finally {
+    await limpiarElCobro(doble, vendedor);
+  }
+});
+
+// 214. Una ráfaga del mismo pago: tres avisos y tres vueltas a la vez. Todas
+// terminan, y el pago produce sus efectos una sola vez.
+await runCase(214, 'Seis confirmaciones del mismo pago a la vez: una transición, un descuento, un par de avisos', async () => {
+  const CUENTA = '900730';
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    return await sinDejarLaApiColgada(async () => {
+      vendedor = await preparaElCobro(CUENTA);
+      const orden = await ordenMercadoPago(vendedor);
+      const { producto } = orden;
+      const stockAntes = stockDe(producto);
+      const reservadoAntes = reservadoDe(producto);
+      const ventasAntes = ventasDe(producto);
+      const pago = pagarEnElDoble(doble, orden, CUENTA);
+
+      doble.pausarElCierre({ preferencia: orden.preferencia });
+      const salud = vigilarLaSalud();
+      const avisos = [];
+      const vueltas = [];
+      for (let i = 0; i < 3; i += 1) {
+        avisos.push(avisar({ dataId: pago.id, cuenta: CUENTA }));
+        vueltas.push(volverDeMercadoPago(orden));
+      }
+      const todas = Promise.all([Promise.all(avisos), Promise.all(vueltas)]);
+      await esperarA(() => doble.cierres(orden.preferencia) >= 1 || salud.lentas() > 0,
+        'que alguna confirmación llegara a apagar el link');
+
+      // La regla que no se afloja: el link se apaga con la fila de la orden
+      // tomada. Si se soltara para esperar a Mercado Pago, otro pago podría
+      // entrar por el mismo link mientras se lo apaga.
+      const conLaFila = ordenBloqueada(orden.order_id);
+      await salud.otras(5);
+      doble.soltarElCierre();
+      const terminaron = await conTope(todas, 30_000);
+      const medida = await salud.terminar();
+
+      const problemas = [];
+      if (medida.lentas) {
+        problemas.push(`la API dejó de responder durante la ráfaga: ${medida.lentas} de ${medida.consultas} `
+          + 'consultas de salud tardaron 2 s o más');
+      }
+      if (!conLaFila) problemas.push('mientras se apagaba el link, la fila de la orden estaba suelta');
+      if (!terminaron) {
+        problemas.push('las seis confirmaciones no terminaron en 30 s');
+      } else {
+        const [deLosAvisos, deLasVueltas] = terminaron;
+        const resultados = deLosAvisos.map((r) => `${r.status} ${r.resultado}`);
+        if (!deLosAvisos.every((r) => r.status === 200 && ['aplicado', 'repetido'].includes(r.resultado))) {
+          problemas.push(`los avisos respondieron ${resultados.join(', ')}`);
+        }
+        const estados = deLasVueltas.map((r) => `${r.status} ${r.datos?.payment_state}`);
+        if (!deLasVueltas.every((r) => r.status === 200 && r.datos?.payment_state === 'aprobado')) {
+          problemas.push(`las vueltas respondieron ${estados.join(', ')}`);
+        }
+      }
+      const estado = ordenEnLaBase(orden.order_id).estado;
+      if (estado !== 'paid') problemas.push(`la orden quedó «${estado}»`);
+      if (reservaDe(orden.order_id) !== 'consolidada') {
+        problemas.push(`la reserva quedó «${reservaDe(orden.order_id)}»`);
+      }
+      if (stockDe(producto) !== stockAntes - 1) {
+        problemas.push(`el stock pasó de ${stockAntes} a ${stockDe(producto)}: tenía que bajar uno`);
+      }
+      if (reservadoDe(producto) !== reservadoAntes - 1) {
+        problemas.push(`lo reservado pasó de ${reservadoAntes} a ${reservadoDe(producto)}: tenía que bajar uno`);
+      }
+      if (ventasDe(producto) !== ventasAntes + 1) {
+        problemas.push(`las ventas pasaron de ${ventasAntes} a ${ventasDe(producto)}: tenían que subir una`);
+      }
+      const avisosDePago = avisosDePagoDe(orden);
+      if (JSON.stringify(avisosDePago) !== JSON.stringify(['compra: Pago aprobado', 'vende: Venta pagada'])) {
+        problemas.push(`los avisos de pago son ${JSON.stringify(avisosDePago)}: tenía que haber uno para cada parte`);
+      }
+      if (!doble.vencida(orden.preferencia) || !linkCerrado(orden.order_id)) {
+        problemas.push('el link no quedó apagado');
+      }
+      if (doble.cierres(orden.preferencia) !== 1) {
+        problemas.push(`el link se apagó ${doble.cierres(orden.preferencia)} veces: las confirmaciones que `
+          + 'llegaron después tenían que ver que ya estaba apagado');
+      }
+      const intentos = intentosDe(orden.order_id);
+      if (intentos.length !== 1) problemas.push(`quedaron ${intentos.length} intentos guardados para un pago`);
+
+      assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+      return `tres avisos y tres vueltas del mismo pago terminaron con 200; mientras una esperaba a Mercado `
+        + `Pago con la fila tomada, la salud contestó ${medida.consultas} veces (la peor en ${medida.peor} ms); `
+        + 'la orden quedó pagada una vez, el stock y lo reservado bajaron uno, las ventas subieron una, hay un '
+        + '«Pago aprobado» y un «Venta pagada», y el link se apagó una sola vez';
+    });
+  } finally {
+    await limpiarElCobro(doble, vendedor);
+  }
+});
+
+// 215. «Cancelar» y «Rechazar» contra una confirmación del mismo pago, en los
+// dos órdenes de llegada. Pase lo que pase primero, la orden cobrada queda
+// pagada y quien quería cancelar o rechazar se entera de que llegó tarde: es lo
+// que ya definen los casos de una orden cobrada (96 y el cierre que encuentra el
+// cobro).
+await runCase(215, '«Cancelar» y «Rechazar» contra una confirmación del mismo pago no cuelgan la API', async () => {
+  const CUENTA = '900731';
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    return await sinDejarLaApiColgada(async () => {
+      vendedor = await preparaElCobro(CUENTA);
+      const producto = productoConStock(vendedor.id, 5);
+      const stockAntes = stockDe(producto);
+      const reservadoAntes = reservadoDe(producto);
+
+      const cancelar = (orden, token) => pedirCrudo(`/orders/${orden.order_id}/cancel`, {
+        method: 'POST', header: token, body: { reason: 'COBRO-CONCURRENTE-1' },
+      });
+      const rechazar = (orden) => pedirCrudo(`/orders/${orden.order_id}/status`, {
+        method: 'PATCH', header: vendedor.token, body: { status: 'rejected', reason: 'COBRO-CONCURRENTE-1' },
+      });
+      const aviso = (orden, pago) => avisar({ dataId: pago.id, cuenta: CUENTA });
+      const vuelta = (orden) => volverDeMercadoPago(orden);
+      const detalle = (r) => (typeof r.datos === 'object' ? r.datos?.detail : r.datos) || '';
+
+      // Quién toma la fila primero y quién llega mientras tanto. El que la toma
+      // se queda esperando a Mercado Pago para apagar el link.
+      const escenas = [
+        ['«Cancelar» de quien compra, y llega el aviso', (o) => cancelar(o, state.buyerToken), aviso],
+        ['«Rechazar» de quien vende, y llega la vuelta', rechazar, vuelta],
+        ['el aviso, y llega «Rechazar» (la cancelación de quien vende)', aviso, (o) => cancelar(o, vendedor.token)],
+        ['la vuelta, y llega «Rechazar» por estado', vuelta, rechazar],
+      ];
+      const problemas = [];
+      const hechas = [];
+      for (const [escena, primero, despues] of escenas) {
+        const orden = await ordenMercadoPago(vendedor, { producto });
+        const pago = pagarEnElDoble(doble, orden, CUENTA);
+        doble.pausarElCierre({ preferencia: orden.preferencia });
+        const delPrimero = primero(orden, pago);
+        await esperarA(() => doble.cierres(orden.preferencia) >= 1,
+          `${escena}: que el primero llegara a apagar el link`);
+        const delSegundo = despues(orden, pago);
+        const salud = vigilarLaSalud();
+        await salud.otras(5);
+        doble.soltarElCierre();
+        const terminaron = await conTope(Promise.all([delPrimero, delSegundo]), 30_000);
+        const medida = await salud.terminar();
+        if (medida.lentas) {
+          problemas.push(`${escena}: la API dejó de responder (${medida.lentas} de ${medida.consultas} `
+            + 'consultas de salud tardaron 2 s o más)');
+        }
+        if (!terminaron) problemas.push(`${escena}: no terminaron en 30 s`);
+        // Con la API colgada, la escena siguiente no mediría nada suyo: se corta
+        // acá, en la escena que la colgó.
+        assert(!medida.lentas && terminaron, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+        // Lo que responde cada uno, según qué es y no según quién llegó primero.
+        for (const r of terminaron) {
+          const texto = detalle(r);
+          const esCierre = r.resultado === undefined && r.datos?.payment_state === undefined;
+          if (r.resultado !== undefined) {
+            if (r.status !== 200 || !['aplicado', 'repetido'].includes(r.resultado)) {
+              problemas.push(`${escena}: el aviso respondió ${r.status} ${r.resultado}`);
+            }
+          } else if (!esCierre) {
+            if (r.status !== 200 || r.datos?.payment_state !== 'aprobado') {
+              problemas.push(`${escena}: la vuelta respondió ${r.status} ${r.datos?.payment_state}`);
+            }
+          } else if (!((r.status === 409 && /pago acreditado/i.test(texto))
+            || (r.status === 400 && /No puedes cambiar de paid a rejected/.test(texto)))) {
+            problemas.push(`${escena}: cancelar o rechazar respondió ${r.status} «${texto}»`);
+          }
+        }
+        const estado = ordenEnLaBase(orden.order_id).estado;
+        if (estado !== 'paid') problemas.push(`${escena}: la orden cobrada quedó «${estado}»`);
+        if (reservaDe(orden.order_id) !== 'consolidada') {
+          problemas.push(`${escena}: la reserva quedó «${reservaDe(orden.order_id)}»`);
+        }
+        const avisosDePago = avisosDePagoDe(orden);
+        if (avisosDePago.length !== 2) {
+          problemas.push(`${escena}: los avisos de pago son ${JSON.stringify(avisosDePago)}`);
+        }
+        hechas.push(`${escena}: ${terminaron.map((r) => r.status).join(' y ')}, salud ${medida.peor} ms`);
+      }
+      if (stockDe(producto) !== stockAntes - escenas.length) {
+        problemas.push(`el stock pasó de ${stockAntes} a ${stockDe(producto)}: tenía que bajar ${escenas.length}`);
+      }
+      if (reservadoDe(producto) !== reservadoAntes) {
+        problemas.push(`lo reservado pasó de ${reservadoAntes} a ${reservadoDe(producto)}: tenía que volver`);
+      }
+      assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+      return `las cuatro órdenes cobradas quedaron pagadas, con su reserva consolidada una vez y su par de `
+        + `avisos: ${hechas.join('; ')}`;
+    });
+  } finally {
+    await limpiarElCobro(doble, vendedor);
+  }
+});
+
+// 216. El reconciliador es otro proceso. Mientras tiene la fila de una orden y le
+// pregunta a Mercado Pago, un aviso de esa orden espera sin frenar a nadie.
+await runCase(216, 'Con el reconciliador sosteniendo la fila, un aviso de esa orden no congela la API', async () => {
+  const CUENTA = '900732';
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    return await sinDejarLaApiColgada(async () => {
+      vendedor = await preparaElCobro(CUENTA);
+      const orden = await ordenMercadoPago(vendedor);
+      const { producto } = orden;
+      const stockAntes = stockDe(producto);
+      vencerElLink(orden.order_id);
+
+      // La segunda búsqueda de esta orden es la del cierre, y el reconciliador
+      // la hace con la fila tomada. Ahí se lo retiene.
+      const referencia = `topgreen-${orden.order_number}`;
+      doble.pausarLaBusqueda({ desde: 2, referencia });
+      const barrido = reconciliar();
+      await esperarA(() => doble.busquedas(referencia) >= 2,
+        'la búsqueda con la que el reconciliador decide sobre esta orden');
+      assert(ordenBloqueada(orden.order_id), 'el reconciliador no tenía la fila: el caso no prueba nada');
+
+      const pago = pagarEnElDoble(doble, orden, CUENTA);
+      const aviso = avisar({ dataId: pago.id, cuenta: CUENTA });
+      const salud = vigilarLaSalud();
+      await salud.otras(5);
+      // Y otra petición cualquiera, que no tiene nada que ver con esa orden.
+      const otra = await conTope(pedirCrudo('/catalog/products'), TOPE_DE_LA_SALUD);
+      doble.soltarLaBusqueda();
+      const resumen = await conTope(barrido, 60_000);
+      const respuesta = await conTope(aviso, 30_000);
+      const medida = await salud.terminar();
+
+      const problemas = [];
+      if (medida.lentas) {
+        problemas.push(`con el reconciliador sosteniendo la fila, la API dejó de responder: ${medida.lentas} `
+          + `de ${medida.consultas} consultas de salud tardaron 2 s o más`);
+      }
+      if (!otra || otra.status !== 200) problemas.push(`el catálogo respondió ${otra ? otra.status : 'nada en 2 s'}`);
+      if (!respuesta) problemas.push('el aviso no terminó en 30 s después de soltar al reconciliador');
+      else if (respuesta.status !== 200) problemas.push(`el aviso respondió ${respuesta.status} ${respuesta.resultado}`);
+      if (!resumen) problemas.push('el reconciliador no terminó');
+      else if (resumen.vencida || resumen.liberada) {
+        problemas.push(`el reconciliador cerró una orden que se estaba pagando: ${JSON.stringify(resumen)}`);
+      }
+      const estado = ordenEnLaBase(orden.order_id).estado;
+      if (estado !== 'paid') problemas.push(`la orden quedó «${estado}» con un pago acreditado`);
+      if (stockDe(producto) !== stockAntes - 1) {
+        problemas.push(`el stock pasó de ${stockAntes} a ${stockDe(producto)}: tenía que bajar uno`);
+      }
+      assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+      return `con el reconciliador sosteniendo la fila, la salud contestó ${medida.consultas} veces (la peor en `
+        + `${medida.peor} ms) y el catálogo respondió; al soltarlo, el aviso terminó con 200, la orden quedó `
+        + `pagada y el stock bajó uno (${JSON.stringify(resumen)})`;
+    });
+  } finally {
+    await limpiarElCobro(doble, vendedor);
+  }
+});
+
+// 217. El tope. Una confirmación que espera la fila no espera para siempre: si
+// no se suelta a tiempo, cada camino devuelve algo que se puede reintentar, y
+// ninguna respuesta queda colgada.
+await runCase(217, 'Si la fila no se suelta a tiempo, cada camino responde algo que se puede reintentar', async () => {
+  const CUENTA = '900733';
+  const TOPE = 10_000; // el de `candado.SEGUNDOS_DE_TOPE`
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  try {
+    return await sinDejarLaApiColgada(async () => {
+      vendedor = await preparaElCobro(CUENTA);
+      const orden = await ordenMercadoPago(vendedor);
+      const pago = pagarEnElDoble(doble, orden, CUENTA);
+
+      doble.pausarElCierre({ preferencia: orden.preferencia });
+      const primero = avisar({ dataId: pago.id, cuenta: CUENTA });
+      await esperarA(() => doble.cierres(orden.preferencia) >= 1, 'que el primer aviso llegara a apagar el link');
+
+      const desde = Date.now();
+      const esperan = Promise.all([
+        avisar({ dataId: pago.id, cuenta: CUENTA }),
+        volverDeMercadoPago(orden),
+        pedirCrudo(`/orders/${orden.order_id}/cancel`, { method: 'POST', header: state.buyerToken, body: {} }),
+        pedirCrudo(`/orders/${orden.order_id}/status`, {
+          method: 'PATCH', header: vendedor.token, body: { status: 'rejected', reason: 'COBRO-CONCURRENTE-1' },
+        }),
+      ]);
+      const salud = vigilarLaSalud();
+      const respuestas = await conTope(esperan, TOPE + 15_000);
+      const tardaron = Date.now() - desde;
+      const medida = await salud.terminar();
+      doble.soltarElCierre();
+      const delPrimero = await conTope(primero, 30_000);
+
+      const problemas = [];
+      if (medida.lentas) {
+        problemas.push(`la API dejó de responder mientras esperaban: ${medida.lentas} de ${medida.consultas} `
+          + 'consultas de salud tardaron 2 s o más');
+      }
+      if (!respuestas) {
+        problemas.push(`las cuatro que esperaban no respondieron en ${(TOPE + 15_000) / 1000} s`);
+      } else {
+        const [otroAviso, vuelta, cancelacion, rechazo] = respuestas;
+        const texto = (r) => (typeof r.datos === 'object' ? r.datos?.detail : r.datos) || '';
+        if (otroAviso.status !== 503 || otroAviso.resultado !== 'orden_ocupada') {
+          problemas.push(`el aviso respondió ${otroAviso.status} ${otroAviso.resultado}: tenía que ser 503, `
+            + 'para que Mercado Pago lo reintente');
+        }
+        if (vuelta.status !== 200 || vuelta.datos?.payment_state !== 'en_proceso' || vuelta.datos?.verificado !== false) {
+          problemas.push(`la vuelta respondió ${vuelta.status} ${JSON.stringify(vuelta.datos)}: tenía que decir `
+            + '«en proceso», sin verificar');
+        }
+        for (const [nombre, r] of [['«Cancelar»', cancelacion], ['«Rechazar»', rechazo]]) {
+          if (r.status !== 409 || !/Probá de nuevo/.test(texto(r))) {
+            problemas.push(`${nombre} respondió ${r.status} «${texto(r)}»: tenía que ser un 409 que diga que se `
+              + 'pruebe de nuevo');
+          }
+        }
+        if (tardaron < TOPE - 1000) problemas.push(`respondieron a los ${tardaron} ms: no esperaron el tope`);
+      }
+      // Con la API colgada, reintentar no mediría nada: se corta acá.
+      assert(!medida.lentas && respuestas, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+      if (!delPrimero || delPrimero.status !== 200 || delPrimero.resultado !== 'aplicado') {
+        problemas.push(`el aviso que tenía la fila terminó en ${delPrimero ? `${delPrimero.status} ${delPrimero.resultado}` : 'nada'}`);
+      }
+
+      // Y reintentar sirve: el aviso que volvió con 503 vuelve a llegar, y la
+      // vuelta vuelve a preguntar.
+      const reintento = await avisar({ dataId: pago.id, cuenta: CUENTA });
+      if (reintento.status !== 200 || reintento.resultado !== 'repetido') {
+        problemas.push(`el reintento del aviso respondió ${reintento.status} ${reintento.resultado}`);
+      }
+      const otraVuelta = await volverDeMercadoPago(orden);
+      if (otraVuelta.datos?.payment_state !== 'aprobado') {
+        problemas.push(`la vuelta, al volver a preguntar, dijo «${otraVuelta.datos?.payment_state}»`);
+      }
+      const estado = ordenEnLaBase(orden.order_id).estado;
+      if (estado !== 'paid') problemas.push(`la orden quedó «${estado}»`);
+      const avisosDePago = avisosDePagoDe(orden);
+      if (avisosDePago.length !== 2) problemas.push(`los avisos de pago son ${JSON.stringify(avisosDePago)}`);
+
+      assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+      return `con la fila tomada más que el tope, a los ${tardaron} ms el aviso recibió 503 «orden_ocupada», `
+        + 'la vuelta «en proceso» sin verificar, y «Cancelar» y «Rechazar» un 409 que pide probar de nuevo; la '
+        + `salud contestó ${medida.consultas} veces (la peor en ${medida.peor} ms); el aviso que tenía la fila `
+        + 'terminó aplicado, y el reintento dio «repetido» y la vuelta «aprobado»';
+    });
+  } finally {
+    await limpiarElCobro(doble, vendedor);
+  }
+});
+
+// 218. Lo que no es la orden. Mientras una confirmación espera a Mercado Pago,
+// la publicación que se está pagando no queda tomada: otra compra de la misma
+// publicación se confirma entera. Y cuando otro proceso sí la tiene —como el
+// reconciliador—, editarla, subirle o borrarle fotos y presentar documentación
+// esperan sin frenar a nadie.
+await runCase(218, 'La publicación y la documentación tomadas por otro no congelan la API', async () => {
+  const CUENTA = '900734';
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let vendedor = null;
+  const sostenidas = [];
+  const fotosNuevas = [];
+  let conFotos = null;
+  try {
+    return await sinDejarLaApiColgada(async () => {
+      vendedor = await preparaElCobro(CUENTA);
+      const problemas = [];
+      const hechas = [];
+      const texto = (r) => (typeof r.datos === 'object' ? JSON.stringify(r.datos) : String(r.datos)).slice(0, 160);
+
+      // --- 1. Dos compras de la misma publicación. La primera espera a
+      //        Mercado Pago con su orden tomada; la segunda se confirma entera,
+      //        descuento de stock incluido, sin esperar a la primera.
+      const producto = productoConStock(vendedor.id, 3);
+      const stockAntes = stockDe(producto);
+      const primera = await ordenMercadoPago(vendedor, { producto });
+      const segunda = await ordenMercadoPago(vendedor, { producto });
+      const pagoPrimera = pagarEnElDoble(doble, primera, CUENTA);
+      const pagoSegunda = pagarEnElDoble(doble, segunda, CUENTA);
+      doble.pausarElCierre({ preferencia: primera.preferencia });
+      const avisoPrimera = avisar({ dataId: pagoPrimera.id, cuenta: CUENTA });
+      await esperarA(() => doble.cierres(primera.preferencia) >= 1,
+        'que la primera compra llegara a apagar su link');
+      const salud = vigilarLaSalud();
+      const avisoSegunda = await conTope(avisar({ dataId: pagoSegunda.id, cuenta: CUENTA }), 10_000);
+      const deLaPublicacion = filaTomada('products', producto);
+      await salud.otras(3);
+      doble.soltarElCierre();
+      const delPrimero = await conTope(avisoPrimera, 30_000);
+      const medida = await salud.terminar();
+      if (medida.lentas) {
+        problemas.push(`con la primera compra esperando a Mercado Pago, la API dejó de responder `
+          + `(${medida.lentas} de ${medida.consultas} consultas de salud tardaron 2 s o más)`);
+      }
+      if (!avisoSegunda || avisoSegunda.status !== 200 || avisoSegunda.resultado !== 'aplicado') {
+        problemas.push('la segunda compra de la misma publicación no se confirmó mientras la primera esperaba: '
+          + `${avisoSegunda ? `${avisoSegunda.status} ${avisoSegunda.resultado}` : 'no terminó en 10 s'}`);
+      }
+      if (deLaPublicacion) {
+        problemas.push('mientras la primera compra esperaba a Mercado Pago, la fila de la publicación estaba tomada');
+      }
+      if (!delPrimero || delPrimero.status !== 200) {
+        problemas.push(`la primera compra terminó en ${delPrimero ? delPrimero.status : 'nada'}`);
+      }
+      for (const orden of [primera, segunda]) {
+        const estado = ordenEnLaBase(orden.order_id).estado;
+        if (estado !== 'paid') problemas.push(`${orden.order_number} quedó «${estado}»`);
+      }
+      if (stockDe(producto) !== stockAntes - 2) {
+        problemas.push(`el stock pasó de ${stockAntes} a ${stockDe(producto)}: tenía que bajar dos`);
+      }
+      // Cada parte corta en su primer rojo: con la API colgada, la siguiente no
+      // mediría nada suyo.
+      assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+      hechas.push(`la segunda compra se confirmó mientras la primera esperaba (salud: peor ${medida.peor} ms)`);
+
+      // --- 2. Otro proceso tiene la publicación. Cada petición que la pide
+      //        espera sin frenar a la API, y termina cuando la sueltan.
+      [[conFotos]] = queryRows(`
+        SELECT p.id FROM products p
+        WHERE p.seller_id = ${sqlLiteral(vendedor.id)} AND p.status = 'ACTIVE'
+          AND (SELECT count(*) FROM product_images i WHERE i.product_id = p.id) <= 1
+        ORDER BY p.created_at LIMIT 1
+      `);
+      const subirFoto = async () => {
+        const sobre = new FormData();
+        sobre.append('files', new Blob([RECIBO_PNG], { type: 'image/png' }), 'cobro-concurrente.png');
+        const respuesta = await fetch(`${API_URL}/products/${conFotos}/images`, {
+          method: 'POST', headers: { Authorization: `Bearer ${vendedor.token}` }, body: sobre,
+        });
+        const crudo = await respuesta.text();
+        let datos = null;
+        try { datos = JSON.parse(crudo); } catch { datos = crudo; }
+        return { status: respuesta.status, datos };
+      };
+      const fotosAntes = new Set(queryRows(
+        `SELECT id FROM product_images WHERE product_id = ${sqlLiteral(conFotos)}`).map(([id]) => id));
+      const previa = await subirFoto();
+      assert(previa.status === 200, `no se pudo subir la foto que después se borra: ${previa.status} ${texto(previa)}`);
+      const [[aBorrar]] = queryRows(`
+        SELECT id FROM product_images WHERE product_id = ${sqlLiteral(conFotos)}
+        ORDER BY created_at DESC LIMIT 1
+      `);
+      fotosNuevas.push(aBorrar);
+      const [[stockDeLaEditada]] = queryRows(`SELECT stock FROM products WHERE id = ${sqlLiteral(conFotos)}`);
+
+      const fila = sostenerFila('products', conFotos);
+      sostenidas.push(fila);
+      await fila.tomada;
+      const esperando = [];
+      const conLaPublicacionTomada = vigilarLaSalud();
+      for (const [nombre, pedir] of [
+        ['editar la publicación', () => pedirCrudo(`/products/${conFotos}`, {
+          method: 'PATCH', header: vendedor.token, body: { stock: Number(stockDeLaEditada) },
+        })],
+        ['subirle una foto', subirFoto],
+        ['borrarle una foto', () => pedirCrudo(`/products/${conFotos}/images/${aBorrar}`, {
+          method: 'DELETE', header: vendedor.token,
+        })],
+      ]) {
+        esperando.push([nombre, pedir()]);
+        await conLaPublicacionTomada.otras(3);
+        if (conLaPublicacionTomada.lentas() > 0) {
+          problemas.push(`con la publicación tomada por otro proceso, ${nombre} congeló la API`);
+          break;
+        }
+      }
+      await fila.soltar();
+      for (const [nombre, pedido] of esperando) {
+        const r = await conTope(pedido, 30_000);
+        if (!r || r.status !== 200) {
+          problemas.push(`${nombre} terminó en ${r ? `${r.status} ${texto(r)}` : 'nada en 30 s'} al soltarla`);
+        }
+      }
+      await conLaPublicacionTomada.terminar();
+      assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+      hechas.push('editar, subir y borrar una foto esperaron la publicación y terminaron con 200');
+
+      // --- 3. Lo mismo con la documentación de quien vende: su fila la tiene
+      //        otro proceso, y presentarla de nuevo espera sin frenar a nadie.
+      const credenciales = {
+        email: `smoke.cobro.${Date.now()}@example.com`, password: 'smokecobro123',
+        full_name: 'Vendedora Cobro Concurrente', phone: '+54 11 5555 0909', role: 'user',
+      };
+      await registrarYVerificar(credenciales);
+      const ingreso = await apiRequest('/auth/login', {
+        method: 'POST', body: { email: credenciales.email, password: credenciales.password },
+      });
+      const deLaVendedora = ingreso.data.access_token;
+      await presentarDocumentacion({
+        token: deLaVendedora, cuit: CUIT_TERCERO, razonSocial: 'Cobro Concurrente SA', archivo: pdfDePrueba('primera'),
+      });
+      const documentacion = idDeLaDocumentacion(ingreso.data.user.id);
+      const suya = sostenerFila('documentacion_de_vendedores', documentacion);
+      sostenidas.push(suya);
+      await suya.tomada;
+      const conLaDocumentacionTomada = vigilarLaSalud();
+      const presentacion = presentarDocumentacion({
+        token: deLaVendedora, cuit: CUIT_TERCERO, razonSocial: 'Cobro Concurrente SA', archivo: pdfDePrueba('segunda'),
+      }).then((r) => r, (error) => ({ status: 0, data: String(error.message) }));
+      await conLaDocumentacionTomada.otras(3);
+      if (conLaDocumentacionTomada.lentas()) {
+        problemas.push('con la documentación tomada por otro proceso, presentarla de nuevo congeló la API');
+      }
+      await suya.soltar();
+      const presentada = await conTope(presentacion, 30_000);
+      await conLaDocumentacionTomada.terminar();
+      if (!presentada || presentada.status !== 201) {
+        problemas.push(`presentar la documentación terminó en ${presentada ? `${presentada.status} ${JSON.stringify(presentada.data).slice(0, 160)}` : 'nada en 30 s'}`);
+      }
+      hechas.push('presentar la documentación esperó su fila y terminó con 201');
+
+      // Lo que este caso subió se va.
+      for (const [id] of queryRows(`SELECT id FROM product_images WHERE product_id = ${sqlLiteral(conFotos)}`)) {
+        if (!fotosAntes.has(id) && !fotosNuevas.includes(id)) fotosNuevas.push(id);
+      }
+
+      assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+      return hechas.join('; ');
+    });
+  } finally {
+    for (const fila of sostenidas) await fila.soltar().catch(() => {});
+    if (conFotos && vendedor) {
+      for (const foto of fotosNuevas) {
+        await pedirCrudo(`/products/${conFotos}/images/${foto}`, { method: 'DELETE', header: vendedor.token })
+          .catch(() => {});
+      }
+    }
+    await limpiarElCobro(doble, vendedor);
+  }
+});
+
+// 219. El inventario, por código y no por memoria. Todo `with_for_update()`
+// que la API puede alcanzar desde un `async def` espera sin frenar el proceso:
+// o es `nowait=True` —el que usa `candado.tomar`, que reintenta con
+// `await asyncio.sleep`—, o está en la lista de abajo con su porqué. Uno nuevo
+// que espere la fila con el bloqueo de siempre da rojo acá, con su archivo y
+// su línea, antes de que alguien lo encuentre con la API colgada.
+const INVENTARIO_DE_CANDADOS = `
+import ast, json, pathlib, app
+raiz = pathlib.Path(app.__file__).parent
+# (archivo, función): por qué su espera no frena a la API.
+PERMITIDAS = {
+    ("reconciliar.py", "_una"): "corre en otro proceso (python -m app.reconciliar), una orden a la vez: su espera no frena a la API",
+    ("services/cobro.py", "_guardar_intento"): "se llama con la fila de la orden ya tomada: el intento de un pago es de esa orden y nadie más lo pide",
+}
+funciones = []
+for ruta in sorted(raiz.rglob("*.py")):
+    arbol = ast.parse(ruta.read_text(encoding="utf-8"))
+    for f in ast.walk(arbol):
+        if not isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        propias = [n for n in ast.walk(f) if n is not f and isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+        adentro = set()
+        for p in propias:
+            adentro |= {id(n) for n in ast.walk(p)}
+        sitios, llamadas = [], set()
+        for n in ast.walk(f):
+            if id(n) in adentro or not isinstance(n, ast.Call):
+                continue
+            nombre = n.func.attr if isinstance(n.func, ast.Attribute) else getattr(n.func, "id", None)
+            llamadas.add(nombre)
+            if nombre == "with_for_update":
+                sin_espera = any(k.arg == "nowait" and getattr(k.value, "value", None) is True for k in n.keywords)
+                sitios.append((n.lineno, sin_espera))
+            elif nombre == "tomar" and getattr(n.func, "value", None) is not None and getattr(n.func.value, "id", None) == "candado":
+                sitios.append((n.lineno, True))
+        funciones.append({"archivo": str(ruta.relative_to(raiz)), "nombre": f.name,
+                          "async": isinstance(f, ast.AsyncFunctionDef), "sitios": sitios, "llamadas": llamadas})
+filas = []
+for f in funciones:
+    for linea, sin_espera in f["sitios"]:
+        llaman = sorted({g["archivo"] + ":" + g["nombre"] for g in funciones if g["async"] and f["nombre"] in g["llamadas"]})
+        porque = PERMITIDAS.get((f["archivo"], f["nombre"]))
+        if sin_espera:
+            veredicto = "espera sin frenar (candado.tomar)"
+        elif porque:
+            veredicto = "permitida: " + porque
+        elif f["async"] or llaman:
+            veredicto = "FRENA"
+        else:
+            veredicto = "síncrona: FastAPI la corre en un hilo aparte"
+        filas.append({"sitio": f["archivo"] + ":" + str(linea), "funcion": f["nombre"],
+                      "async": f["async"], "la_llaman": llaman, "veredicto": veredicto})
+print(json.dumps(filas, ensure_ascii=False))
+`;
+
+await runCase(219, 'Ningún camino de la API espera una fila frenando el proceso: el inventario, por código', async () => {
+  const filas = JSON.parse(correrEnLaApi(INVENTARIO_DE_CANDADOS));
+  const frenan = filas.filter((f) => f.veredicto === 'FRENA');
+  assert(filas.length >= 8, `el inventario encontró sólo ${filas.length} lugares: no está leyendo el código`);
+  assert(frenan.length === 0, `${frenan.length} lugar(es) esperan la fila con el bloqueo que frena la API:\n  `
+    + frenan.map((f) => `${f.sitio} ${f.async ? 'async ' : ''}${f.funcion}`
+      + (f.la_llaman.length ? ` (la llaman ${f.la_llaman.join(', ')})` : '')).join('\n  '));
+  const cuantos = (inicio) => filas.filter((f) => f.veredicto.startsWith(inicio)).length;
+  return `${filas.length} lugares toman una fila: ${cuantos('espera sin frenar')} esperan sin frenar, `
+    + `${cuantos('síncrona')} son endpoints síncronos que FastAPI corre en un hilo, y ${cuantos('permitida')} `
+    + `tienen su porqué escrito (${filas.filter((f) => f.veredicto.startsWith('permitida'))
+      .map((f) => `${f.sitio} ${f.funcion}`).join(', ')})`;
+});
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese

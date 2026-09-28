@@ -112,6 +112,14 @@ export function levantarDoble(puerto = 8099) {
   // con la reserva ya escrita y todavía sin link.
   let pausaDePreferencia = null;
   let resolverLaPreferencia = null;
+  // Y para el cierre de un link. Retenerlo deja al producto adentro de la
+  // espera a Mercado Pago con la fila de la orden tomada: es la ventana en la
+  // que otra confirmación de la misma orden tiene que esperar sin frenar al
+  // resto de la API. Se retiene el de UNA preferencia, o el próximo si no se
+  // dice cuál.
+  let pausaDeCierre = null;
+  let resolverElCierre = null;
+  let preferenciaQueSePausa = null;
 
   // El cuerpo con el que se contesta una preferencia creada.
   const cuerpoDeLaPreferencia = (id, referencia) => ({
@@ -234,28 +242,38 @@ export function levantarDoble(puerto = 8099) {
         pedidos.push({ ruta: 'vencer', preferencia: id, cuerpo, cuenta });
 
         if (cuenta === CUENTA_LENTA) { demorados.push(respuesta); return; }
-        if (cuenta === CUENTA_RECHAZA || revocado) {
-          responderJson(respuesta, 401, { message: DETALLE_CRUDO });
+        // Como la búsqueda: la respuesta se arma cuando se suelta, así lo que
+        // pase mientras tanto cuenta para lo que contesta.
+        const responderCierre = () => {
+          if (cuenta === CUENTA_RECHAZA || revocado) {
+            responderJson(respuesta, 401, { message: DETALLE_CRUDO });
+            return;
+          }
+          // Si Mercado Pago está caído, lo está para todo: apagar un link
+          // tampoco funciona, y eso es justo lo que no puede dar por cerrado
+          // un cobro.
+          if (caido) { responderJson(respuesta, 500, { message: 'algo se rompió acá' }); return; }
+          // Falla transitoria del cierre, y sólo del cierre: consultar y buscar
+          // siguen funcionando. Es el caso que importa para el link que quedó
+          // vivo después de cobrar, porque ahí el pago se registra igual y lo
+          // único que falla es apagar la preferencia.
+          if (fallosDeCierre > 0) {
+            fallosDeCierre -= 1;
+            responderJson(respuesta, 500, { message: 'no se pudo vencer ahora' });
+            return;
+          }
+          const emitida = emitidas.get(id);
+          if (!emitida) { responderJson(respuesta, 404, { message: 'no existe' }); return; }
+          emitida.vencida = true;
+          emitida.cuerpo = { ...emitida.cuerpo, ...(cuerpo || {}) };
+          responderJson(respuesta, 200, { id, ...(cuerpo || {}) });
+        };
+        if (pausaDeCierre && (!preferenciaQueSePausa || id === preferenciaQueSePausa)) {
+          pausaDeCierre.then(responderCierre);
+          pausaDeCierre = null;
           return;
         }
-        // Si Mercado Pago está caído, lo está para todo: apagar un link
-        // tampoco funciona, y eso es justo lo que no puede dar por cerrado
-        // un cobro.
-        if (caido) { responderJson(respuesta, 500, { message: 'algo se rompió acá' }); return; }
-        // Falla transitoria del cierre, y sólo del cierre: consultar y buscar
-        // siguen funcionando. Es el caso que importa para el link que quedó
-        // vivo después de cobrar, porque ahí el pago se registra igual y lo
-        // único que falla es apagar la preferencia.
-        if (fallosDeCierre > 0) {
-          fallosDeCierre -= 1;
-          responderJson(respuesta, 500, { message: 'no se pudo vencer ahora' });
-          return;
-        }
-        const emitida = emitidas.get(id);
-        if (!emitida) { responderJson(respuesta, 404, { message: 'no existe' }); return; }
-        emitida.vencida = true;
-        emitida.cuerpo = { ...emitida.cuerpo, ...(cuerpo || {}) };
-        responderJson(respuesta, 200, { id, ...(cuerpo || {}) });
+        responderCierre();
       });
       return;
     }
@@ -451,6 +469,13 @@ export function levantarDoble(puerto = 8099) {
           pausaDePreferencia = new Promise((r) => { resolverLaPreferencia = r; });
         },
         soltarLaPreferencia() { if (resolverLaPreferencia) resolverLaPreferencia(); },
+        // Retiene el próximo cierre de un link —el de `preferencia`, si se
+        // dice— hasta que lo suelten.
+        pausarElCierre({ preferencia = null } = {}) {
+          preferenciaQueSePausa = preferencia;
+          pausaDeCierre = new Promise((r) => { resolverElCierre = r; });
+        },
+        soltarElCierre() { if (resolverElCierre) resolverElCierre(); },
         // Cuántas búsquedas se pidieron: sirve para saber que la retenida ya
         // llegó antes de meterle el webhook adentro.
         busquedas(referencia = null) {
@@ -458,7 +483,16 @@ export function levantarDoble(puerto = 8099) {
             (p) => p.ruta === 'buscar' && (!referencia || p.referencia === referencia),
           ).length;
         },
-        cierres() { return pedidos.filter((p) => p.ruta === 'vencer').length; },
+        cierres(preferencia = null) {
+          return pedidos.filter(
+            (p) => p.ruta === 'vencer' && (!preferencia || p.preferencia === preferencia),
+          ).length;
+        },
+        // Cuántas veces se consultó un pago: sirve para saber que las
+        // confirmaciones de una carrera ya hablaron con Mercado Pago.
+        consultas(pago) {
+          return pedidos.filter((p) => p.ruta === 'consultar' && p.pago === String(pago)).length;
+        },
         cerrar: () => new Promise((listo) => {
           for (const respuesta of demorados) respuesta.destroy();
           servidor.closeAllConnections?.();
