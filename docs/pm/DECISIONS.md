@@ -10,6 +10,18 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-29 — No se desvincula Mercado Pago con cobros en curso
+
+Emi eligió asignar `DESVINCULAR-CON-COBROS-1` antes que el cambio de
+contraseña desde la pantalla. La regla: mientras un vendedor tenga cobros de
+Mercado Pago en curso, no puede desvincular su cuenta ni pasar a otra. Renovar
+y reconectar la misma cuenta siguen permitidos.
+
+Motivo: sin el token del vendedor nadie puede preguntarle a Mercado Pago por
+esas compras, y la orden y la mercadería quedan trabadas hasta que vuelva a
+vincular. La plata no corre riesgo, pero ni quien vende ni quien compra saben
+por qué. Es condición para encender el cobro.
+
 ## 2026-09-29 — El reconciliador se crea con Mercado Pago y corta solo a los 9 minutos
 
 Al revisar `RECONCILIADOR-PROGRAMADO-1`, PM decidió:
