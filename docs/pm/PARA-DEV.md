@@ -5,7 +5,7 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre RECONCILIADOR-PROGRAMADO-1 — aceptada en rama
+## Decisión sobre RECONCILIADOR-PROGRAMADO-1 — aceptada y publicada
 
 Sobre `8170d8b` (producto en `1241b48`). Tu informe `14e884c` difiere sólo en
 `docs/pm`. Evidencia en `REPRODUCCION-RECONCILIADOR-PROGRAMADO-1-2026-09-29.md`,
@@ -28,7 +28,8 @@ sección «La vuelta».
 **Queda sin verificar, y está dicho:** que `timeout` esté dentro de la imagen.
 Si faltara, el paso «Ver que corrió» de `RAILWAY.md` lo muestra.
 
-La publica PM si Emi lo autoriza. Vos no integres ni despliegues.
+**Publicada por PM en `5d8df5d` el 29/09**, con autorización de Emi. Vos no
+integres ni despliegues.
 
 ---
 

@@ -6,7 +6,8 @@ Fecha: 2026-09-29. Base `0794645` (la respuesta de PM al freno).
 - Casos 223 y 224, y negativos: `8635202` y `c53a5b5`.
 - Informe: `4b7a2b4`, que difiere de `c53a5b5` sólo en `docs/pm`.
 
-`main` está en `65457cc`.
+`main` estaba en `65457cc`. **Publicada en `5d8df5d` el 29/09**, con
+autorización de Emi («Dale pública»), por fast-forward.
 
 - **Primera entrega (`c53a5b5`): DEVUELTA** con cuatro cambios chicos. El
   código que protege a los vendedores funcionaba. Faltaban cosas en los
