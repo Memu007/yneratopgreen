@@ -6,10 +6,14 @@ Fecha: 2026-09-29. Base `0794645` (la respuesta de PM al freno).
 - Casos 223 y 224, y negativos: `8635202` y `c53a5b5`.
 - Informe: `4b7a2b4`, que difiere de `c53a5b5` sólo en `docs/pm`.
 
-`main` está en `65457cc`. **DEVUELTA** con cuatro cambios chicos. El código
-que protege a los vendedores funciona. Lo que falta está en los pasos para
-Emi, en un caso que no distingue lo que dice mirar y en una línea de error
-que no nombra la variable.
+`main` está en `65457cc`.
+
+- **Primera entrega (`c53a5b5`): DEVUELTA** con cuatro cambios chicos. El
+  código que protege a los vendedores funcionaba. Faltaban cosas en los
+  pasos para Emi, un caso no distinguía lo que decía mirar y una línea de
+  error no nombraba la variable.
+- **La vuelta (`8170d8b`, informe `14e884c`): ACEPTADA EN RAMA.** Ver la
+  última sección.
 
 ## Qué cambia
 
@@ -146,5 +150,51 @@ carga la API, dieron lo de la tabla.
   hasta que reconecte algún vendedor, y su línea dice que la clave «no es la
   del Backend». Rotarla ya obliga a todos a reconectar; se ve cuando se decida
   una rotación.
+
+## La vuelta — aceptada en rama
+
+Base `edfd886` (la devolución). Producto `1241b48` (`RAILWAY.md` y el import de
+`reconciliar.py`); casos y negativos `8170d8b`; informe `14e884c`, que difiere
+de `8170d8b` sólo en `docs/pm`. Contra `main` (`65457cc`), fuera de `docs/pm`
+cambian sólo `RAILWAY.md`, `backend/app/reconciliar.py` y dos archivos de
+`scripts/`: sin migraciones y sin nada en `src/`.
+
+**Los cuatro cambios, como se pidieron:**
+
+1. `RAILWAY.md` dice **cuándo se crea** el servicio (el día que se habilita
+   Mercado Pago, antes de encender el cobro), que **antes** se mira que el
+   Backend tenga `MP_TOKEN_KEY` (sólo el nombre), y que ante «falta
+   MP_TOKEN_KEY» se mira **primero el Backend**. La Dev reconoce que había
+   afirmado sin respaldo que el Backend la tenía.
+2. El comando es `railway-entrypoint timeout 540 python -m app.reconciliar`,
+   y salió el «detenela a mano». El 223 exige un tope menor que el intervalo.
+3. El 223 exige `*/N * * * *`, con los cinco campos.
+4. Una variable con un valor que no sirve se nombra, sin su valor:
+   «variables con un valor que no sirve: MP_MINUTOS_DE_GRACIA». El 224 tiene
+   una cuarta escena y comprueba que el valor no aparezca.
+
+También agregó la línea opcional del primer despliegue, en condicional.
+
+| Verificación | Resultado |
+|---|---|
+| Suite completa desde base recién creada, sobre este código | **223/224** en 22 minutos. Sólo cae el **131**, de entorno. Pasan el 100 y del 210 al 224. El 223 dice «el horario es «*/10 * * * *» y el tope de cada corrida, 540 s»; el 224, «no barrió en ninguna de las cuatro» |
+| Negativos del script de la Dev (10, con los dos de PM de la primera vuelta) | **10 rojos esperados** en la primera corrida; «src, backend y RAILWAY.md después: como estaban» |
+| Negativo PM 3, `pm-escribe-el-valor`: la línea nombra la variable y además escribe su valor | **rojo** en el 224, sólo por «escribió el valor de la variable en el registro». La expresión de la escena seguía coincidiendo: lo caza el control nuevo, no la línea |
+| Negativo PM 4, `pm-tope-igual-al-intervalo`: `timeout 600` con un horario de 10 minutos | **rojo** en el 223: «no tiene un tope menor que el intervalo del horario (600 s)». El borde está bien puesto |
+| El comando a mano, como en producción, leído de `RAILWAY.md` | **9 de 9 como se esperaba.** El comando tal cual y con `postgres://`: «RECONCILIACION {"sin_respuesta": 9}», salida 0, sin migrar. Clave vacía, clave inválida, `MP_MINUTOS_DE_GRACIA` vacía, sin `DATABASE_URL`: salida 2 con su línea, que nombra la variable. Con `MP_MINUTOS_DE_GRACIA=valor-secreto-123`, el valor aparece 0 veces en la salida. `timeout 3` corta a los 3 s con 124. `alembic_version` igual antes y después |
+| Build, tipos, lint, `compileall`, `pip check`, `node --check`, `alembic check` | verdes; «No new upgrade operations detected.» |
+| Diff-check con `cr-at-eol` (`edfd886..8170d8b` y `65457cc..14e884c`) | limpio. `smoke.mjs` conserva sus 4 líneas CRLF |
+| `PRE_FIRMA.md`, `.env` o secretos en el delta contra `main` | ninguno |
+| a11y, contraste, auditoría móvil y guías | no corridas: nada en `src/` desde `65457cc`, que ya las pasó |
+
+**No verificado por nadie:** que `timeout` esté dentro de la imagen de
+Railway. Es de coreutils, que viene en la imagen Debian de
+`python:3.11-slim`, pero acá no hay Docker. Si faltara, la primera corrida no
+diría «RECONCILIACION» y el paso «Ver que corrió» de `RAILWAY.md` lo muestra.
+
+**Publicarla no cambia nada visible.** En Railway se vuelve a desplegar sólo
+el Backend, porque `backend/**` es su ruta vigilada; el Frontend no. El
+servicio del reconciliador no existe hasta que Emi lo cree, el día que se
+habilite Mercado Pago.
 
 No se tocó `main`, Railway ni datos reales.
