@@ -98,6 +98,11 @@ export function levantarDoble(puerto = 8099) {
   // mismo que `caido`: acá Mercado Pago contesta todo menos apagar el link.
   let fallosDeCierre = 0;
 
+  // Cuentas a las que, por ahora, Mercado Pago no les deja crear preferencias.
+  // Es `CUENTA_RECHAZA` con arreglo: la cuenta vuelve a funcionar sin cambiar
+  // de cuenta, que es lo que pasa cuando quien vende arregla la suya.
+  const rechazanPreferencias = new Set();
+
   // Una búsqueda retenida a mitad de camino, para poder meter un webhook
   // adentro de la ventana que el reconciliador tiene abierta.
   let pausaDeBusqueda = null;
@@ -197,7 +202,7 @@ export function levantarDoble(puerto = 8099) {
         const referencia = String(cuerpo?.external_reference || '');
         const cuenta = (registro.autorizacion.match(/-(\d{6,})-\d+$/) || [])[1] || '';
         if (cuenta === CUENTA_LENTA) { demorados.push(respuesta); return; }
-        if (cuenta === CUENTA_RECHAZA) {
+        if (cuenta === CUENTA_RECHAZA || rechazanPreferencias.has(cuenta)) {
           respuesta.writeHead(401, { 'Content-Type': 'application/json' });
           respuesta.end(JSON.stringify({ message: DETALLE_CRUDO, error: 'invalid_token' }));
           return;
@@ -461,6 +466,9 @@ export function levantarDoble(puerto = 8099) {
         vencida(preferencia) { return Boolean(emitidas.get(preferencia)?.vencida); },
         // Hace fallar los próximos `cuantos` intentos de apagar un link.
         fallarElCierre(cuantos = 1) { fallosDeCierre = cuantos; },
+        // Esa cuenta no puede crear preferencias hasta `aceptarPreferencias`.
+        rechazarPreferencias(cuenta) { rechazanPreferencias.add(String(cuenta)); },
+        aceptarPreferencias(cuenta) { rechazanPreferencias.delete(String(cuenta)); },
         // Retiene una búsqueda de pagos hasta que la suelten. `desde` dice
         // cuál: 1 es la próxima, 2 la siguiente. El reconciliador hace dos por
         // orden —una al preguntar y otra al cerrar— y la que importa retener

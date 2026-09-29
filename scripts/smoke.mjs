@@ -8,8 +8,8 @@ import { chromium } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
 
 import {
-  CUENTA_INCOMPLETA, CUENTA_LENTA, CUENTA_RECHAZA, DETALLE_CRUDO, SECRETO_DE_ACCESO,
-  SECRETO_DE_REFRESCO, firmaDeAviso, levantarDoble,
+  CUENTA_INCOMPLETA, CUENTA_LENTA, DETALLE_CRUDO, SECRETO_DE_ACCESO,
+  SECRETO_DE_REFRESCO, firmaDeAviso, levantarDoble as levantarDobleDeMP,
 } from './lib/mp-doble.mjs';
 import {
   BASE_DE_LA_APLICACION, queryCount, queryRows, querySql, sqlLiteral,
@@ -975,6 +975,10 @@ const CASOS_PEDIDOS = (process.env.SMOKE_CASOS || '')
 // 409 se perdería y la vendedora quedaría vinculada sin que nadie se entere.
 // `desvincular` lo anota y el caso que lo dejó falla por eso.
 const sinDesvincular = [];
+// Y los casos en los que, para desvincular, hubo que terminar antes ventas en
+// curso. Sale en el resumen: dice qué casos dependen de eso.
+const terminaronVentas = new Set();
+let casoActual = null;
 
 function loQueNoDesvinculo(desde) {
   const quedaron = sinDesvincular.splice(desde);
@@ -987,6 +991,7 @@ async function runCase(number, name, callback) {
   if (CASOS_PEDIDOS.length && !CASOS_PEDIDOS.includes(number)) return;
   const startedAt = Date.now();
   const desvinculosAntes = sinDesvincular.length;
+  casoActual = number;
 
   try {
     const observation = await callback();
@@ -6632,37 +6637,84 @@ async function estadoDelVinculo(token) {
   return datos;
 }
 
-// Con cobros en curso la API no desvincula: contesta 409 y se anota en
-// `sinDesvincular`, así el caso que lo dejó falla aunque lo llame en un
-// `finally`. Antes de desvincular, un caso con ventas de Mercado Pago las
-// termina con `terminarLosCobros`.
+// El doble que está levantado, si hay uno. `desvincular` lo usa para terminar
+// las ventas de una vendedora antes de desvincularla.
+let dobleEnMarcha = null;
+
+async function levantarDoble(puerto) {
+  const doble = await levantarDobleDeMP(puerto);
+  const cerrar = doble.cerrar;
+  doble.cerrar = async () => {
+    if (dobleEnMarcha === doble) dobleEnMarcha = null;
+    return cerrar();
+  };
+  dobleEnMarcha = doble;
+  return doble;
+}
+
+// Desvincular en la suite. Desde DESVINCULAR-CON-COBROS-1 la API no lo hace si
+// la vendedora tiene cobros de Mercado Pago en curso: contesta 409. Casi todos
+// los casos desvinculan para dejarla como estaba, muchos en un `finally`, así
+// que acá se terminan antes esas ventas, como lo haría el producto, y se
+// vuelve a pedir. Si igual no desvincula, se anota en `sinDesvincular` y el
+// caso falla por eso: una vendedora que queda vinculada choca con el caso
+// siguiente.
 async function desvincular(token) {
-  const { status, datos } = await pedirCrudo('/mp-oauth/unlink', { method: 'POST', header: token, body: {} });
-  if (status === 409) sinDesvincular.push(`409 ${JSON.stringify(datos?.detail ?? datos)}`);
+  const pedir = () => pedirCrudo('/mp-oauth/unlink', { method: 'POST', header: token, body: {} });
+  let { status, datos } = await pedir();
+  if (status !== 409) return;
+  let motivo = '';
+  terminaronVentas.add(casoActual);
+  try {
+    await terminarLosCobros(token);
+    ({ status, datos } = await pedir());
+  } catch (error) {
+    motivo = `; terminar sus ventas falló: ${error instanceof Error ? error.message : error}`;
+  }
+  if (status === 409) sinDesvincular.push(`409 ${JSON.stringify(datos?.detail ?? datos)}${motivo}`);
 }
 
 // Termina, como lo haría el producto, las ventas de Mercado Pago que una
-// vendedora de la suite todavía tiene en curso, para que pueda desvincularse.
-// Las reservadas las rechaza ella; el cierre pendiente y el link abierto de
-// una venta cobrada los resuelve el reconciliador. Necesita el doble del caso
-// levantado: es el que conoce esas preferencias. Lo deja contestando, como un
-// Mercado Pago que volvió.
-async function terminarLosCobros(vendedor, doble) {
-  doble.caer(false);
-  doble.revocar(false);
-  doble.fallarElCierre(0);
-  doble.soltarElCierre();
-  doble.soltarLaBusqueda();
-  doble.soltarLaPreferencia();
-  const reservadas = queryRows(`
-    SELECT id, 'reservada' FROM orders
-    WHERE seller_id = ${sqlLiteral(vendedor.id)} AND payment_method = 'mercadopago'
-      AND stock_reserva = 'reservada'
-  `);
-  for (const [id] of reservadas) {
-    await pedirCrudo(`/orders/${id}/cancel`, { method: 'POST', header: vendedor.token, body: {} });
+// vendedora todavía tiene en curso: las reservadas las rechaza ella, y el
+// cierre pendiente y el link abierto de una venta cobrada los resuelve el
+// reconciliador.
+//
+// Hace falta un Mercado Pago que conteste. Se usa el doble del caso, si sigue
+// levantado, o uno propio mientras dura esto. Y a ese doble se le enseñan las
+// preferencias de esas ventas que todavía no conoce: Mercado Pago recuerda las
+// que emitió, pero cada caso levanta un doble nuevo, que no.
+async function terminarLosCobros(token) {
+  const { data: quien } = await apiRequest('/auth/me', { token });
+  const propio = dobleEnMarcha ? null : await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const doble = dobleEnMarcha;
+  try {
+    doble.caer(false);
+    doble.revocar(false);
+    doble.fallarElCierre(0);
+    doble.soltarElCierre();
+    doble.soltarLaBusqueda();
+    doble.soltarLaPreferencia();
+    const abiertas = queryRows(`
+      SELECT p.mp_preference_id, coalesce(u.mp_user_id, '${NULO}')
+      FROM payments p JOIN orders o ON o.id = p.order_id JOIN users u ON u.id = o.seller_id
+      WHERE o.seller_id = ${sqlLiteral(quien.id)} AND p.mp_preference_id IS NOT NULL
+        AND NOT p.link_cerrado
+    `);
+    for (const [preferencia, cuenta] of abiertas) {
+      if (!doble.emitidas.has(preferencia)) doble.emitidas.set(preferencia, { cuerpo: null, cuenta, vencida: false });
+    }
+    const reservadas = queryRows(`
+      SELECT id, 'reservada' FROM orders
+      WHERE seller_id = ${sqlLiteral(quien.id)} AND payment_method = 'mercadopago'
+        AND stock_reserva = 'reservada'
+    `);
+    for (const [id] of reservadas) {
+      await pedirCrudo(`/orders/${id}/cancel`, { method: 'POST', header: token, body: {} });
+    }
+    await reconciliar();
+  } finally {
+    if (propio) await propio.cerrar();
   }
-  await reconciliar();
 }
 
 const SECRETOS_DEL_DOBLE = [SECRETO_DE_ACCESO, SECRETO_DE_REFRESCO, DETALLE_CRUDO,
@@ -7810,13 +7862,16 @@ await runCase(76, 'Dos vendedores con Mercado Pago: pagos separados y el que fal
     await comprador();
     await desvincular(vendedor.token);
     await desvincular(otro.token);
-    // El segundo vincula una cuenta que el doble rechaza al crear preferencias:
-    // vincular bien y fallar al cobrar es exactamente lo que pasa cuando el
-    // vendedor le revoca el permiso a la aplicación después.
+    // El segundo vincula una cuenta a la que Mercado Pago no le deja crear
+    // preferencias: vincular bien y fallar al cobrar es lo que pasa cuando el
+    // vendedor le revoca el permiso a la aplicación después, o tiene la cuenta
+    // restringida. Después la arregla, sin cambiar de cuenta.
+    const CUENTA_DEL_OTRO = '900202';
     assert((await vincular(vendedor.token, 'ok:900201')).ok === 'vinculado',
       'el primer vendedor no vinculó');
-    assert((await vincular(otro.token, `ok:${CUENTA_RECHAZA}`)).ok === 'vinculado',
+    assert((await vincular(otro.token, `ok:${CUENTA_DEL_OTRO}`)).ok === 'vinculado',
       'el segundo vendedor no vinculó');
+    doble.rechazarPreferencias(CUENTA_DEL_OTRO);
 
     const suyo = productoConStock(vendedor.id);
     const delOtro = productoConStock(otro.id);
@@ -7885,27 +7940,19 @@ await runCase(76, 'Dos vendedores con Mercado Pago: pagos separados y el que fal
     assert(trasReintento[0][0] === NULO && trasReintento[0][1] === NULO,
       `el reintento dejó un pago a medias: ${trasReintento[0].join(' | ')}`);
 
-    // Y si el vendedor revoca el vínculo, el reintento lo dice con su propio
-    // motivo: la orden no cae a transferencia por atrás ni se marca de nada.
-    await desvincular(otro.token);
-    const sinVinculo = await apiRequest(`/orders/${trabada.order_id}/payment-link`, {
-      method: 'POST', token: state.buyerToken, body: {},
-    });
-    assert(sinVinculo.data.preparation === 'pendiente'
-      && sinVinculo.data.reason === 'sin_vinculo',
-      `con el vínculo revocado el reintento devolvió ${JSON.stringify(sinVinculo.data)}`);
-    assert(sinVinculo.data.payment_method === 'mercadopago',
-      'la orden cambió de medio sola al perder el vínculo');
-    const sinVinculoEnLaBase = pagosDe(trabada.order_id);
-    assert(sinVinculoEnLaBase.length === 1,
-      `perder el vínculo dejó ${sinVinculoEnLaBase.length} filas de pago`);
-    assert(sinVinculoEnLaBase[0][0] === NULO && sinVinculoEnLaBase[0][1] === NULO,
-      `el reintento sin vínculo dejó un pago a medias: ${sinVinculoEnLaBase[0].join(' | ')}`);
+    // Con la orden trabada no se desvincula: está en curso, y sin la cuenta el
+    // reconciliador no puede cerrarla (DESVINCULAR-CON-COBROS-1). Hasta
+    // entonces acá se desvinculaba para ver el motivo `sin_vinculo`, que por
+    // este camino ya no se alcanza.
+    const quiereDesvincular = await pedirCrudo('/mp-oauth/unlink', { method: 'POST', header: otro.token, body: {} });
+    assert(quiereDesvincular.status === 409 && quiereDesvincular.datos?.detail?.motivo === 'cobros_en_curso',
+      `con la orden trabada, desvincular respondió ${quiereDesvincular.status}: ${JSON.stringify(quiereDesvincular.datos)}`);
 
-    // Cuando el vendedor arregla su cuenta, la MISMA orden se paga: se
-    // revincula con una cuenta que sí contesta y se reanuda.
-    assert((await vincular(otro.token, 'ok:900202')).ok === 'vinculado',
-      'el segundo vendedor no pudo revincular');
+    // Cuando el vendedor arregla su cuenta, la MISMA orden se paga. Vuelve a
+    // autorizar la misma cuenta, que con cobros en curso se puede, y se reanuda.
+    doble.aceptarPreferencias(CUENTA_DEL_OTRO);
+    assert((await vincular(otro.token, `ok:${CUENTA_DEL_OTRO}`)).ok === 'vinculado',
+      'el segundo vendedor no pudo reconectar su misma cuenta');
     const reanudada = await apiRequest(`/orders/${trabada.order_id}/payment-link`, {
       method: 'POST', token: state.buyerToken, body: {},
     });
@@ -7920,9 +7967,9 @@ await runCase(76, 'Dos vendedores con Mercado Pago: pagos separados y el que fal
       'el conteo de órdenes del comprador cambió al reanudar');
 
     return 'dos órdenes por Mercado Pago con claves y cuentas distintas; la que el '
-      + 'vendedor no podía cobrar quedó «pendiente» con motivo propio (mp_rechazo, y '
-      + 'sin_vinculo tras revocar), sin pago a medias, y se reanudó sobre la misma '
-      + 'orden cuando su cuenta volvió';
+      + 'vendedor no podía cobrar quedó «pendiente» con motivo propio (mp_rechazo), sin '
+      + 'pago a medias y sin poder desvincular (409), y se reanudó sobre la misma orden '
+      + 'cuando su cuenta volvió';
   } finally {
     await doble.cerrar();
     try {
@@ -9689,14 +9736,19 @@ await runCase(92, 'Token revocado y Mercado Pago caído: reintentable, no rechaz
     await noSePudo('Mercado Pago caído', 'mp_sin_respuesta');
     doble.caer(false);
 
-    // 3. Sin credencial de este lado: el vínculo se cortó.
-    await desvincular(vendedor.token);
-    const sinVinculo = await avisar({ dataId: pago.id, cuenta: '900608' });
+    // 3. Sin credencial de este lado. Con esta orden en curso el vínculo ya no
+    //    se puede cortar (DESVINCULAR-CON-COBROS-1): desvincular da 409, y es
+    //    lo que evita perder este aviso. Queda el aviso de una cuenta que nadie
+    //    tiene vinculada, que pasa por el mismo lugar.
+    const cortar = await pedirCrudo('/mp-oauth/unlink', { method: 'POST', header: vendedor.token, body: {} });
+    assert(cortar.status === 409 && cortar.datos?.detail?.motivo === 'cobros_en_curso',
+      `con la orden en curso, desvincular respondió ${cortar.status}: ${JSON.stringify(cortar.datos)}`);
+    const sinVinculo = await avisar({ dataId: pago.id, cuenta: '900690' });
     assert(sinVinculo.status === 503 && sinVinculo.resultado === 'sin_destinatario',
       `sin vínculo respondió ${sinVinculo.status} ${sinVinculo.resultado}`);
     assert(ordenEnLaBase(orden.order_id).estado === 'placed',
       'sin vínculo se movió la orden igual');
-    vistos.push(`vínculo cortado→${sinVinculo.status} ${sinVinculo.resultado}`);
+    vistos.push(`desvincular con la orden en curso→${cortar.status}; cuenta sin vincular→${sinVinculo.status} ${sinVinculo.resultado}`);
 
     // 4. Y cuando el mundo se arregla, el mismo aviso converge.
     assert((await vincular(vendedor.token, 'ok:900608')).ok === 'vinculado',
@@ -38361,7 +38413,6 @@ await runCase(225, 'Con ventas reservadas no se desvincula, la pantalla dice por
       + 'y celular. Vencida una por el reconciliador y cancelada la otra, desvincula';
   } finally {
     if (cuentas) {
-      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
       await desvincular(cuentas.vendedor.token).catch(() => {});
     }
     await doble.cerrar();
@@ -38396,7 +38447,6 @@ await runCase(226, 'Con una venta en cierre pendiente no se desvincula', async (
       + 'reconciliador apaga el link y suelta la mercadería, desvincula';
   } finally {
     if (cuentas) {
-      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
       await desvincular(cuentas.vendedor.token).catch(() => {});
     }
     await doble.cerrar();
@@ -38434,7 +38484,6 @@ await runCase(227, 'Con un pago aprobado y el link abierto no se desvincula', as
       + 'link, la venta terminó y desvincula';
   } finally {
     if (cuentas) {
-      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
       await desvincular(cuentas.vendedor.token).catch(() => {});
     }
     await doble.cerrar();
@@ -38487,7 +38536,6 @@ await runCase(228, 'Con sólo ventas terminadas desvincula, y las ventas de otra
   } finally {
     for (const c of [cuentas, otras]) {
       if (!c) continue;
-      await terminarLosCobros(c.vendedor, doble).catch(() => {});
       await desvincular(c.vendedor.token).catch(() => {});
     }
     await doble.cerrar();
@@ -38556,7 +38604,6 @@ await runCase(229, 'Con cobros en curso no se pasa a otra cuenta, y con la misma
       + 'las credenciales no cambian; la misma cuenta reconecta y renueva; vencida la venta, pasa a la otra cuenta';
   } finally {
     if (cuentas) {
-      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
       await desvincular(cuentas.vendedor.token).catch(() => {});
     }
     await doble.cerrar();
@@ -38606,7 +38653,6 @@ await runCase(230, 'Una compra ya escrita frena desvincular aunque su link todav
     doble.soltarLaPreferencia();
     if (compra) await compra.catch(() => {});
     if (cuentas) {
-      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
       await desvincular(cuentas.vendedor.token).catch(() => {});
     }
     await doble.cerrar();
@@ -38634,6 +38680,9 @@ for (const result of results) {
 console.log('-------------------');
 if (CASOS_PEDIDOS.length) {
   console.log(`CORRIDA FILTRADA (SMOKE_CASOS=${CASOS_PEDIDOS.join(',')}): NO es la suite completa`);
+}
+if (terminaronVentas.size) {
+  console.log(`Para desvincular hubo que terminar ventas en curso en: ${[...terminaronVentas].join(', ')}`);
 }
 console.log(`${passed}/${results.length} pasaron; ${failed} fallaron`);
 
