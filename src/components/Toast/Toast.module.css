@@ -148,9 +148,10 @@
   background: var(--tg-color-error);
 }
 
+/* El marrón de advertencia es oscuro: sobre él va blanco (6,9:1). Con el color
+   de texto quedaba en 2,3:1. */
 .confirmHeader.warning {
   background: var(--tg-color-warning);
-  color: var(--tg-color-text);
 }
 
 .confirmHeader.info {
@@ -220,7 +221,6 @@
 
 .confirmButton.warning {
   background: var(--tg-color-warning);
-  color: var(--tg-color-text);
 }
 
 .confirmButton.warning:hover {
