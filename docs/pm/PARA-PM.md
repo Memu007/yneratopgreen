@@ -2,6 +2,116 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## DESVINCULAR-CON-COBROS-1: frenada antes de escribir código
+
+**Resultado: freno por dos condiciones tuyas.** No escribí código.
+
+- **«Si encontrás un caso en el que el token haga falta después de que la
+  orden terminó».** Lo encontré y lo medí.
+- **«Si arreglar la carrera toca el checkout».** La carrera existe, y
+  cerrarla del todo lo toca.
+
+### 1. El token hace falta después: las devoluciones y los contracargos
+
+Un pago ya cobrado se puede devolver o desconocer después: quien vende lo
+devuelve desde Mercado Pago, o hay un contracargo. **`PAGO-ORDEN-CERRADA-1`
+le pide a quien vende justamente eso:** «devolvé el pago desde Mercado Pago».
+Mercado Pago avisa de esa novedad, y para leerla hace falta el token de quien
+vende (`mp_webhook.py:129-142` busca a quien vende por su cuenta).
+
+**Medido**, con un caso temporal que no quedó en el repositorio: una compra
+pagada, con el link apagado y la reserva consolidada. Es decir, **no** «en
+curso» según el criterio de la tarea.
+
+```text
+aviso del pago         → 200 aplicado; orden paid, link apagado, reserva consolidada
+POST /mp-oauth/unlink  → 200 (hoy se puede, y con la regla pedida también)
+Mercado Pago devuelve el pago; llega el aviso
+aviso de la devolución → 503 sin_destinatario
+la intención queda     → APPROVED; quien compra ve «aprobado»
+```
+
+Mercado Pago reintenta el 503 un tiempo y después deja de avisar. **La
+devolución no queda registrada nunca:** quien compra ve «Pago acreditado»
+aunque le hayan devuelto la plata. Con la regla como está pedida, esto sigue
+pasando para toda orden que no esté «en curso».
+
+**Lo que decidís vos.** Te recomiendo la (a):
+
+- **(a) La regla como está pedida, y el riesgo dicho en la pantalla.** No
+  desvincula con cobros en curso. Al desvincular, el panel avisa: «Si después
+  devolvés un pago desde Mercado Pago, AgroBoeda no se va a enterar: la
+  compra va a seguir figurando como pagada.» Es lo más chico, y no traba a
+  nadie más allá de sus compras en curso.
+- **(b) Frenar también mientras haya pagos «en revisión»**: el pago que llegó
+  con la orden cerrada y el de más de un pago. Son los casos en que la
+  plataforma le pide a quien vende que devuelva. **Pero `EN_REVISION` no
+  termina nunca:** después de la devolución, `aplicar` la vuelve a dejar en
+  revisión. Con esta regla, esa persona no podría desvincular jamás. Haría
+  falta un estado nuevo, y eso es una migración.
+- **(c) Frenar mientras haya ventas cobradas en los últimos N días**, el plazo
+  en que Mercado Pago admite devoluciones o contracargos. No encontré ese
+  plazo en el código ni lo pude leer en la documentación, y trabaría a
+  cualquiera que haya vendido hace poco.
+
+### 2. La carrera: sí puede quedar una preferencia de una cuenta borrada
+
+**No la reproduje; sale del código.** El checkout confirma la orden con su
+reserva (`checkout.py:428`) y **después** lee el token de quien vende para
+crear la preferencia (`mp_preferencia.py:257`, y la espera en `:266`).
+Desvincular es un endpoint síncrono que corre en otro hilo.
+
+La secuencia:
+
+1. `unlink` cuenta los cobros en curso, **antes** de que la orden nueva esté
+   confirmada: ve 0;
+2. el checkout confirma la orden;
+3. el checkout lee el token, **antes** de que `unlink` confirme el borrado;
+4. `unlink` borra las credenciales;
+5. el checkout crea la preferencia en Mercado Pago con el token viejo, y la
+   guarda.
+
+Queda una orden con su link, de una cuenta que ya no está vinculada. Si alguien
+paga, el aviso da 503 como arriba, y el reconciliador no puede preguntar: la
+orden queda trabada hasta que la vendedora vuelva a vincular.
+
+- **La ventana es de milisegundos:** entre dos idas y vueltas a la base de
+  cada lado.
+- **Cerrarla del todo toca el checkout.** Que la reserva y la lectura del
+  token vean el vínculo en la misma transacción, con la fila de la vendedora
+  tomada de los dos lados; o que el checkout vuelva a mirar el vínculo después
+  de crear la preferencia.
+- **Achicarla sin tocarlo:** que `unlink` cuente y borre en una sola
+  sentencia (`UPDATE … WHERE NOT EXISTS (cobros en curso)`). Queda el hueco
+  entre esa sentencia y su `commit`, más chico todavía.
+
+**Lo que decidís vos:** (i) aceptar el hueco, achicado sin tocar el checkout
+y dicho como riesgo, o (ii) cerrarlo tocando el checkout. Te recomiendo la
+(i): hoy Mercado Pago no está habilitado, y una orden trabada así se destraba
+cuando la vendedora vuelve a vincular la misma cuenta.
+
+### Lo demás ya está leído, y cabe en la tarea
+
+- **El criterio «en curso»** va en un solo lugar, en `cobro`: reserva viva, o
+  pago aprobado o en revisión con el link abierto. El reconciliador lo usa
+  sumándole la condición de vencimiento.
+- **Los usos del token**, además de las devoluciones de arriba:
+  - crear la preferencia: orden con reserva viva;
+  - el aviso y la vuelta: el pago de una orden en curso, o una novedad
+    posterior como la de arriba;
+  - cerrar el cobro: reserva viva;
+  - apagar el link: pago con el link abierto;
+  - el reconciliador: sus candidatas.
+
+  Fuera de las novedades posteriores, todos caen en el criterio.
+- **Reconectar con otra cuenta:** `guardar_credenciales` pisa `mp_user_id`
+  (`mp_vinculo.py:333`). La vuelta de Mercado Pago lo va a comparar con la
+  cuenta de antes.
+
+Con tus dos respuestas sigo.
+
+---
+
 ## RECONCILIADOR-PROGRAMADO-1: la vuelta
 
 | | |
