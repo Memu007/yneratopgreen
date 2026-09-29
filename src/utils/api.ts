@@ -216,12 +216,17 @@ export type CausaDeFalla = 'sesion-vencida' | 'indisponible' | 'respuesta';
 export class ErrorDeLaApi extends Error {
   readonly causa: CausaDeFalla;
   readonly estado?: number;
+  /** El `detail` de la respuesta tal como vino, para quien necesite más que
+   *  el texto: un motivo con código y algún dato, como el 409 de desvincular
+   *  Mercado Pago con cobros en curso. */
+  readonly detalle?: unknown;
 
-  constructor(mensaje: string, causa: CausaDeFalla, estado?: number) {
+  constructor(mensaje: string, causa: CausaDeFalla, estado?: number, detalle?: unknown) {
     super(mensaje);
     this.name = 'ErrorDeLaApi';
     this.causa = causa;
     this.estado = estado;
+    this.detalle = detalle;
   }
 }
 
@@ -295,6 +300,7 @@ export async function apiFetch<T = unknown>(
         // se cayó. Eso se reintenta; lo demás es una respuesta.
         response.status >= 500 ? 'indisponible' : 'respuesta',
         response.status,
+        errorData?.detail,
       );
     }
 

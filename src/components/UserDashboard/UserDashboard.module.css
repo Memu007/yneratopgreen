@@ -1365,6 +1365,20 @@
   background: var(--tg-color-error-bg);
 }
 
+/* Por qué no se pudo desvincular y hasta cuándo. Es texto para leer, no un
+   rótulo: va con el color de texto sobre el fondo de advertencia. Con dos
+   clases, para ganarles a `.mpLinked p` y `.mpUnlinked > p`. */
+.mpContent .mpCobrosEnCurso {
+  background: var(--tg-color-warning-bg);
+  color: var(--tg-color-text);
+  border-left: 4px solid var(--tg-color-warning);
+  padding: 12px 16px;
+  border-radius: var(--tg-radius-lg);
+  margin: 16px 0 4px;
+  line-height: 1.5;
+  text-align: left;
+}
+
 .mpUnlinked {
   text-align: center;
 }

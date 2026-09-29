@@ -37,12 +37,30 @@ export const MOTIVOS_MP: Record<string, string> = {
   respuesta_invalida: 'Mercado Pago respondió algo inesperado. Probá de nuevo en unos minutos.',
   credencial_ilegible: 'Tus credenciales guardadas dejaron de ser válidas. Reconectá tu cuenta.',
   sin_configurar: 'La conexión con Mercado Pago todavía no está habilitada.',
+  otra_cuenta_con_cobros: 'Tenés ventas con cobro de Mercado Pago en curso, y se terminan con la cuenta '
+    + 'que ya tenías vinculada: sigue vinculada esa. Vas a poder cambiarla cuando esas ventas se paguen, se '
+    + 'cancelen o venzan sin pago.',
 };
 
 export const explicarMP = (motivo?: string | null) =>
   (motivo && MOTIVOS_MP[motivo]) || 'No se pudo completar la conexión con Mercado Pago.';
 
 export const VINCULO_OK = 'vinculado';
+
+/** El motivo del 409 de desvincular: hay cobros en curso. */
+export const COBROS_EN_CURSO = 'cobros_en_curso';
+
+/**
+ * Por qué no se pudo desvincular y cuándo se va a poder. Lo dice el panel,
+ * no un aviso que se va: es lo que la persona tiene que saber para volver.
+ */
+export function explicarCobrosEnCurso(cuantos: number): string {
+  const una = cuantos === 1;
+  return `Todavía no podés desvincular tu cuenta: tenés ${cuantos} ${una ? 'venta' : 'ventas'} con cobro de `
+    + `Mercado Pago en curso, y AgroBoeda necesita tu cuenta para confirmar con Mercado Pago cómo `
+    + `${una ? 'termina' : 'terminan'}. Vas a poder desvincularla cuando ${una ? 'esa venta' : 'esas ventas'} `
+    + `${una ? 'se pague, se cancele o venza' : 'se paguen, se cancelen o venzan'} sin pago.`;
+}
 
 /**
  * Saca de la URL el resultado que dejó el callback y lo borra, para que

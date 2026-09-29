@@ -2,13 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './UserDashboard.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { apiGet, apiPatch, apiDelete, apiPost, apiUpload, apiBlob } from '../../utils/api';
+import { apiGet, apiPatch, apiDelete, apiPost, apiUpload, apiBlob, ErrorDeLaApi } from '../../utils/api';
 import { revisarElPrecio } from '../../publicaciones/precio';
 import {
   fraseDeImagenesFallidas,
   subirImagenDePublicacion,
 } from '../../publicaciones/imagenes';
-import { explicarMP, type VinculoMP } from '../../utils/mercadoPago';
+import {
+  COBROS_EN_CURSO, explicarCobrosEnCurso, explicarMP, type VinculoMP,
+} from '../../utils/mercadoPago';
 import { ETIQUETA_DE_ESTADO, type MiDocumentacion } from '../../utils/documentacion';
 import { type TipoDeCarga } from '../../utils/logistica';
 import { ProductImage } from '../ProductImage/ProductImage';
@@ -576,6 +578,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   const [mpVinculo, setMpVinculo] = useState<VinculoMP | null>(null);
   const [mpCargando, setMpCargando] = useState(true);
   const [mpTrabajando, setMpTrabajando] = useState(false);
+  // Cuántas ventas con cobro en curso frenaron el último intento de
+  // desvincular. Mientras no sea `null`, el panel dice por qué y hasta cuándo.
+  const [mpCobrosEnCurso, setMpCobrosEnCurso] = useState<number | null>(null);
 
   // Documentación fiscal presentada para revisión manual. No habilita ni
   // bloquea nada: sin presentar, pendiente o rechazada se publica y se vende
@@ -1016,6 +1021,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
     const confirmado = await showConfirm({
       title: 'Desvincular Mercado Pago',
       message: 'Se borran de AgroBoeda las credenciales de tu cuenta.\n\n'
+        + 'Si después se devuelve un pago o hay un contracargo, AgroBoeda no se va a enterar: '
+        + 'la compra va a seguir figurando como pagada.\n\n'
         + 'Para retirarle el permiso a la aplicación también del lado de Mercado Pago, '
         + 'hacelo desde tu cuenta.',
       confirmText: 'Desvincular',
@@ -1024,11 +1031,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
     if (!confirmado) return;
 
     setMpTrabajando(true);
+    setMpCobrosEnCurso(null);
     try {
       setMpVinculo(await apiPost<VinculoMP>('/mp-oauth/unlink', {}));
       showToast('Cuenta de Mercado Pago desvinculada.', 'success');
-    } catch {
-      showToast('No se pudo desvincular la cuenta.', 'error');
+    } catch (error) {
+      const detalle = error instanceof ErrorDeLaApi && error.estado === 409
+        ? error.detalle as { motivo?: string; cobros_en_curso?: number } | undefined
+        : undefined;
+      if (detalle?.motivo === COBROS_EN_CURSO && typeof detalle.cobros_en_curso === 'number') {
+        setMpCobrosEnCurso(detalle.cobros_en_curso);
+      } else {
+        showToast('No se pudo desvincular la cuenta.', 'error');
+      }
     } finally {
       setMpTrabajando(false);
     }
@@ -2533,6 +2548,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                   </button>
                 </>
               )}
+              {mpCobrosEnCurso !== null && (
+                <p className={styles.mpCobrosEnCurso} role="alert">
+                  {explicarCobrosEnCurso(mpCobrosEnCurso)}
+                </p>
+              )}
               <button
                 className={styles.mpUnlinkButton}
                 onClick={desvincularMercadoPago}
@@ -2559,6 +2579,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
               >
                 {mpTrabajando ? 'Abriendo Mercado Pago…' : ' Reconectar cuenta'}
               </button>
+              {mpCobrosEnCurso !== null && (
+                <p className={styles.mpCobrosEnCurso} role="alert">
+                  {explicarCobrosEnCurso(mpCobrosEnCurso)}
+                </p>
+              )}
               <button
                 className={styles.mpUnlinkButton}
                 onClick={desvincularMercadoPago}
@@ -2583,7 +2608,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                 <ul>
                   <li> Cobrás vos, en tu propia cuenta</li>
                   <li> AgroBoeda no recibe ni retiene ese dinero</li>
-                  <li> Podés desvincularla cuando quieras</li>
+                  <li> Podés desvincularla cuando quieras, salvo mientras tengas ventas con cobro de Mercado Pago en curso</li>
                 </ul>
               </div>
               <button

@@ -36,6 +36,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 
+from sqlalchemy import distinct, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -645,6 +646,63 @@ def hay_intento_en_curso(db: Session, orden: Order) -> bool:
     **no** se libera. El reloj no es autoridad sobre la plata.
     """
     return any(i.estado in EN_PROCESO for i in _intentos(db, orden))
+
+
+def en_curso(vencida=None):
+    """La condición de una orden cuyo cobro todavía necesita la cuenta de
+    Mercado Pago de su vendedor. Va sobre `Order`, con `Payment` por fuera.
+
+    Es una sola y la usan dos: el reconciliador, para saber qué órdenes mirar,
+    y el vínculo, que no deja desvincular ni pasar a otra cuenta a quien tiene
+    alguna. Las dos preguntan lo mismo —¿hace falta el token de ese vendedor
+    para terminar este cobro?—, y escrita dos veces, una se quedaría atrás.
+
+    Hace falta en dos situaciones:
+
+    - **la reserva está viva:** reservada, esperando el pago, o en cierre
+      pendiente, esperando que se confirme que el link se apagó. En las dos
+      hay que preguntarle a Mercado Pago y apagar el link;
+    - **hubo cobro y el link sigue abierto:** hay que apagarlo, y mientras
+      tanto se puede volver a pagar.
+
+    Una orden terminada —cobrada con el link apagado, o cerrada con la
+    mercadería de vuelta— no está. Si después llega una devolución o un
+    contracargo, el aviso lo trae con la cuenta vinculada; sin ella no se
+    registra, y eso no frena: lo dice la confirmación de desvincular.
+
+    `vencida` es lo que agrega el reconciliador: de las reservas vivas, sólo
+    las que ya vencieron.
+    """
+    reserva_viva = Order.stock_reserva.in_([stock.RESERVADA, stock.CIERRE_PENDIENTE])
+    if vencida is not None:
+        reserva_viva = reserva_viva & vencida
+    link_abierto = Payment.link_cerrado.is_(False) & Payment.status.in_(
+        [PaymentStatus.APPROVED, PaymentStatus.EN_REVISION]
+    )
+    return (Order.payment_method == MEDIO_MERCADO_PAGO) & (reserva_viva | link_abierto)
+
+
+def _en_curso_de(vendedor_id):
+    return (
+        select(Order.id)
+        .outerjoin(Payment, Payment.order_id == Order.id)
+        .where(Order.seller_id == vendedor_id, en_curso())
+    )
+
+
+def hay_cobros_en_curso(vendedor_id):
+    """`en_curso` para un vendedor, como condición de otra sentencia.
+
+    Es para decidir y escribir en el mismo acto: la usa el vínculo adentro del
+    `UPDATE` que borra o cambia la cuenta, y no en una consulta anterior.
+    """
+    return _en_curso_de(vendedor_id).exists()
+
+
+def cobros_en_curso(db: Session, vendedor_id) -> int:
+    """Cuántas órdenes de ese vendedor están en curso. Sólo para decirlo."""
+    ordenes = _en_curso_de(vendedor_id).subquery()
+    return db.scalar(select(func.count(distinct(ordenes.c.id))))
 
 
 async def cerrar_cobro(db: Session, orden: Order) -> str:

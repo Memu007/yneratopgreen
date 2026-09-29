@@ -81,10 +81,9 @@ except ValidationError as error:
 from app.core import cifrado
 from app.db.base import SessionLocal
 from app.models.order import Order, OrderStatus
-from app.models.payment import Payment, PaymentStatus
+from app.models.payment import Payment
 from app.models.user import User
 from app.services import candado, cobro, mp_pagos, stock
-from app.services.checkout import MEDIO_MERCADO_PAGO
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +113,6 @@ def _candidatas(db: Session) -> List[Order]:
     # a medias—, la mercadería se recupere en vez de quedar comprometida para
     # siempre por una compra que nunca llegó a tener link.
     sin_pago = Payment.id.is_(None)
-    reserva_viva = Order.stock_reserva.in_([stock.RESERVADA, stock.CIERRE_PENDIENTE])
     vencida = (
         (Order.stock_reserva == stock.CIERRE_PENDIENTE)
         | (Payment.expires_at <= limite)
@@ -125,16 +123,14 @@ def _candidatas(db: Session) -> List[Order]:
     # consolidada, así que por reserva no entrarían nunca, y sin embargo son
     # las más urgentes: una preferencia viva sobre una orden cobrada se puede
     # volver a pagar.
-    link_abierto = Payment.link_cerrado.is_(False) & Payment.status.in_(
-        [PaymentStatus.APPROVED, PaymentStatus.EN_REVISION]
-    )
+    #
+    # Los tres grupos son las órdenes que todavía necesitan la cuenta de su
+    # vendedor, con el vencimiento puesto a las reservas. Ese conjunto vive en
+    # `cobro.en_curso`, que es también el que no deja desvincular.
     return (
         db.query(Order)
         .outerjoin(Payment, Payment.order_id == Order.id)
-        .filter(
-            Order.payment_method == MEDIO_MERCADO_PAGO,
-            (reserva_viva & vencida) | link_abierto,
-        )
+        .filter(cobro.en_curso(vencida=vencida))
         .all()
     )
 

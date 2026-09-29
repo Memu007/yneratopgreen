@@ -23,7 +23,7 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user, get_current_user_optional
 from app.db.base import get_db
 from app.models.user import User
-from app.services import mp_vinculo
+from app.services import cobro, mp_vinculo
 
 router = APIRouter(prefix="/mp-oauth", tags=["mercadopago-oauth"])
 
@@ -118,6 +118,10 @@ async def volver_de_mercado_pago(
     lo pidió; y que la cuenta de Mercado Pago no esté ya cobrando para otro
     vendedor. Si falla cualquiera, no se toca la base.
 
+    Y una cuarta, que decide la misma escritura: si es otra cuenta que la
+    vinculada y el vendedor tiene cobros en curso, tampoco se toca. Esos
+    cobros se terminan con la cuenta de antes.
+
     El `state` se gasta apenas llega la vuelta, sea cual sea el resultado.
     Cancelar es haber vuelto: ese intento ya no puede volver a servir.
     """
@@ -161,7 +165,8 @@ async def volver_de_mercado_pago(
         return _volver(mp_vinculo.CUENTA_EN_USO)
 
     try:
-        mp_vinculo.guardar_credenciales(db, user, cuerpo)
+        if not mp_vinculo.guardar_credenciales(db, user, cuerpo):
+            return _volver(mp_vinculo.OTRA_CUENTA_CON_COBROS)
     except SinClaveDeCifrado:
         # Nunca guardamos en claro para «salir del paso».
         db.rollback()
@@ -212,7 +217,10 @@ async def renovar_vinculo(
         return _estado(current_user, motivo=mp_vinculo.RESPUESTA_INVALIDA)
 
     try:
-        mp_vinculo.guardar_credenciales(db, current_user, cuerpo)
+        if not mp_vinculo.guardar_credenciales(db, current_user, cuerpo):
+            # Es la misma cuenta que se comprobó arriba, así que sólo pasa si
+            # en el medio se vinculó otra con cobros en curso. No se pisa.
+            return _estado(current_user, motivo=mp_vinculo.OTRA_CUENTA_CON_COBROS)
     except SinClaveDeCifrado:
         db.rollback()
         mp_vinculo.marcar_reconexion(db, current_user)
@@ -228,9 +236,21 @@ def desvincular(
 ):
     """Borra el vínculo local. Es idempotente: desvincular dos veces no falla.
 
+    Con cobros en curso no borra nada y contesta 409, con el motivo y cuántos
+    son, para que la pantalla diga por qué y hasta cuándo.
+
     Ojo con lo que **no** hace: no le revoca el permiso a la aplicación del
     lado de Mercado Pago. Eso lo hace el vendedor desde su cuenta, y la
     pantalla se lo dice.
     """
-    mp_vinculo.borrar_credenciales(db, current_user)
+    if not mp_vinculo.borrar_credenciales(db, current_user):
+        # Cuántos se cuenta después y sólo para decirlo: lo que decidió no
+        # borrar es la sentencia de `borrar_credenciales`, no este número.
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "motivo": mp_vinculo.COBROS_EN_CURSO,
+                "cobros_en_curso": cobro.cobros_en_curso(db, current_user.id),
+            },
+        )
     return _estado(current_user)

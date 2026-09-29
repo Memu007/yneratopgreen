@@ -33,7 +33,7 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import httpx
-from sqlalchemy import update
+from sqlalchemy import func, update
 from sqlalchemy.orm import Session
 
 from app.core.cifrado import (
@@ -74,6 +74,11 @@ SIN_CONFIGURAR = "sin_configurar"
 # Lo guardado no abre con la clave vigente. No es culpa de Mercado Pago y no
 # conviene decir que lo es: el motivo es nuestro y la salida también.
 CREDENCIAL_ILEGIBLE = "credencial_ilegible"
+# El vendedor tiene cobros en curso y su cuenta hace falta para terminarlos:
+# no se desvincula (`COBROS_EN_CURSO`) ni se pasa a otra cuenta
+# (`OTRA_CUENTA_CON_COBROS`). Qué es «en curso» lo dice `cobro.en_curso`.
+COBROS_EN_CURSO = "cobros_en_curso"
+OTRA_CUENTA_CON_COBROS = "otra_cuenta_con_cobros"
 
 # El state vale poco tiempo: es el que tarda una persona en autorizar, no el
 # que tarda alguien en encontrarlo en un historial.
@@ -322,36 +327,87 @@ def cuenta_tomada_por_otro(db: Session, mp_user_id: str, user_id: str) -> bool:
     )
 
 
-def guardar_credenciales(db: Session, user: User, cuerpo: dict) -> None:
+def _sin_cobros_en_curso(user: User):
+    """La condición para soltar la cuenta que hay guardada, como parte de la
+    sentencia que la suelta.
+
+    Sin cuenta guardada no hay nada que soltar, y la condición se cumple.
+
+    Va adentro del `UPDATE`, y no en una consulta antes, para achicar la
+    carrera con una compra que se confirma en ese momento: preguntar y borrar
+    son la misma sentencia. No la cierra del todo. La compra que se confirma
+    mientras esa sentencia corre no se ve, y la que se confirma antes de su
+    `commit` todavía lee el token. Cerrarla del todo pide tocar el checkout.
+    """
+    # Acá adentro, para no importar en círculo: `cobro` usa este módulo para
+    # leer el token.
+    from app.services import cobro
+
+    return User.mp_user_id.is_(None) | ~cobro.hay_cobros_en_curso(user.id)
+
+
+def guardar_credenciales(db: Session, user: User, cuerpo: dict) -> bool:
     """Escribe el vínculo completo. Cifrado, y todo junto o nada.
 
     Rotar es reemplazar los dos tokens y el vencimiento en la misma
     transacción. Si se guardara el access nuevo con el refresh viejo, la
     próxima renovación fallaría y el vendedor quedaría sin cobrar sin
     entender por qué.
+
+    Devuelve `False`, sin tocar nada, si es **otra** cuenta y el vendedor
+    tiene cobros en curso: esos cobros se terminan con la cuenta de antes.
+    Renovar y volver a vincular la misma cuenta pasan siempre.
     """
-    user.mp_user_id = str(cuerpo["user_id"])
-    user.mp_access_token_cifrado = cifrar(str(cuerpo["access_token"]))
-    user.mp_refresh_token_cifrado = cifrar(str(cuerpo["refresh_token"]))
-    user.mp_token_expires_at = _vencimiento(cuerpo)
-    user.mp_requiere_reconexion = False
-    if not user.mp_linked_at:
-        user.mp_linked_at = datetime.utcnow()
+    cuenta = str(cuerpo["user_id"])
+    valores = dict(
+        mp_user_id=cuenta,
+        mp_access_token_cifrado=cifrar(str(cuerpo["access_token"])),
+        mp_refresh_token_cifrado=cifrar(str(cuerpo["refresh_token"])),
+        mp_token_expires_at=_vencimiento(cuerpo),
+        mp_requiere_reconexion=False,
+        mp_linked_at=func.coalesce(User.mp_linked_at, datetime.utcnow()),
+    )
+    escrito = db.execute(
+        update(User)
+        .where(User.id == user.id, (User.mp_user_id == cuenta) | _sin_cobros_en_curso(user))
+        .values(**valores)
+        .execution_options(synchronize_session=False)
+    ).rowcount
+    if not escrito:
+        db.rollback()
+        return False
     db.commit()
+    return True
 
 
-def borrar_credenciales(db: Session, user: User) -> None:
-    """Desvincular es borrar, no marcar. No queda nada local de esa cuenta."""
-    user.mp_user_id = None
-    user.mp_access_token_cifrado = None
-    user.mp_refresh_token_cifrado = None
-    user.mp_token_expires_at = None
-    user.mp_linked_at = None
-    user.mp_requiere_reconexion = False
+def borrar_credenciales(db: Session, user: User) -> bool:
+    """Desvincular es borrar, no marcar. No queda nada local de esa cuenta.
+
+    Devuelve `False`, sin tocar nada, si el vendedor tiene cobros en curso:
+    sin su token nadie puede preguntarle a Mercado Pago por esas compras, y
+    la orden y la mercadería quedarían trabadas sin que nadie sepa por qué.
+    """
+    borrado = db.execute(
+        update(User)
+        .where(User.id == user.id, _sin_cobros_en_curso(user))
+        .values(
+            mp_user_id=None,
+            mp_access_token_cifrado=None,
+            mp_refresh_token_cifrado=None,
+            mp_token_expires_at=None,
+            mp_linked_at=None,
+            mp_requiere_reconexion=False,
+        )
+        .execution_options(synchronize_session=False)
+    ).rowcount
+    if not borrado:
+        db.rollback()
+        return False
     db.query(MPOAuthState).filter(MPOAuthState.user_id == user.id).delete(
         synchronize_session=False
     )
     db.commit()
+    return True
 
 
 def marcar_reconexion(db: Session, user: User) -> None:
