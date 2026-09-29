@@ -37960,7 +37960,10 @@ try:
                                text=True, timeout=datos["tope"])
         salida = {"codigo": hecho.returncode, "stdout": hecho.stdout, "stderr": hecho.stderr}
     except subprocess.TimeoutExpired as vencido:
-        salida = {"codigo": None, "stdout": vencido.stdout or "", "stderr": vencido.stderr or "", "no_termino": True}
+        # Al vencer, Python entrega lo que alcanzó a salir en bytes aunque se
+        # haya pedido texto.
+        texto = lambda b: b.decode("utf-8", "replace") if isinstance(b, bytes) else (b or "")
+        salida = {"codigo": None, "stdout": texto(vencido.stdout), "stderr": texto(vencido.stderr), "no_termino": True}
     salida["segundos"] = round(time.monotonic() - desde, 1)
     print(json.dumps(salida))
 finally:
@@ -38076,7 +38079,6 @@ await runCase(224, 'Sin sus variables, o con otra clave, el servicio no barre y 
     const orden = await ordenMercadoPago(vendedor, { producto });
     vencerElLink(orden.order_id);
     const marcadas = () => Number(queryRows('SELECT count(*) FROM users WHERE mp_requiere_reconexion')[0][0]);
-    const antes = marcadas();
     const otraClave = correrEnLaApi('from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())');
 
     const escenas = [
@@ -38086,6 +38088,8 @@ await runCase(224, 'Sin sus variables, o con otra clave, el servicio no barre y 
     ];
     const hechas = [];
     for (const [escena, opciones, dice] of escenas) {
+      // Escena por escena: lo que marcó una no se le cuenta a la siguiente.
+      const antes = marcadas();
       const salida = await correrElServicio(opciones);
       const todo = `${salida.stdout}\n${salida.stderr}`;
       if (salida.no_termino) problemas.push(`${escena}: no terminó`);
