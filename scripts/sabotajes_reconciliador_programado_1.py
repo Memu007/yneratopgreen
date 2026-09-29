@@ -21,6 +21,14 @@ como estaba, con otro reinicio. Tiene que dar rojo por su motivo, y sólo por é
   mensaje-con-traza         Sin una variable que pide la configuración, el
                             servicio sale con la traza de pydantic en vez de
                             una línea. El 224.
+  sin-tope                  RAILWAY.md le da al servicio el comando sin
+                            `timeout`. El 223.
+  pm-horario-restringido    (de PM) El horario de RAILWAY.md corre sólo entre
+                            las 3 y las 4 UTC. El 223.
+  invalida-sin-nombre       Con una variable que no sirve, la línea no dice
+                            cuál. El 224.
+  pm-avisa-pero-barre       (de PM) El servicio dice «NO CORRIO» pero barre
+                            igual. El 224.
 
 El reinicio de la API sale de REINICIAR_API; por omisión,
 `./scripts/entorno_nativo.sh --reiniciar-api`. El caso copia `app/` del entorno
@@ -63,11 +71,27 @@ SABOTAJES = {
     ),
     "otro-comando": (
         RAILWAY_MD,
-        [("   - **Comando de inicio (Custom Start Command):** `railway-entrypoint python -m app.reconciliar`\n",
-          "   - **Comando de inicio (Custom Start Command):** `railway-entrypoint python -V`\n")],
+        [("   - **Comando de inicio (Custom Start Command):** `railway-entrypoint timeout 540 python -m app.reconciliar`\n",
+          "   - **Comando de inicio (Custom Start Command):** `railway-entrypoint timeout 540 python -V`\n")],
         223,
         ["no imprimió «RECONCILIACION {…}»", "la orden vencida quedó «placed»"],
         ["no terminó", "corrió migraciones"],
+    ),
+    "sin-tope": (
+        RAILWAY_MD,
+        [("   - **Comando de inicio (Custom Start Command):** `railway-entrypoint timeout 540 python -m app.reconciliar`\n",
+          "   - **Comando de inicio (Custom Start Command):** `railway-entrypoint python -m app.reconciliar`\n")],
+        223,
+        ["no tiene un tope menor que el intervalo del horario (600 s)"],
+        ["no terminó", "corrió migraciones", "no imprimió", "no es «*/N * * * *»"],
+    ),
+    "pm-horario-restringido": (
+        RAILWAY_MD,
+        [("   - **Horario (Cron Schedule):** `*/10 * * * *`\n",
+          "   - **Horario (Cron Schedule):** `*/10 3 * * *`\n")],
+        223,
+        ["el horario de RAILWAY.md, «*/10 3 * * *», no es «*/N * * * *»"],
+        ["no terminó", "corrió migraciones", "no imprimió", "no tiene un tope"],
     ),
     "sin-comprobar-la-clave": (
         RECONCILIADOR,
@@ -93,6 +117,23 @@ SABOTAJES = {
         224,
         ["sin JWT_SECRET: no dijo por qué en una línea", "sin JWT_SECRET: salió con una traza"],
         ["sin MP_TOKEN_KEY:", "con otra MP_TOKEN_KEY:", "marcó"],
+    ),
+    "invalida-sin-nombre": (
+        RECONCILIADOR,
+        [("    if no_sirven:\n"
+          "        partes.append(f\"variables con un valor que no sirve: {', '.join(no_sirven)}\")\n",
+          "")],
+        224,
+        ["con MP_MINUTOS_DE_GRACIA inválida: no dijo por qué en una línea"],
+        ["sin JWT_SECRET:", "sin MP_TOKEN_KEY:", "con otra MP_TOKEN_KEY:", "marcó", "escribió el valor"],
+    ),
+    "pm-avisa-pero-barre": (
+        RECONCILIADOR,
+        [("            _no_corre(motivo)\n",
+          "            print(f\"RECONCILIACION NO CORRIO: {motivo}\", file=sys.stderr)\n")],
+        224,
+        ["barrió igual", "salió con 0", "marcó 1 vendedor(es)"],
+        ["sin JWT_SECRET:", "con MP_MINUTOS_DE_GRACIA inválida:"],
     ),
 }
 

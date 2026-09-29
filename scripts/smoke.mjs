@@ -38021,10 +38021,21 @@ await runCase(223, 'El servicio del reconciliador barre, dice RECONCILIACION y t
   try {
     const { comando, horario } = servicioSegunRailwayMd();
     const problemas = [];
+    // Los cinco campos: «*/N * * * *». Con otra hora, día o mes el servicio
+    // correría sólo a ratos —«*/10 3 * * *» es cada 10 minutos, pero sólo
+    // entre las 3 y las 4 UTC—.
     const campos = horario.trim().split(/\s+/);
     const cada = (campos[0].match(/^\*\/(\d+)$/) || [])[1];
-    if (campos.length !== 5 || !cada || Number(cada) < 5) {
-      problemas.push(`el horario de RAILWAY.md, «${horario}», no es «cada N minutos» con N de 5 o más, que es el mínimo de Railway`);
+    if (campos.length !== 5 || !cada || Number(cada) < 5 || campos.slice(1).some((c) => c !== '*')) {
+      problemas.push(`el horario de RAILWAY.md, «${horario}», no es «*/N * * * *» con N de 5 o más: `
+        + 'cada N minutos, a toda hora y todos los días');
+    }
+    // Y un tope menor que el intervalo: Railway no corta una corrida colgada,
+    // y mientras siga saltea las siguientes.
+    const tope = (comando.match(/\btimeout\s+(\d+)\b/) || [])[1];
+    if (!tope || !cada || Number(tope) >= Number(cada) * 60) {
+      problemas.push(`el comando de RAILWAY.md, «${comando}», no tiene un tope menor que el intervalo del `
+        + `horario (${cada ? `${Number(cada) * 60} s` : 'sin intervalo'}): una corrida colgada dejaría de programar las siguientes`);
     }
 
     // Una compra por Mercado Pago que nadie pagó y cuyo link ya venció.
@@ -38058,7 +38069,8 @@ await runCase(223, 'El servicio del reconciliador barre, dice RECONCILIACION y t
     assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
     return `«${comando}», con los archivos de backend/Dockerfile.railway, ENV=production y sin .env, barrió en `
       + `${salida.segundos} s, dijo «RECONCILIACION ${JSON.stringify(barrido)}», salió con 0 y no migró; la orden `
-      + `vencida quedó cancelada, con su link apagado y su unidad de vuelta; el horario es «${horario}»`;
+      + `vencida quedó cancelada, con su link apagado y su unidad de vuelta; el horario es «${horario}» y el tope `
+      + `de cada corrida, ${tope} s`;
   } finally {
     await doble.cerrar();
     if (cuentas) await desvincular(cuentas.vendedor.token).catch(() => {});
@@ -38085,6 +38097,10 @@ await runCase(224, 'Sin sus variables, o con otra clave, el servicio no barre y 
       ['sin JWT_SECRET', { variables: ['DATABASE_URL', 'MP_TOKEN_KEY', 'MP_API_BASE_URL'] }, /^RECONCILIACION NO CORRIO: faltan variables: JWT_SECRET\b/m],
       ['sin MP_TOKEN_KEY', { variables: ['DATABASE_URL', 'JWT_SECRET', 'MP_API_BASE_URL'] }, /^RECONCILIACION NO CORRIO: falta MP_TOKEN_KEY\b/m],
       ['con otra MP_TOKEN_KEY', { pisar: { MP_TOKEN_KEY: otraClave } }, /^RECONCILIACION NO CORRIO: MP_TOKEN_KEY no abre ninguna de las \d+ credenciales guardadas/m],
+      // Una variable que está pero no sirve: se nombra, y su valor no se
+      // escribe en el registro.
+      ['con MP_MINUTOS_DE_GRACIA inválida', { pisar: { MP_MINUTOS_DE_GRACIA: 'diez-minutos' } },
+        /^RECONCILIACION NO CORRIO: variables con un valor que no sirve: MP_MINUTOS_DE_GRACIA\b/m],
     ];
     const hechas = [];
     for (const [escena, opciones, dice] of escenas) {
@@ -38096,6 +38112,7 @@ await runCase(224, 'Sin sus variables, o con otra clave, el servicio no barre y 
       else if (salida.codigo === 0) problemas.push(`${escena}: salió con 0`);
       if (!dice.test(salida.stderr)) problemas.push(`${escena}: no dijo por qué en una línea: ${JSON.stringify(salida.stderr.trim().slice(-240))}`);
       if (/Traceback/.test(todo)) problemas.push(`${escena}: salió con una traza en vez de una línea`);
+      if (/diez-minutos/.test(todo)) problemas.push(`${escena}: escribió el valor de la variable en el registro`);
       if (lineaDelBarrido(salida)) problemas.push(`${escena}: barrió igual: «${lineaDelBarrido(salida) && JSON.stringify(lineaDelBarrido(salida))}»`);
       if (marcadas() !== antes) problemas.push(`${escena}: marcó ${marcadas() - antes} vendedor(es) para reconectar su cuenta de Mercado Pago`);
       const estado = ordenEnLaBase(orden.order_id).estado;
@@ -38108,7 +38125,7 @@ await runCase(224, 'Sin sus variables, o con otra clave, el servicio no barre y 
     if (vinculo !== 'f') problemas.push('la vendedora de la orden quedó marcada para reconectar');
 
     assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
-    return `con una vendedora vinculada y una orden vencida esperando, el servicio no barrió en ninguna de las tres, `
+    return `con una vendedora vinculada y una orden vencida esperando, el servicio no barrió en ninguna de las cuatro, `
       + `no marcó a nadie para reconectar y no tocó la orden: ${hechas.join('; ')}`;
   } finally {
     await doble.cerrar();
