@@ -8,9 +8,9 @@ Actualizado: 2026-09-27.
 
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `58bb62b`, publicado el 28/09 con autorización de Emi («publicá y A»), por fast-forward desde `a7e2237`. Suma `COBRO-CONCURRENTE-1` y documentos de PM. Sin migraciones. La verificación previa fue sobre el mismo código (`599dded`, que difiere sólo en `docs/pm`): suite 218/219 (131 de entorno), puertas y las dos guías verdes, sin secretos ni archivos prohibidos. La red de PM no llega a `railway.app`. **No cambia nada visible: Emi comprueba en incógnito que el sitio sigue andando** (Inicio, el Mercado, una ficha e ingresar). Siguen pendientes de verificar la publicación del 27/09 (`a7e2237`, la lista de la devolución de la clienta) y la del 26/09 (`c92c0d7`: modelo, año y origen).
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`58bb62b`) tiene todo lo aceptado. `PAGO-ORDEN-CERRADA-1` está asignada.
-- **Última decisión PM:** `PUBLICACIONES-PRUEBA-1` **ACEPTADA** (28/09, informe `c635acb`). Las 16 publicaciones de prueba están cargadas en el sitio publicado con la cuenta `prueba@example.com`. Los filtros y la ficha de la 1 coinciden con lo esperado **por la API pública**; la pantalla no se miró. La Dev trabajó desde la terminal de la Mac de Emi, sin base, Railway ni cuenta de administración, y el programa no está en el repositorio. PM comprobó que ninguna contraseña está en la historia del repositorio. PM no puede reproducirlo, porque su red no llega a `railway.app`: **la pantalla la mira Emi.** Las 16 quedan publicadas hasta que Emi pida pausarlas. Antes: `COBRO-CONCURRENTE-1`, aceptada y publicada en `58bb62b`.
-- **Tarea activa:** `PAGO-ORDEN-CERRADA-1` (Emi, 28/09, «dale B»), la última pieza antes de habilitar Mercado Pago. Tres partes: el pago que llega a una orden cerrada avisa a las dos partes y la pantalla dice la verdad (hoy dice «más de un pago», que es falso ahí); dos cobros para una orden avisan a las dos partes; y el P2 del reconciliador. Es dinero: revisión fuerte y suite completa de PM.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`58bb62b`) tiene todo lo aceptado salvo `PAGO-ORDEN-CERRADA-1`, aceptada en rama el 29/09. Sin tarea activa.
+- **Última decisión PM:** `PAGO-ORDEN-CERRADA-1` **ACEPTADA EN RAMA** (29/09, `b3b5f3c`, producto en `c1e7f0c`). El pago que llega a una orden cerrada y los dos cobros avisan a las dos partes con textos verdaderos, una vez por orden y por motivo. La pantalla ya no dice «más de un pago» cuando es un pago tras el cierre, y el reconciliador no espera a Mercado Pago con la fila de una publicación tomada. Casos 220 a 222 en 3/3; 10 negativos en rojo, dos de PM; suite 221/222 (131 de entorno); puertas, auditorías y guías verdes. **Sin publicar.** Evidencia en `REPRODUCCION-PAGO-ORDEN-CERRADA-1-2026-09-28.md`.
+- **Tarea activa:** ninguna. La próxima la ordena Emi. Las candidatas son programar el reconciliador en Railway (condición para habilitar Mercado Pago), la tanda de P3 y la mejora de logística.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
@@ -44,6 +44,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `PAGO-ORDEN-CERRADA-1` | aceptada en rama (`b3b5f3c`), sin publicar | `REPRODUCCION-PAGO-ORDEN-CERRADA-1-2026-09-28.md` |
 | `COBRO-CONCURRENTE-1` | publicada en `58bb62b` | `REPRODUCCION-COBRO-CONCURRENTE-1-2026-09-28.md` |
 | `AVISOS-DE-PAGO-1` | publicada en `a7e2237` | `REPRODUCCION-AVISOS-DE-PAGO-1-2026-09-27.md` |
 | `NOTIF-TEXTOS-1` | publicada en `a7e2237` | `REPRODUCCION-NOTIF-TEXTOS-1-2026-09-27.md` |
@@ -168,10 +169,14 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   - nadie puede cambiar su propia contraseña desde la pantalla. La API tiene
     `/auth/change-password`, pero ninguna pantalla lo usa, y el panel no deja
     restablecer la propia.
-- **Pago que llega a una orden ya cerrada:** no avisa (decisión PM del
-  27/09), porque «Pago aprobado» sería falso. Hoy sólo queda en el registro
-  del servidor y nadie se entera. Además, la pantalla dice «más de un pago», que ahí es
-  falso. **Tarea activa: `PAGO-ORDEN-CERRADA-1`**, con el P2 del reconciliador.
+- **Pago que llega a una orden ya cerrada:** resuelto en rama por
+  `PAGO-ORDEN-CERRADA-1` (29/09), sin publicar.
+- **P1 para habilitar Mercado Pago — el reconciliador no está programado:**
+  lo dice `reconciliar.py`, y no figura en `RAILWAY.md`. Sin barridos, las
+  reservas de las órdenes que nadie paga no vencen. Además, el link que no se
+  pudo apagar queda abierto: desde `PAGO-ORDEN-CERRADA-1`, apagarlo se
+  reintenta sólo en el barrido siguiente. Programarlo es un cambio de Railway:
+  pide tarea explícita y autorización de Emi.
 - **Devolución concurrente de stock:** cancelar o rechazar una orden pagada aún
   usa lectura y escritura en Python. Dev no reprodujo pérdida en 6 rondas porque
   esos endpoints hoy se ejecutan sin intercalarse; queda como riesgo de diseño,
@@ -258,9 +263,9 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. **Emi verifica en incógnito** la ficha de la 1 (`https://yneratopgreen-production.up.railway.app/?section=product&id=5553bdcd-3804-4dd7-937a-97f7c9876ab0`): marca John Deere, modelo 5090E, año 2018, 90 HP, usado y origen «Dueño directo». En el Mercado, con «prueba» en el buscador, aparecen las 16, y con «Servicios», 5. Eso verifica también lo publicado el 26 y el 27/09 (modelo, año, origen y marca en la ficha). Queda la lista de la devolución de la clienta del 27/09.
-2. Dev trabaja `PAGO-ORDEN-CERRADA-1`. Dependen de Emi: cambiar las dos contraseñas, crearle la cuenta a la clienta desde el panel, la regla del teléfono, el correo (#15), cuentas de prueba de Mercado Pago, backups y la charla de Inicio (#5) con la clienta. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
+2. **Emi decide** si se publica `PAGO-ORDEN-CERRADA-1`, y cuál es la próxima tarea de la Dev: programar el reconciliador, los P3 o la logística. Dependen de Emi: cambiar las dos contraseñas, crearle la cuenta a la clienta desde el panel, la regla del teléfono, el correo (#15), cuentas de prueba de Mercado Pago, backups y la charla de Inicio (#5) con la clienta. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
 6. Los atributos por rubro ya tienen datos y decisión (25/09); Inicio (#5) espera la charla de Emi con la clienta; AgroMarket como módulo (#10) no se trabaja por ahora (27/09); Servicios (#7) quedó decidido el 25/09. La mejora de logística está por definir.
-7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada. Mercado Pago no se habilita sin la pieza del pago a una orden cerrada; el arreglo del P1 ya está publicado.
+7. Mercado Pago, red-team y producción contractual permanecen en la secuencia acordada. Mercado Pago no se habilita sin publicar `PAGO-ORDEN-CERRADA-1` y sin programar el reconciliador.
