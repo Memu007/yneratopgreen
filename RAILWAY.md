@@ -1,11 +1,13 @@
 # TopGreen en Railway
 
 Esta configuración agrega Railway sin cambiar el desarrollo local. El proyecto
-se despliega como tres servicios separados:
+se despliega como cuatro servicios separados:
 
 1. `Frontend`: este repositorio, directorio raíz `/`.
 2. `Backend`: este repositorio, directorio raíz `/backend`.
 3. `PostGIS`: plantilla PostGIS del marketplace de Railway.
+4. `Reconciliador`: este repositorio, directorio raíz `/backend`, con horario.
+   Se configura desde el panel, sin archivo (sección 5).
 
 No uses el PostgreSQL estándar: las migraciones y las consultas geográficas de
 TopGreen requieren la extensión PostGIS.
@@ -174,3 +176,105 @@ printf 'main      %s\nbackend   %s\nfrontend  %s\n' "$main" "$backend" "$fronten
 `sin-revision-local` significa que ese artefacto se construyó sin la variable, o
 sea que **no** viene de un despliegue de Railway. Es un valor que se lee como lo
 que es: no lo apruebes como si fuera un commit.
+
+## 5. Reconciliador
+
+Es un servicio aparte que **no atiende a nadie**: cada 10 minutos arranca,
+revisa las compras por Mercado Pago que quedaron a medias y termina. Hace tres
+cosas:
+
+- devuelve al catálogo la mercadería de una compra que nadie pagó;
+- apaga el link de pago que no se pudo apagar al cobrar;
+- registra un pago cuyo aviso se perdió.
+
+Sin él, esas tres cosas no pasan nunca. Es condición para habilitar Mercado
+Pago.
+
+Usa la misma imagen del Backend, pero no va adentro del Backend: mientras
+trabaja espera otras operaciones de una forma que, dentro del Backend, lo
+frenaría entero.
+
+**Va sin archivo de configuración, todo desde el panel.** Railway dejó en
+desuso los archivos `railway.toml` para los servicios nuevos, y para el horario
+recomienda el panel.
+
+### Crear el servicio
+
+1. En el proyecto, «+ New» → «GitHub Repo» → este repositorio. Llamalo
+   `Reconciliador`.
+2. En «Settings» del servicio:
+   - **Root Directory:** `/backend`.
+   - **Config File:** vacío. No le pongas `/backend/railway.toml`: ese es el
+     del Backend y corre las migraciones, que tienen que correr en un solo
+     lugar.
+   - **Public Networking:** nada. No se le genera dominio.
+   - **Healthcheck:** vacío. No atiende pedidos.
+   - **Pre-deploy command:** vacío. Las migraciones las corre sólo el Backend.
+   - **Comando de inicio (Custom Start Command):** `railway-entrypoint python -m app.reconciliar`
+   - **Horario (Cron Schedule):** `*/10 * * * *`
+   - **Restart Policy:** «Never». Termina a propósito; no hay que relanzarlo.
+
+El horario va en UTC, y Railway no permite menos de 5 minutos entre corridas.
+Cada 10 alcanza: el link y la reserva valen 30 minutos, el reconciliador espera
+10 más de gracia, y así una compra abandonada devuelve su mercadería entre los
+40 y los 50 minutos.
+
+### Variables
+
+Todas van **como referencia** a otro servicio, con la forma
+`${{Servicio.VARIABLE}}`: así hay un solo valor, y si se cambia en el Backend
+cambia acá. No copies los valores.
+
+```dotenv
+RAILWAY_DOCKERFILE_PATH=Dockerfile.railway
+ENV=production
+DATABASE_URL=${{PostGIS.DATABASE_URL}}
+JWT_SECRET=${{Backend.JWT_SECRET}}
+MP_TOKEN_KEY=${{Backend.MP_TOKEN_KEY}}
+```
+
+Por qué cada una:
+
+- **`RAILWAY_DOCKERFILE_PATH`** le dice que construya con el mismo
+  `Dockerfile.railway` que el Backend. Sin ella usaría `backend/Dockerfile`, que
+  es el del entorno local.
+- **`ENV`** es el modo de producción, como el Backend.
+- **`DATABASE_URL`** es la misma base que usa el Backend.
+- **`JWT_SECRET`**: el reconciliador no la usa. La pide la configuración
+  común al arrancar, y sin ella no arranca.
+- **`MP_TOKEN_KEY`** abre las credenciales de Mercado Pago de cada vendedor,
+  para preguntarle a Mercado Pago por sus pagos. **Tiene que ser la del
+  Backend.** Si falta o es otra, el reconciliador no barre y lo dice. Sin esa
+  comprobación, les pediría a todos los vendedores que reconecten su cuenta.
+
+Si en el Backend está definida `MP_MINUTOS_DE_GRACIA` o `MP_API_BASE_URL`,
+agregala acá también como referencia. Si no está en el Backend, no la agregues:
+una referencia a algo que no existe llega vacía.
+
+### Ver que corrió
+
+En el servicio `Reconciliador`, cada corrida aparece como un despliegue que
+empieza y termina. Abrí el último y mirá sus registros («Logs»). Tiene que
+haber una línea así:
+
+```text
+RECONCILIACION {"vencida": 1}
+```
+
+Entre las llaves va qué les pasó a las órdenes que revisó, y cuántas: por
+ejemplo `vencida` (nadie pagó; volvió la mercadería) o `cobrada` (había un pago
+que no se había avisado). `{}` quiere decir que no había nada para revisar, y
+también está bien.
+
+Si en cambio dice:
+
+```text
+RECONCILIACION NO CORRIO: falta MP_TOKEN_KEY. …
+```
+
+no tocó nada, y la línea dice qué variable falta o está mal. Corregila en
+«Variables» y esperá la corrida siguiente.
+
+**Si una corrida queda «Active» más de 10 minutos, detenela a mano.** Railway
+no corta una corrida que no termina, y mientras siga activa **saltea las
+siguientes**: el reconciliador dejaría de correr sin avisar.

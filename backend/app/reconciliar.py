@@ -20,27 +20,61 @@ Es idempotente por construcción: lo que mueve el stock es el `UPDATE`
 condicional de la reserva, así que correrlo dos veces, o dos veces a la vez,
 deja el mismo resultado que correrlo una.
 
-Se ejecuta a mano:
+Se ejecuta con:
 
     python -m app.reconciliar
 
-Todavía **no** está programado en ningún lado. Programarlo es parte de la
-puesta en producción, y la puesta en producción no está abierta.
+En producción es un servicio aparte de Railway, programado cada 10 minutos
+desde el panel, con la misma imagen del Backend: `RAILWAY.md`, sección 5. No va
+dentro de la API: acá se esperan filas con el bloqueo síncrono, que en el
+proceso de la API frenaría todo.
+
+Antes de barrer comprueba que puede: que estén las variables, y que la clave
+de cifrado abra las credenciales guardadas. Si no, lo dice en una línea que
+empieza con «RECONCILIACION NO CORRIO» y sale con 2 sin tocar nada.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import sys
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+# Sale con esto cuando no puede barrer: falta configuración o la clave no es la
+# del Backend. No barrió nada.
+NO_CORRIO = 2
+
+
+def _no_corre(motivo: str) -> None:
+    print(f"RECONCILIACION NO CORRIO: {motivo}", file=sys.stderr, flush=True)
+    raise SystemExit(NO_CORRIO)
+
+
+try:
+    from app.core.config import settings
+except ValidationError as error:
+    # Corrido como servicio, lo que falta se dice en una línea que se lee en el
+    # registro de Railway, sin una traza de cuarenta renglones. Importado
+    # desde otro lado, el error sigue como siempre.
+    if __name__ != "__main__":
+        raise
+    faltan = sorted({str(e["loc"][0]) for e in error.errors() if e.get("type") == "missing"})
+    _no_corre(
+        f"faltan variables: {', '.join(faltan)}. Van como referencia a las del "
+        "Backend (RAILWAY.md, sección 5)."
+        if faltan else f"la configuración no es válida: {error.error_count()} error(es)"
+    )
+
+from app.core import cifrado
 from app.db.base import SessionLocal
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentStatus
+from app.models.user import User
 from app.services import candado, cobro, mp_pagos, stock
 from app.services.checkout import MEDIO_MERCADO_PAGO
 
@@ -201,10 +235,47 @@ async def reconciliar(db: Session) -> Dict[str, int]:
     return resumen
 
 
+def por_que_no_puede_barrer(db: Session) -> Optional[str]:
+    """Si falta algo para barrer sin hacer daño, qué. `None` si se puede.
+
+    La clave de cifrado es la que importa. El barrido descifra el token de cada
+    vendedor con órdenes pendientes, y cuando no abre lo marca para reconectar
+    su cuenta de Mercado Pago: es lo correcto con **una** credencial ilegible.
+    Con la clave equivocada, o sin clave, serían todas, y el servicio les
+    pediría a todos los vendedores que reconecten por un error de
+    configuración. Por eso se comprueba antes, sin escribir nada: si hay
+    credenciales guardadas, la clave tiene que abrir alguna.
+    """
+    if not settings.MP_TOKEN_KEY:
+        return ("falta MP_TOKEN_KEY. Va como referencia a la del Backend "
+                "(RAILWAY.md, sección 5).")
+    if not cifrado.hay_clave():
+        return "MP_TOKEN_KEY no es una clave válida: tiene que ser la del Backend."
+    guardadas = [
+        fila[0] for fila in db.query(User.mp_access_token_cifrado)
+        .filter(User.mp_access_token_cifrado.isnot(None)).all()
+    ]
+    for guardada in guardadas:
+        try:
+            cifrado.descifrar(guardada)
+            return None
+        except cifrado.NoSeDescifra:
+            continue
+    if guardadas:
+        return (f"MP_TOKEN_KEY no abre ninguna de las {len(guardadas)} credenciales "
+                "guardadas: no es la del Backend. No se barrió, para no marcar a "
+                "los vendedores para reconectar.")
+    return None
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     db = SessionLocal()
     try:
+        motivo = por_que_no_puede_barrer(db)
+        db.rollback()
+        if motivo:
+            _no_corre(motivo)
         resumen = asyncio.run(reconciliar(db))
     finally:
         db.close()
