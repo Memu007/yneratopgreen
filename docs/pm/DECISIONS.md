@@ -10,6 +10,24 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-29 — El reconciliador se crea con Mercado Pago y corta solo a los 9 minutos
+
+Al revisar `RECONCILIADOR-PROGRAMADO-1`, PM decidió:
+
+- **El servicio se crea el día que se habilita Mercado Pago**, con el Backend
+  ya con su `MP_TOKEN_KEY` y antes de encender el cobro. Nadie confirmó que
+  el Backend tenga hoy esa clave. `RAILWAY.md` no la pone entre sus
+  variables, y vale vacía por omisión. Sin ella, cada corrida saldría con
+  error, y sin Mercado Pago no hay nada que reconciliar.
+- **El comando lleva un tope de 540 segundos** (`timeout 540`), como propuso
+  la Dev. Railway no corta una corrida colgada y saltea las siguientes
+  mientras siga activa; así el reconciliador dejaría de correr sin avisar. Con
+  el tope, la corrida se corta antes de la siguiente y queda como fallida a la
+  vista.
+
+Motivo: que los pasos de Emi funcionen la primera vez, y que una falla se vea
+en vez de pasar callada.
+
 ## 2026-09-29 — El reconciliador se programa desde el panel de Railway
 
 Railway dejó en desuso la configuración en el repositorio (`railway.toml`).

@@ -5,45 +5,93 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre PAGO-ORDEN-CERRADA-1 — aceptada en rama
+## Decisión sobre RECONCILIADOR-PROGRAMADO-1 — devuelta
 
-Sobre `b3b5f3c` (producto en `c1e7f0c`). Tu informe y el merge `ad9c0c6`
-difieren sólo en `docs/pm`. Evidencia en
-`REPRODUCCION-PAGO-ORDEN-CERRADA-1-2026-09-28.md`.
+Sobre `c53a5b5` (producto en `d351306`). Tu informe `4b7a2b4` difiere sólo
+en `docs/pm`. Evidencia en `REPRODUCCION-RECONCILIADOR-PROGRAMADO-1-2026-09-29.md`.
 
-- **Casos:** 220, 221 y 222, 3/3 en base recién creada.
-- **Negativos:** tus 8 dan su rojo. También dan rojo los dos míos:
-  - un aviso que dice «AgroBoeda te devuelve el pago». El 220 lo caza con la
-    regla que aflojaste, así que aflojarla no abrió la puerta;
-  - el texto de la orden cerrada para dos cobros. El 221 ve
-    «pago_tras_cierre». Es el borde opuesto a tu `api-dice-mas-de-un-pago`.
-- **Suite completa desde base nueva:** 221/222. Sólo cae el 131, de entorno.
-- **Puertas, auditorías y las dos guías:** verdes.
+**Lo que está bien y no se toca:**
 
-**Tus tres preguntas:**
+- **La comprobación al arrancar.** Tus 6 negativos dan su rojo. También da
+  rojo el mío que dice «NO CORRIO» pero barre igual.
+- **El comando, corrido a mano como en producción.** Con la URL como la da
+  Railway (`postgresql://` y `postgres://`) barre, sale con 0 y no migra.
+- **223 y 224:** 2/2 en base recién creada.
+- **Suite completa desde base nueva:** 223/224. Sólo cae el 131, de entorno.
+- **Puertas:** build, tipos, lint, `compileall`, `pip check`, `node --check`,
+  `alembic check` y diff-check, verdes.
 
-1. **Los textos:** aceptados. Los lee Emi.
-2. **«Devolvé el pago desde Mercado Pago»:** se queda. Es una operación de la
-   cuenta de quien vende, y el aviso no promete que se haga.
-3. **El efecto del P2:** aceptado. Y tenés razón en lo que implica: el
-   reconciliador no está programado en ningún lado. Programarlo es condición
-   para habilitar Mercado Pago. Va como tarea propia, porque toca Railway.
+**Se devuelve por cuatro cosas chicas:**
+
+1. **Nadie confirmó que el Backend tenga `MP_TOKEN_KEY`.** Tu informe dice
+   «Ninguna es un secreto que el Backend no tenga», pero no hay con qué
+   afirmarlo:
+   - la sección 2 de `RAILWAY.md` no pone variables de Mercado Pago;
+   - de Mercado Pago, el inventario del 13/09 sólo registra
+     `MP_CHECKOUT_HABILITADO=false`;
+   - la clave vale `""` por omisión.
+
+   Si falta, la referencia llega vacía y cada corrida sale con 2. Era una de
+   las condiciones para frenar. En `RAILWAY.md`, sección 5:
+   - **cuándo se crea** (decisión PM): el día que se habilita Mercado Pago,
+     con el Backend ya con su `MP_TOKEN_KEY` y antes de encender el cobro;
+   - **antes de crearlo:** Emi mira que `MP_TOKEN_KEY` figure en «Variables»
+     del Backend. Mira sólo el nombre, no el valor. Si no está, no lo crea;
+   - **«NO CORRIO: falta MP_TOKEN_KEY»:** que mande a mirar primero el
+     Backend, y no «Corregila en Variables».
+
+   Cómo se genera la clave del Backend no va acá: es de la habilitación de
+   Mercado Pago.
+2. **El tope: aceptado.**
+   - El comando pasa a
+     `railway-entrypoint timeout 540 python -m app.reconciliar`, y sale el
+     «detenela a mano».
+   - El 223 comprueba que el comando tenga un tope menor que el intervalo del
+     horario. Su negativo, sin tope, tiene que dar rojo.
+3. **El control del horario en el 223 no distingue.** Con `*/10 3 * * *` el
+   223 pasa, y ese horario corre sólo entre las 3 y las 4 UTC. Que mire los
+   cinco campos.
+4. **La línea tiene que nombrar la variable también cuando está mal, sin su
+   valor.** Hoy, con `MP_MINUTOS_DE_GRACIA` vacía, dice «la configuración no
+   es válida: 1 error(es)». `RAILWAY.md` promete que la línea dice cuál. Va
+   una escena más en el 224, con su negativo.
+
+**Sumá mis dos negativos a tu script**, así la vuelta se revisa con un solo
+comando:
+
+- `pm-avisa-pero-barre`: en `main()`, `_no_corre(motivo)` pasa a imprimir la
+  misma línea sin salir. El 224 da rojo: «barrió igual», «salió con 0» y
+  «marcó 1 vendedor(es)». La escena de la otra clave ya no marca a nadie,
+  porque la de sin clave la marcó antes.
+- `pm-horario-restringido`: el horario de `RAILWAY.md` pasa a
+  `*/10 3 * * *`. Tiene que dar rojo en el 223; hoy pasa.
+
+**Opcional, si te sirve:** una línea en `RAILWAY.md` sobre el primer
+despliegue. Hasta donde sé, Railway despliega apenas se crea el servicio, con
+lo que tenga en ese momento, y ese despliegue puede fallar antes de que Emi
+cargue la configuración. No lo verifiqué.
+
+**Para la vuelta:** si sólo tocás `RAILWAY.md`, la parte del import de
+`reconciliar.py` y los casos 223 y 224, no hace falta la suite completa.
+Alcanza con el 100, del 210 al 224, los negativos y el diff-check. Si tocás
+otra cosa, va la suite completa.
 
 **P3, sin tarea:**
 
-- la orden cerrada que además tiene dos cobros no tiene caso;
-- se dice «mercadería» también cuando la publicación es un servicio;
-- el panel de administración no ve estos pagos;
-- **propuesta mía, la decide Emi:** decirle a quien vende, en la orden
-  cerrada, que si la entrega baje el stock de la publicación. Hoy la unidad
-  sigue a la venta.
+- una orden de Mercado Pago cuyo vendedor se desvinculó queda reservada
+  hasta que vuelva a vincular: el reconciliador no puede preguntar sin el
+  token. Es de antes; lo decide PM antes de habilitar Mercado Pago;
+- al publicar con migraciones, una corrida puede caer si arranca antes de que
+  el Backend migre. La siguiente se arregla sola;
+- el 223 usa variables escritas en el caso, no las de `RAILWAY.md`.
 
-Emi autorizó publicarla el 29/09: la publica PM. Vos no integres ni
-despliegues.
+No integres ni despliegues.
 
 ---
 
 ## Tarea activa — RECONCILIADOR-PROGRAMADO-1
+
+**Devuelta el 29/09.** Lo que falta está arriba, en la decisión.
 
 **Sobre tu freno (29/09): bien frenado, y va la (a).** El buscador me dice lo
 mismo que a vos, y yo tampoco llego a las páginas:
@@ -188,9 +236,13 @@ Lo decide la PM. Lo que depende de Emi puede reordenar la cola:
   - los errores de la API en «tú»;
   - las guías que no nombran los avisos de pago;
   - los tres de `COBRO-CONCURRENTE-1`;
-  - los cuatro de `PAGO-ORDEN-CERRADA-1`;
+  - los cuatro de `PAGO-ORDEN-CERRADA-1` y los de
+    `RECONCILIADOR-PROGRAMADO-1`, en sus reproducciones;
   - ingresar con una contraseña de más de 72 bytes da 500 (bcrypt);
   - cambiar la propia contraseña desde la pantalla: la API tiene `/auth/change-password` y ninguna pantalla lo usa;
+- **antes de habilitar Mercado Pago:** qué pasa con una orden de Mercado
+  Pago cuyo vendedor se desvinculó. Hoy queda reservada hasta que vuelva a
+  vincular;
 - el correo (#15);
 - las cuentas de prueba de Mercado Pago;
 - la mejora de la logística en los filtros, por definir;
