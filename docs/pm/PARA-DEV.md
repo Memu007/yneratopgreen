@@ -71,8 +71,9 @@ Así sigue la tarea:
   - si hay tokens guardados y la clave no descifra ninguno, tampoco barre ni
     marca a nadie para reconectar. Lleva su negativo: con otra clave, el
     servicio marca vendedores para reconectar, y eso tiene que dar rojo.
-- **El costo de un servicio más lo aprueba Emi** antes de crearlo. Vos seguí
-  con el repositorio.
+- **El costo de un servicio más: Emi lo aprobó el 29/09** («Ok el costo»).
+  Vos seguí con el repositorio. El servicio lo crea Emi con tus pasos, después
+  de que PM acepte la pieza.
 - **El corte del 01/12 para el Backend y el Frontend va en una pieza propia**,
   antes de esa fecha. No es de esta tarea.
 
@@ -161,7 +162,8 @@ Cada uno da rojo por su motivo y deja el árbol como estaba.
 - Si hace falta cambiar el Backend o su configuración en Railway.
 - Si el reconciliador necesita una variable secreta que el Backend hoy no
   tiene.
-- Si programarlo exige otro plan de Railway o un costo nuevo.
+- Si programarlo exige otro plan de Railway, o un costo más allá de un
+  servicio que corre unos segundos cada 10 minutos (lo aprobado el 29/09).
 
 ### Entrega en `PARA-PM.md`
 

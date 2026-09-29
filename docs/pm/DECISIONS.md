@@ -10,6 +10,28 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-29 — El reconciliador se programa desde el panel de Railway
+
+Railway dejó en desuso la configuración en el repositorio (`railway.toml`).
+Los servicios nuevos no pueden usarla, y los que ya la usan la pierden el
+01/12/2026. Lo dicen los resúmenes del buscador sobre `docs.railway.com`; ni
+PM ni la Dev llegan a la página. La Dev frenó `RECONCILIADOR-PROGRAMADO-1` por
+eso, y se decidió:
+
+- **El servicio se programa desde el panel, cada 10 minutos** (PM). Es lo que
+  Railway recomienda para el horario. El repositorio guarda los pasos en
+  `RAILWAY.md`, la comprobación local y los casos.
+- **Las variables van como referencia al Backend, no como copia** (PM). Con
+  otra `MP_TOKEN_KEY`, el reconciliador marcaría a los vendedores para
+  reconectar su cuenta de Mercado Pago; por eso la comprueba al arrancar.
+- **Emi aprobó el costo de un servicio más** («Ok el costo»). Corre unos
+  segundos cada 10 minutos. PM lo estima en centavos por mes, sin medirlo.
+- **El corte del 01/12 del Backend y el Frontend va en una pieza propia**,
+  antes de esa fecha.
+
+Motivo: sin barridos, las reservas que nadie paga no vencen y un link que no se
+pudo apagar queda abierto. Es la última condición para habilitar Mercado Pago.
+
 ## 2026-09-28 — PM y Dev siguen con Opus
 
 Salió Claude Sonnet 5.5. Para programar queda cerca de Opus 5.5, pero no por
