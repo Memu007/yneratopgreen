@@ -38341,13 +38341,17 @@ async function desvincularDesdeElPanel(browser, nombre, viewport, cuenta, proble
     }
     await axeEn(page, '[class*="_confirmModal_"]', `${nombre}, la confirmación`, problemas);
     await dialogo.getByRole('button', { name: 'Desvincular', exact: true }).click();
+    // Se espera lo primero que diga algo: el motivo en el panel, el aviso
+    // genérico o el de desvinculada. Los avisos se van solos, así que mirarlos
+    // después de esperar al motivo sería no verlos nunca.
     const motivo = seccion.getByRole('alert');
-    const dijo = await motivo.first().waitFor({ state: 'visible', timeout: 15_000 })
-      .then(async () => sinEspacios(await motivo.first().innerText()))
-      .catch(() => null);
+    const generico = page.getByText('No se pudo desvincular la cuenta.');
+    const desvinculada = page.getByText('Cuenta de Mercado Pago desvinculada.');
+    await esperarA(async () => (await motivo.count()) > 0 || (await generico.count()) > 0
+      || (await desvinculada.count()) > 0, 'el panel no dijo nada', 15_000).catch(() => {});
+    if (await generico.count()) problemas.push(`${nombre}: dice «No se pudo desvincular la cuenta.»`);
+    const dijo = (await motivo.count()) ? sinEspacios(await motivo.first().innerText()) : null;
     if (dijo) await axeEn(page, '[class*="_mpSection_"]', `${nombre}, el panel con el motivo`, problemas);
-    const generico = await page.getByText('No se pudo desvincular la cuenta.').count();
-    if (generico) problemas.push(`${nombre}: dice «No se pudo desvincular la cuenta.»`);
     const sigue = await seccion.getByText('Cuenta vinculada').isVisible();
     if (!sigue) problemas.push(`${nombre}: el panel dejó de mostrar la cuenta vinculada`);
     const [ancho, visible] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
