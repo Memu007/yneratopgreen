@@ -2,369 +2,290 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## DESVINCULAR-CON-COBROS-1: frenada antes de escribir código
-
-**Resultado: freno por dos condiciones tuyas.** No escribí código.
-
-- **«Si encontrás un caso en el que el token haga falta después de que la
-  orden terminó».** Lo encontré y lo medí.
-- **«Si arreglar la carrera toca el checkout».** La carrera existe, y
-  cerrarla del todo lo toca.
-
-### 1. El token hace falta después: las devoluciones y los contracargos
-
-Un pago ya cobrado se puede devolver o desconocer después: quien vende lo
-devuelve desde Mercado Pago, o hay un contracargo. **`PAGO-ORDEN-CERRADA-1`
-le pide a quien vende justamente eso:** «devolvé el pago desde Mercado Pago».
-Mercado Pago avisa de esa novedad, y para leerla hace falta el token de quien
-vende (`mp_webhook.py:129-142` busca a quien vende por su cuenta).
-
-**Medido**, con un caso temporal que no quedó en el repositorio: una compra
-pagada, con el link apagado y la reserva consolidada. Es decir, **no** «en
-curso» según el criterio de la tarea.
-
-```text
-aviso del pago         → 200 aplicado; orden paid, link apagado, reserva consolidada
-POST /mp-oauth/unlink  → 200 (hoy se puede, y con la regla pedida también)
-Mercado Pago devuelve el pago; llega el aviso
-aviso de la devolución → 503 sin_destinatario
-la intención queda     → APPROVED; quien compra ve «aprobado»
-```
-
-Mercado Pago reintenta el 503 un tiempo y después deja de avisar. **La
-devolución no queda registrada nunca:** quien compra ve «Pago acreditado»
-aunque le hayan devuelto la plata. Con la regla como está pedida, esto sigue
-pasando para toda orden que no esté «en curso».
-
-**Lo que decidís vos.** Te recomiendo la (a):
-
-- **(a) La regla como está pedida, y el riesgo dicho en la pantalla.** No
-  desvincula con cobros en curso. Al desvincular, el panel avisa: «Si después
-  devolvés un pago desde Mercado Pago, AgroBoeda no se va a enterar: la
-  compra va a seguir figurando como pagada.» Es lo más chico, y no traba a
-  nadie más allá de sus compras en curso.
-- **(b) Frenar también mientras haya pagos «en revisión»**: el pago que llegó
-  con la orden cerrada y el de más de un pago. Son los casos en que la
-  plataforma le pide a quien vende que devuelva. **Pero `EN_REVISION` no
-  termina nunca:** después de la devolución, `aplicar` la vuelve a dejar en
-  revisión. Con esta regla, esa persona no podría desvincular jamás. Haría
-  falta un estado nuevo, y eso es una migración.
-- **(c) Frenar mientras haya ventas cobradas en los últimos N días**, el plazo
-  en que Mercado Pago admite devoluciones o contracargos. No encontré ese
-  plazo en el código ni lo pude leer en la documentación, y trabaría a
-  cualquiera que haya vendido hace poco.
-
-### 2. La carrera: sí puede quedar una preferencia de una cuenta borrada
-
-**No la reproduje; sale del código.** El checkout confirma la orden con su
-reserva (`checkout.py:428`) y **después** lee el token de quien vende para
-crear la preferencia (`mp_preferencia.py:257`, y la espera en `:266`).
-Desvincular es un endpoint síncrono que corre en otro hilo.
-
-La secuencia:
-
-1. `unlink` cuenta los cobros en curso, **antes** de que la orden nueva esté
-   confirmada: ve 0;
-2. el checkout confirma la orden;
-3. el checkout lee el token, **antes** de que `unlink` confirme el borrado;
-4. `unlink` borra las credenciales;
-5. el checkout crea la preferencia en Mercado Pago con el token viejo, y la
-   guarda.
-
-Queda una orden con su link, de una cuenta que ya no está vinculada. Si alguien
-paga, el aviso da 503 como arriba, y el reconciliador no puede preguntar: la
-orden queda trabada hasta que la vendedora vuelva a vincular.
-
-- **La ventana es de milisegundos:** entre dos idas y vueltas a la base de
-  cada lado.
-- **Cerrarla del todo toca el checkout.** Que la reserva y la lectura del
-  token vean el vínculo en la misma transacción, con la fila de la vendedora
-  tomada de los dos lados; o que el checkout vuelva a mirar el vínculo después
-  de crear la preferencia.
-- **Achicarla sin tocarlo:** que `unlink` cuente y borre en una sola
-  sentencia (`UPDATE … WHERE NOT EXISTS (cobros en curso)`). Queda el hueco
-  entre esa sentencia y su `commit`, más chico todavía.
-
-**Lo que decidís vos:** (i) aceptar el hueco, achicado sin tocar el checkout
-y dicho como riesgo, o (ii) cerrarlo tocando el checkout. Te recomiendo la
-(i): hoy Mercado Pago no está habilitado, y una orden trabada así se destraba
-cuando la vendedora vuelve a vincular la misma cuenta.
-
-### Lo demás ya está leído, y cabe en la tarea
-
-- **El criterio «en curso»** va en un solo lugar, en `cobro`: reserva viva, o
-  pago aprobado o en revisión con el link abierto. El reconciliador lo usa
-  sumándole la condición de vencimiento.
-- **Los usos del token**, además de las devoluciones de arriba:
-  - crear la preferencia: orden con reserva viva;
-  - el aviso y la vuelta: el pago de una orden en curso, o una novedad
-    posterior como la de arriba;
-  - cerrar el cobro: reserva viva;
-  - apagar el link: pago con el link abierto;
-  - el reconciliador: sus candidatas.
-
-  Fuera de las novedades posteriores, todos caen en el criterio.
-- **Reconectar con otra cuenta:** `guardar_credenciales` pisa `mp_user_id`
-  (`mp_vinculo.py:333`). La vuelta de Mercado Pago lo va a comparar con la
-  cuenta de antes.
-
-Con tus dos respuestas sigo.
-
----
-
-## RECONCILIADOR-PROGRAMADO-1: la vuelta
-
-| | |
-|---|---|
-| base | `edfd886` (tu devolución) |
-| producto | `1241b48` (`RAILWAY.md` y el import de `reconciliar.py`) |
-| casos y negativos | `8170d8b` |
-| no integrado, no desplegado | no entré a Railway |
-
-**Resultado: los cuatro cambios, y tus dos negativos en el script.**
-
-1. **`MP_TOKEN_KEY` en el Backend.** Tenías razón: escribí «Ninguna es un
-   secreto que el Backend no tenga» sin nada que lo sostuviera. Fue un error
-   mío. `RAILWAY.md`, sección 5, dice ahora:
-   - **cuándo se crea:** el día que se habilita Mercado Pago, con el Backend
-     ya configurado y antes de encender el cobro;
-   - **antes de crearlo:** mirar en «Variables» del Backend que figure
-     `MP_TOKEN_KEY`, sólo el nombre. Si no está, no se crea;
-   - **ante «NO CORRIO: falta MP_TOKEN_KEY»:** mirar primero el Backend; si
-     la tiene, revisar la referencia en este servicio.
-2. **El tope.** El comando es `railway-entrypoint timeout 540 python -m app.reconciliar`,
-   y salió el «detenela a mano». El 223 exige un `timeout` menor que el
-   intervalo del horario, y `sin-tope` da rojo. Una aclaración: `timeout` es de
-   coreutils, que viene en la imagen Debian de `python:3.11-slim`. Lo
-   comprobé en mi entorno, no dentro de la imagen, porque acá no hay Docker.
-3. **El horario, los cinco campos.** El 223 exige `*/N * * * *` con N ≥ 5.
-   Tu `pm-horario-restringido` da rojo.
-4. **La variable que no sirve se nombra, sin su valor.** El 224 tiene una
-   escena más: `MP_MINUTOS_DE_GRACIA=diez-minutos`. La línea dice
-   «variables con un valor que no sirve: MP_MINUTOS_DE_GRACIA», y el caso
-   comprueba que el valor no aparezca. `invalida-sin-nombre` da rojo.
-
-**La línea opcional del primer despliegue: la puse**, en condicional y sin
-verificar: «Railway puede hacer un primer despliegue apenas conectás el
-repositorio… Si ese primero falla, no pasa nada: cuando termines,
-«Redeploy»».
-
-**Lo que corrí**, como pediste para la vuelta:
-
-```text
-SMOKE_CASOS=100,210…224 node scripts/smoke.mjs
-→ 16/16 pasaron; 0 fallaron
-
-python3 scripts/sabotajes_reconciliador_programado_1.py
-→ los 10 [ROJO ESPERADO], en la primera corrida
-→ src, backend y RAILWAY.md después: como estaban
-→ todos dieron el rojo esperado
-
-git -c core.whitespace=cr-at-eol diff --check   → limpio
-compileall                                      → verde
-```
-
-| sabotaje nuevo | rojo |
-|---|---|
-| `sin-tope` | 223: «el comando de RAILWAY.md, «railway-entrypoint python -m app.reconciliar», no tiene un tope menor que el intervalo del horario (600 s)» |
-| `pm-horario-restringido` | 223: «el horario de RAILWAY.md, «*/10 3 * * *», no es «*/N * * * *» con N de 5 o más» |
-| `invalida-sin-nombre` | 224: «con MP_MINUTOS_DE_GRACIA inválida: no dijo por qué en una línea: "…la configuración no es válida: 1 error(es)"» |
-| `pm-avisa-pero-barre` | 224: sin clave, «salió con 0», «barrió igual» y «marcó 1 vendedor(es)»; con otra clave, «salió con 0» y «barrió igual» |
-
-Los 6 de antes siguen dando el mismo rojo.
-
-**No corrí:** la suite completa, porque sólo toqué lo que dijiste: `RAILWAY.md`,
-el import de `reconciliar.py` y los casos 223 y 224. Tampoco lint, tipos ni
-build: no hay cambios en `src/`.
-
----
-
-## RECONCILIADOR-PROGRAMADO-1: entrega
+## DESVINCULAR-CON-COBROS-1: entrega
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `0794645` (tu respuesta al freno) |
-| producto | `d351306` (`RAILWAY.md` y `backend/app/reconciliar.py`) |
-| casos y negativos | `8635202` y `c53a5b5` |
-| no integrado, no desplegado | `main` sigue en `65457cc`. No entré a Railway |
+| base | `0495b31` (tu respuesta al freno) |
+| producto | `bcc8ca5` (la regla y la pantalla) y `a27fc7c` (contraste) |
+| casos, negativos, suite y `API_ENDPOINTS.md` | `718ec68`, `ead24f6` y `777bee1` |
+| no integrado, no desplegado | `main` sigue en `5d8df5d` |
 
 **Resultado.**
 
-- **El servicio se crea desde el panel, con los pasos de `RAILWAY.md`,
-  sección 5.** Están escritos para Emi, y el caso 223 los lee de ahí:
-  - el comando es `railway-entrypoint python -m app.reconciliar`;
-  - corre cada 10 minutos (`*/10 * * * *`), con reinicio «Never»;
-  - no tiene pre-deploy ni healthcheck, ni archivo de configuración;
-  - las variables van como referencia, por nombre y cada una con su porqué.
-- **Antes de barrer, el reconciliador comprueba que puede hacerlo sin daño.**
-  - Si falta una variable, o si `MP_TOKEN_KEY` falta, no es válida o no abre
-    ninguna credencial guardada, lo dice en una línea que empieza con
-    `RECONCILIACION NO CORRIO: …` y sale con 2 sin tocar nada.
-  - Con el código de la base, el 224 **mide el daño que te había anunciado
-    leyendo el código**: sin clave, o con otra, el barrido marca para
-    reconectar a la vendedora con una orden pendiente.
-- **La comprobación local es como en producción.**
-  - Usa sólo los archivos que copia `backend/Dockerfile.railway`, leídos del
-    Dockerfile, más el entrypoint.
-  - Corre sin `.env`, con `ENV=production` y con las variables de la
-    sección 5.
-  - El comando cierra una orden vencida, dice `RECONCILIACION {…}`, sale con
-    0 y no migra.
-- **Suite completa desde base nueva, sobre `c53a5b5`: 223/224.** Sólo cae
-  el 131, de entorno.
+- **Con cobros de Mercado Pago en curso no se desvincula ni se pasa a otra
+  cuenta.** Renovar y reconectar la misma cuenta pasan siempre.
+  - `unlink` contesta **409** con `detail: {"motivo": "cobros_en_curso",
+    "cobros_en_curso": N}` y no toca nada.
+  - Si en la vuelta de Mercado Pago viene otra cuenta, vuelve con
+    `mp_error=otra_cuenta_con_cobros` y queda la de antes.
+- **El criterio vive en `cobro.en_curso`**, en un solo lugar. El
+  reconciliador lo usa con el vencimiento agregado.
+- **La carrera se achica sin tocar el checkout.** Desvincular y guardar otra
+  cuenta deciden y escriben en la misma sentencia. Lo que queda está en
+  «Riesgos».
+- **La pantalla dice por qué y hasta cuándo**, y la confirmación avisa lo de
+  las devoluciones. Los textos están abajo.
+- **Sin migraciones.**
+- **Suite completa desde base nueva, sobre `777bee1`:** 229/230. Sólo cae
+  el 131, el de entorno de siempre (el puente sólo traduce `docker exec`).
 
 **Lo que decidís vos (o Emi):**
 
-1. **Un tope para una corrida colgada.** Railway no corta una corrida que no
-   termina, y mientras siga activa saltea las siguientes: el reconciliador
-   dejaría de correr sin avisar.
-   - `RAILWAY.md` le dice a Emi que la detenga a mano si pasa de 10 minutos.
-   - **Propuesta:** que el comando sea
-     `railway-entrypoint timeout 540 python -m app.reconciliar`, así el
-     proceso se corta solo antes de la corrida siguiente. No lo hice porque
-     el comando lo fijaste vos.
-2. **Los nombres del panel.** Escribí «Custom Start Command», «Cron
-   Schedule», «Restart Policy» y «Config File» como los conozco y como
-   aparecen en los resúmenes del buscador. No pude abrir las páginas, así que
-   Emi puede encontrarlos con otro nombre. El valor de cada uno no cambia.
+1. **Los textos.** Están completos abajo.
+2. **Una orden sin link también frena.** Pasa cuando falló la creación del
+   link. El reconciliador le pregunta a Mercado Pago antes de mirar si hay
+   link, así que sin cuenta no la puede cerrar: entra en «reserva viva», como
+   pediste. **La consecuencia:** quien vende no puede pasar a otra cuenta para
+   reanudar esa misma orden. Tiene que arreglar la suya, o esperar a que venza
+   (hasta unos 50 minutos). Antes el 76 probaba justamente eso, y lo cambié
+   (abajo).
+3. **Un hueco del criterio que no cambié.** Es un pago devuelto o con
+   contracargo cuyo link no se pudo apagar. Hacen falta dos fallas seguidas al
+   apagarlo: una al cobrar y otra al llegar la devolución.
+   - `link_abierto` mira sólo `APPROVED` y `EN_REVISION`. Esa orden queda
+     fuera del criterio y del reconciliador: **el link queda abierto para
+     siempre**, y quien vende puede desvincular.
+   - Lo leí en el código (`_resumen` deja `REFUNDED` o `CHARGED_BACK`); no lo
+     reproduje.
+   - **Propuesta:** que `link_abierto` mire los cuatro estados con cobro
+     (`CON_COBRO`). No lo hice: cambia qué barre el reconciliador, y no lo
+     pediste.
 
-## Lo que dice Railway
+## El criterio
 
-Con la misma aclaración que en el freno: `docs.railway.com` está bloqueado
-para mi entorno y para la herramienta de lectura web. Esto sale de los
-resúmenes del buscador sobre esas páginas; no son citas textuales.
+`cobro.en_curso(vencida=None)`: una orden de Mercado Pago con la reserva
+viva (reservada o cierre pendiente), o con un pago aprobado o en revisión cuyo
+link sigue abierto. Sobre `Order`, con `Payment` por fuera.
 
-| qué | lo que dice | fuente |
+- **El vínculo** lo usa por vendedor (`hay_cobros_en_curso`), adentro del
+  `UPDATE` que borra o cambia la cuenta.
+- **El reconciliador** lo usa con `vencida` (`_candidatas`): a la reserva
+  viva le agrega el vencimiento.
+- **Cuántas** (`cobros_en_curso`) se cuentan aparte, sólo para decirlo.
+
+**Dónde hace falta el token**, comprobado en el código:
+
+| uso | qué orden | ¿en el criterio? |
 |---|---|---|
-| cómo se programa | desde el panel del servicio o con `deploy.cronSchedule` en `railway.toml`/`railway.json`, que está en desuso para servicios nuevos | https://docs.railway.com/cron-jobs y https://docs.railway.com/config-as-code |
-| intervalo mínimo | 5 minutos | https://docs.railway.com/cron-jobs |
-| zona horaria | UTC | lo mismo |
-| si la anterior sigue corriendo | saltea la nueva, y no termina la vieja | lo mismo |
-| el proceso | tiene que terminar solo, sin dejar conexiones abiertas | lo mismo |
-| reinicio | existe «Never» | https://docs.railway.com/deployments/restart-policy |
-| otro Dockerfile | la variable `RAILWAY_DOCKERFILE_PATH`, o «Dockerfile Path» en la configuración del servicio | https://docs.railway.com/builds/dockerfiles |
-| horario en el archivo | problema conocido: a veces no dispara; recomiendan ponerlo en el panel | https://station.railway.com/questions/cron-jobs-are-stuck-and-not-executing-on-40255aab |
+| crear el link (`mp_preferencia.preparar_pago`) | reservada | sí, reserva viva |
+| cancelar o rechazar (`cerrar_cobro`) | reservada | sí |
+| el reconciliador (`_una` → `sincronizar`) | sus candidatas, **también sin link** | sí |
+| apagar el link cobrado (`apagar_link`) | aprobado o en revisión, link abierto | sí |
+| lo mismo, ya devuelto o con contracargo | `REFUNDED`/`CHARGED_BACK`, link abierto | **no** (punto 3 de arriba) |
+| el aviso y la vuelta (`procesar_pago`, `sincronizar`) | una orden en curso | sí |
+| lo mismo, una novedad posterior | devolución o contracargo de una terminada | no: es tu (a), y lo dice la confirmación |
 
-## La frecuencia
+**Sin cuenta, la vuelta de una orden terminada** dice lo último que se sabía,
+«sin verificar». Es parte de la (a).
 
-**Cada 10 minutos.** La reserva y el link valen 30 minutos
-(`MP_MINUTOS_DE_VIGENCIA`), y el reconciliador suelta después de 10 más de
-gracia (`MP_MINUTOS_DE_GRACIA`). Con cada 10, una compra abandonada devuelve su
-mercadería entre los 40 y los 50 minutos, y un link que no se pudo apagar se
-reintenta a los 10. Cada 5 es el mínimo de Railway y duplica las corridas por
-poco.
+## Los textos nuevos
 
-## Las variables
+**La confirmación de desvincular.** Lo del medio es nuevo:
 
-Todas como referencia (`${{Servicio.VARIABLE}}`), para que haya un solo valor.
-En `RAILWAY.md` cada una tiene su porqué, en palabras de Emi.
+> Se borran de AgroBoeda las credenciales de tu cuenta.
+>
+> Si después se devuelve un pago o hay un contracargo, AgroBoeda no se va a
+> enterar: la compra va a seguir figurando como pagada.
+>
+> Para retirarle el permiso a la aplicación también del lado de Mercado Pago,
+> hacelo desde tu cuenta.
 
-| variable | valor | por qué |
-|---|---|---|
-| `RAILWAY_DOCKERFILE_PATH` | `Dockerfile.railway` | la imagen del Backend; sin ella usaría `backend/Dockerfile`, el del entorno local |
-| `ENV` | `production` | como el Backend |
-| `DATABASE_URL` | `${{PostGIS.DATABASE_URL}}` | la misma base |
-| `JWT_SECRET` | `${{Backend.JWT_SECRET}}` | no la usa, pero la configuración común no arranca sin ella (medido: sin ella, «faltan variables: JWT_SECRET») |
-| `MP_TOKEN_KEY` | `${{Backend.MP_TOKEN_KEY}}` | abre las credenciales de cada vendedor; tiene que ser la del Backend |
+**El panel, cuando no se puede.** Queda a la vista, en lugar del aviso «No se
+pudo desvincular la cuenta.»:
 
-Ninguna es un secreto que el Backend no tenga. `MP_MINUTOS_DE_GRACIA` y
-`MP_API_BASE_URL` van como referencia sólo si el Backend las define: una
-referencia a algo que no existe llega vacía.
+> Todavía no podés desvincular tu cuenta: tenés 1 venta con cobro de Mercado
+> Pago en curso, y AgroBoeda necesita tu cuenta para confirmar con Mercado Pago
+> cómo termina. Vas a poder desvincularla cuando esa venta se pague, se
+> cancele o venza sin pago.
+
+Con más de una: «tenés 2 ventas…», «cómo terminan», «cuando esas ventas se
+paguen, se cancelen o venzan sin pago».
+
+**La vuelta de Mercado Pago con otra cuenta:**
+
+> Tenés ventas con cobro de Mercado Pago en curso, y se terminan con la cuenta
+> que ya tenías vinculada: sigue vinculada esa. Vas a poder cambiarla cuando
+> esas ventas se paguen, se cancelen o venzan sin pago.
+
+**Antes de vincular**, en «Qué pasa cuando la vinculás»: «Podés desvincularla
+cuando quieras, salvo mientras tengas ventas con cobro de Mercado Pago en
+curso». Antes decía «Podés desvincularla cuando quieras».
+
+**La guía de usuario no cambió:** sólo recorre «Cuenta no vinculada» y
+«Vincular Mercado Pago» (paso 14). `API_ENDPOINTS.md` dice el 409 y el motivo
+de la vuelta.
+
+**El contraste de la confirmación.** axe encontró, en la confirmación de
+desvincular, el título y el botón a 2,28:1: iba el color de texto sobre el
+marrón de advertencia. Ahora van en blanco, a 6,94:1 (`a27fc7c`). Es la
+confirmación común de tipo «warning», así que también cambia «Vaciar
+carrito». El mensaje nuevo del panel va a 12,85:1.
 
 ## Casos
 
-| caso | qué mira | con el código de la base |
+| caso | qué mira | con el producto de la base |
 |---|---|---|
-| 223 | El comando que `RAILWAY.md` le da al servicio, corrido como en producción, cierra una orden vencida de una vendedora nueva. Dice `RECONCILIACION {…}` con `vencida` ≥ 1, sale con 0 y no migra. La reserva vuelve y el link se apaga en el doble. El horario de `RAILWAY.md` es «cada N minutos» con N ≥ 5 | pasa: el comando ya funcionaba. Lo nuevo son los pasos y la comprobación |
-| 224 | Con una vendedora vinculada y una orden vencida esperando: sin `JWT_SECRET`, sin `MP_TOKEN_KEY` y con otra clave. El servicio no barre, lo dice en una línea, sale con 2, no marca a nadie para reconectar y no toca la orden | rojo, 11 problemas: sin `JWT_SECRET` sale con la traza de pydantic; sin clave y con otra, barre, sale con 0 y **marca a la vendedora para reconectar** |
+| 225 | Dos ventas reservadas: 409 con 2 y las credenciales iguales. La pantalla, en escritorio con dos y en celular con una: la confirmación con el aviso, el panel con su texto exacto, sin el genérico y con axe limpio. Vence una con el reconciliador: 409 con 1. La cancela quien compra y desvincula. Antes de vincular dice la condición | rojo, 14 problemas: desvincula, la pantalla no avisa ni explica, y **la vencida queda reservada** porque la vendedora ya no tiene cuenta |
+| 226 | Rechazada con el cierre caído: cierre pendiente y 409. El reconciliador la cierra y desvincula | rojo: desvincula |
+| 227 | Pago aprobado con el link sin apagar: 409. El reconciliador lo apaga y desvincula | rojo: desvincula |
+| 228 | Una cobrada con el link apagado, una cancelada y una vencida: desvincula aunque otra vendedora tenga una reservada. A esa otra, la suya la frena | rojo: a la otra no la frena |
+| 229 | Con una reservada, volver con otra cuenta dice `otra_cuenta_con_cobros`, la pantalla lo explica y las credenciales no cambian. La misma cuenta reconecta y renueva. Vencida la venta, pasa a la otra | rojo: se queda con la otra cuenta |
+| 230 | La carrera: con el link retenido en el doble, la orden ya está escrita. Desvincular da 409. Después el link sale con la cuenta que sigue vinculada | rojo: **desvincula, y el link sale igual con la cuenta recién borrada**. Es la orden trabada del freno |
 
-Salida en la suite completa:
+Corridos en la suite completa, sobre `777bee1`:
 
 ```text
-[PASS] 223 … «railway-entrypoint python -m app.reconciliar», con los archivos de backend/Dockerfile.railway,
-  ENV=production y sin .env, barrió en 1.6 s, dijo «RECONCILIACION {"sin_respuesta":1,"vencida":1}», salió con 0
-  y no migró; la orden vencida quedó cancelada, con su link apagado y su unidad de vuelta; el horario es «*/10 * * * *»
-[PASS] 224 … sin JWT_SECRET: salida 2, «RECONCILIACION NO CORRIO: faltan variables: JWT_SECRET. …»;
-  sin MP_TOKEN_KEY: salida 2, «RECONCILIACION NO CORRIO: falta MP_TOKEN_KEY. …»;
-  con otra MP_TOKEN_KEY: salida 2, «RECONCILIACION NO CORRIO: MP_TOKEN_KEY no abre ninguna de las 1 …»
+[PASS] 225 … con dos ventas reservadas desvincular da 409 «cobros_en_curso» con 2, y con una, 1; las credenciales no cambian. La confirmación avisa lo de las devoluciones y el panel dice por qué y hasta cuándo, en escritorio y celular. Vencida una por el reconciliador y cancelada la otra, desvincula (10535 ms)
+[PASS] 226 … rechazada con el cierre caído queda en cierre pendiente y desvincular da 409 con 1; cuando el reconciliador apaga el link y suelta la mercadería, desvincula (4370 ms)
+[PASS] 227 … con el pago aprobado y el link sin apagar, desvincular da 409 con 1; cuando el reconciliador apaga el link, la venta terminó y desvincula (4716 ms)
+[PASS] 228 … con una venta cobrada y el link apagado, una cancelada y una vencida, desvincula aunque otra vendedora tenga una venta reservada; a esa otra, su venta sí la frena (409 con 1) (9112 ms)
+[PASS] 229 … con una venta reservada, volver con otra cuenta dice «otra_cuenta_con_cobros», la pantalla lo explica y las credenciales no cambian; la misma cuenta reconecta y renueva; vencida la venta, pasa a la otra cuenta (5353 ms)
+[PASS] 230 … con la creación del link retenida en Mercado Pago, la orden ya está escrita y reservada, y desvincular da 409 con 1; el link sale después con la cuenta que sigue vinculada (4491 ms)
 ```
 
-**Un error del caso que encontró un negativo.** Al vencer el tope, Python
-entrega la salida en bytes, y el 223 se rompía en vez de decir «no terminó».
-Lo encontró `no-termina` y está arreglado en `c53a5b5`. En el título de ese
-commit dice «RECONCILIACION» por «RECONCILIADOR»; no reescribí la historia.
+Los rojos de la tabla los medí con la primera versión de los casos
+(`718ec68`) contra el producto de `0495b31`. Después el 225 sumó axe y la
+espera nueva: sólo agregan controles.
 
 ## Negativos
 
-`python3 scripts/sabotajes_reconciliador_programado_1.py`: «todos dieron el
-rojo esperado» y «src, backend y RAILWAY.md después: como estaban», sobre
-`c53a5b5`.
+`python3 scripts/sabotajes_desvincular_con_cobros_1.py`, sobre `777bee1`: los
+siete dan su rojo en la primera corrida. Dice «todos dieron el rojo esperado»
+y «src y backend después: como estaban».
 
 | sabotaje | rojo |
 |---|---|
-| `no-termina` (barre y se queda esperando) | 223: «no terminó en 90 s» |
-| `corre-migraciones` (el entrypoint migra antes de cualquier comando) | 223: «el servicio corrió migraciones: «alembic» en su salida» |
-| `otro-comando` (`RAILWAY.md` dice `railway-entrypoint python -V`) | 223: «no imprimió «RECONCILIACION {…}»: "Python 3.11.15"», y la orden vencida queda sin cerrar |
-| `sin-comprobar-la-clave` | 224: con otra clave sale con 0, barre y marca a la vendedora para reconectar |
-| `sin-exigir-la-clave` | 224: sin clave, lo mismo |
-| `mensaje-con-traza` | 224: sin `JWT_SECRET` sale la traza de pydantic y no la línea |
+| `regla-solo-en-la-pantalla` (la API desvincula igual) | 225: «desvincular respondió 200 y no 409», con dos y con una |
+| `sin-cierre-pendiente` | 226: «en cierre pendiente: desvincular respondió 200 y no 409». Además, «el reconciliador la dejó cierre_pendiente»: usa el mismo criterio |
+| `sin-link-abierto` | 227: «con el link abierto: desvincular respondió 200 y no 409». Además, «el reconciliador no apagó el link» |
+| `vuelta-acepta-otra-cuenta` | 229: «con otra cuenta volvió con «vinculado»» y «las credenciales cambiaron» |
+| `pantalla-generica` | 225: «dice «No se pudo desvincular la cuenta.»» y el panel no dice nada, en los dos anchos. La API sigue bien |
+| `otro-vendedor-frena` | 228: «desvincular respondió 409» con sólo ventas terminadas |
+| `sin-aviso-en-la-confirmacion` | 225: «la confirmación no avisa lo de las devoluciones», en los dos anchos |
 
-**Aviso de entorno.** El caso copia `app/` del entorno de la API. En el tuyo,
-nativo, los sabotajes de `reconciliar.py` llegan solos. En Docker harían falta
-reconstruir la imagen. El entrypoint y `RAILWAY.md` los lee siempre del
-repositorio.
+**Un negativo encontró un error del caso.** En la primera corrida,
+`pantalla-generica` dio rojo pero no por su motivo: el 225 buscaba el aviso
+genérico después de esperar 15 s al panel, y el aviso ya se había ido. Ahora
+espera lo primero que aparezca (`777bee1`).
+
+**Aviso de entorno.** Tres negativos dejan desvincular con ventas en curso:
+`regla-solo-en-la-pantalla`, `sin-cierre-pendiente` y `sin-link-abierto`.
+Cada corrida deja esas ventas trabadas en la base, que es el daño que miden.
+Son de vendedoras nuevas de cada corrida y no frenan a ningún otro caso. El
+reconciliador las vuelve a mirar en cada barrido y las saltea sin llamar a
+Mercado Pago.
+
+## La suite
+
+**Desvincular en la suite.** Los 103 lugares llaman a `desvincular`, y lo
+arreglé ahí, una sola vez:
+
+- ante el 409, termina las ventas en curso de esa vendedora por los caminos del
+  producto: las reservadas las rechaza ella, y el reconciliador cierra el
+  cierre pendiente y el link abierto;
+- después vuelve a pedir. Si igual da 409, **el caso falla** por eso, aunque
+  la llamada esté en un `finally`;
+- usa el doble del caso, y si ya lo cerró, uno propio. Le enseña las
+  preferencias que no conoce: Mercado Pago recuerda las que emitió, pero cada
+  caso levanta un doble nuevo;
+- el resumen dice en qué casos hizo falta. En la última corrida: 75, 76, 77,
+  78, 79, 81, 82, 87, 90, 91, 97, 224, 228 y 230. Todos al limpiar, menos el
+  77, que a mitad de camino pasa a la cuenta lenta cuando ya terminó con la
+  primera orden.
+
+**Dos casos probaban lo que la regla prohíbe:**
+
+- **el 76** desvinculaba con una orden trabada para ver `sin_vinculo`, y
+  después pasaba a otra cuenta para reanudarla. Ahora la cuenta rechaza el
+  link y después lo acepta (en el doble: `rechazarPreferencias` y
+  `aceptarPreferencias`). Desvincular con la orden trabada da 409, y la misma
+  orden se reanuda reconectando la misma cuenta;
+- **el 92** desvinculaba con la orden en curso para ver `sin_destinatario`.
+  Ahora mira el 409, y `sin_destinatario` sale de un aviso de una cuenta que
+  nadie tiene vinculada, que pasa por el mismo lugar.
+
+`sin_vinculo` en el reintento del link ya no se alcanza desvinculando. Sigue
+en el producto para una orden que quede sin cuenta por la carrera.
+
+## La carrera
+
+**Con evidencia, del 230:**
+
+- con el código de la base, desvincular pasa con el link en camino, y el link
+  sale igual con la cuenta recién borrada: la orden queda trabada;
+- con el cambio, desde que el checkout escribió la orden, desvincular la ve y
+  da 409, aunque Mercado Pago todavía no haya devuelto el link.
+
+**Lo que queda, leído en el código y sin reproducir.** Es la ventana entre que
+empieza la sentencia de desvincular y su `commit`, de milisegundos:
+
+- una compra que confirma su orden en ese momento no se ve;
+- si lee el token antes del `commit`, crea el link con la cuenta que se
+  borra: queda trabada, como antes;
+- si lo lee después, no hay link. La orden queda reservada y sin cuenta: el
+  reconciliador tampoco la puede cerrar.
+
+En los dos casos se destraba volviendo a vincular la misma cuenta. Con otra
+cuenta también se puede vincular, porque ya no hay una guardada con qué
+compararla, pero esa no apaga un link de la anterior. La vuelta de Mercado
+Pago con otra cuenta tiene la misma ventana.
 
 ## Cómo verificarlo
 
 Con el entorno arriba y la siembra demo:
 
 ```bash
-SMOKE_CASOS=223,224 node scripts/smoke.mjs
-# → 2/2 pasaron; 0 fallaron
+SMOKE_CASOS=225,226,227,228,229,230 node scripts/smoke.mjs
+# → 6/6 pasaron; 0 fallaron   (un minuto)
 
-python3 scripts/sabotajes_reconciliador_programado_1.py
-# → todos dieron el rojo esperado   (unos 3 minutos; no-termina espera 90 s)
-# → src, backend y RAILWAY.md después: como estaban
+python3 scripts/sabotajes_desvincular_con_cobros_1.py
+# → todos dieron el rojo esperado   (unos 3 minutos)
+# → src y backend después: como estaban
 ```
 
-**El comando a mano, como en producción.** Es el punto 4 de tu aceptación. El
-223 lo hace solo, pero si querés verlo:
-
-```bash
-T=$(mktemp -d) && cd backend && cp -r requirements.txt alembic.ini alembic app "$T"/ \
-  && cp railway-entrypoint.sh "$T"/railway-entrypoint && chmod +x "$T"/railway-entrypoint && cd "$T" \
-  && env -i PATH="$T:$OLDPWD/.venv/bin:/usr/bin:/bin" ENV=production \
-     DATABASE_URL="<la de backend/.env>" JWT_SECRET=x MP_TOKEN_KEY="<la de backend/.env>" \
-     railway-entrypoint python -m app.reconciliar; echo "salida $?"
-# → RECONCILIACION {…}
-# → salida 0
-```
+**Tu punto 5** lo hace el 225: con una orden reservada, `unlink` da 409; la
+orden vence con el reconciliador y el 409 baja a 1, y cuando la otra termina,
+`unlink` pasa. El 226 y el 227 hacen lo mismo con el cierre pendiente y con
+el link abierto.
 
 ## Puertas
 
 | puerta | resultado |
 |---|---|
-| suite completa desde base nueva, sobre `c53a5b5` | **223/224**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'». Pasan el 100, del 213 al 222, el 223 y el 224 |
+| suite completa desde base nueva, sobre `777bee1` | 229/230; cae el 131, de entorno |
 | lint, `tsc --noEmit`, build | verdes |
 | `compileall`, `pip check`, `node --check` | verdes; «No broken requirements found.» |
 | `alembic check` | «No new upgrade operations detected.» |
-| diff-check con `cr-at-eol` | limpio sobre `0794645..c53a5b5` |
-| a11y, contraste, auditoría móvil, guías | **no corridas**: no cambia nada visible |
+| diff-check con `cr-at-eol` | limpio sobre `0495b31..777bee1` |
+| a11y `--todas` | «SIN VIOLACIONES BLOQUEANTES, COBERTURA COMPLETA»: 0 serias o críticas, 0 menores o moderadas |
+| contraste | «TODO OK, COBERTURA COMPLETA»: ningún texto bajo el mínimo en las 88 mediciones |
+| la pantalla que cambia | el 225 corre axe sobre la confirmación y sobre el panel con el motivo, en los dos anchos: sin nada serio ni crítico |
+| `guia-usuario.mjs` | «LA GUÍA Y EL SITIO COINCIDEN: 22 pasos en escritorio y celular» |
+| `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular» |
 
 ## Riesgos
 
-- **Una corrida colgada deja de programar las siguientes** (arriba, punto 1).
-- **El servicio pide `JWT_SECRET` aunque no lo usa.** Va como referencia, no
-  como copia. Sacarlo pide cambiar la configuración común: no es de esta
-  tarea.
-- **No verifiqué el panel de Railway.** Los pasos siguen la documentación en
-  resumen; los nombres pueden variar.
-- **El corte del 01/12 para el Backend y el Frontend** sigue pendiente, en su
-  pieza.
+- **La carrera** (arriba): milisegundos, sin reproducir, y hoy Mercado Pago no
+  está habilitado.
+- **Una devolución o un contracargo después de desvincular no se registra.**
+  Es tu (a), y lo dice la confirmación.
+- **El hueco del link abierto de un pago devuelto** (punto 3).
+- **Quien vende no puede cambiar de cuenta para reanudar una orden sin link**
+  (punto 2).
+- **Las órdenes que ya quedaron trabadas**, como las 7 de tu base, siguen
+  así: estaba fuera de alcance. Si alguna es de una vendedora que todavía está
+  vinculada, ahora le frena desvincular hasta que el reconciliador la cierre.
+- **La confirmación común no tiene rol de diálogo.** El 225 la busca por su
+  clase. No lo cambié.
 
 ---
 
-## PAGO-ORDEN-CERRADA-1
+## DESVINCULAR-CON-COBROS-1: el freno
 
-Aceptada en rama sobre `b3b5f3c`. Sin cambios.
+Respondido en `0495b31`: van la (a) y la (i).
+
+## RECONCILIADOR-PROGRAMADO-1
+
+Aceptada sobre `8170d8b` y publicada por vos en `5d8df5d`. Sin cambios.
