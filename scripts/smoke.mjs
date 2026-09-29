@@ -37913,6 +37913,206 @@ await runCase(222, 'El reconciliador no reintenta apagar el link con la publicac
   }
 });
 
+// ---------------------------------------------------------------------------
+// RECONCILIADOR-PROGRAMADO-1 — el reconciliador corre solo, como en producción.
+//
+// En Railway es un servicio aparte, con la imagen del Backend, que corre cada
+// 10 minutos un comando y termina. Se configura desde el panel: el comando y el
+// horario están escritos en RAILWAY.md (sección 5), y de ahí los leen estos
+// casos. Si RAILWAY.md manda a correr otra cosa, los casos corren esa otra cosa
+// y dan rojo.
+//
+// «Como en producción» quiere decir: sólo los archivos que copia
+// `backend/Dockerfile.railway` —leídos de ese archivo, no de memoria—, el
+// entrypoint de la imagen, sin `.env`, con `ENV=production` y sólo las
+// variables que RAILWAY.md le da al servicio. Corre en el entorno de la API
+// (nativo o Docker), que es donde está el Python con las dependencias.
+// ---------------------------------------------------------------------------
+
+const SERVICIO_DEL_RECONCILIADOR = `
+import json, os, pathlib, shlex, shutil, subprocess, sys, tempfile, time
+datos = json.loads(sys.stdin.read())
+raiz = pathlib.Path.cwd()
+destino = pathlib.Path(tempfile.mkdtemp(prefix="reconciliador-"))
+try:
+    for origen, adonde in datos["copias"]:
+        fuente = raiz / origen
+        meta = destino / (origen if adonde in (".", "./") else adonde.lstrip("./"))
+        if fuente.is_dir():
+            shutil.copytree(fuente, meta, ignore=shutil.ignore_patterns("__pycache__"))
+        else:
+            meta.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(fuente, meta)
+    entrada = destino / "railway-entrypoint"
+    entrada.write_text(datos["entrypoint"])
+    entrada.chmod(0o755)
+    from app.core.config import settings
+    locales = {"DATABASE_URL": settings.DATABASE_URL, "JWT_SECRET": settings.JWT_SECRET,
+               "MP_TOKEN_KEY": settings.MP_TOKEN_KEY, "MP_API_BASE_URL": settings.MP_API_BASE_URL}
+    env = {"PATH": f"{destino}:{os.path.dirname(sys.executable)}:/usr/local/bin:/usr/bin:/bin",
+           "PYTHONUNBUFFERED": "1", "PYTHONDONTWRITEBYTECODE": "1", "ENV": "production"}
+    for nombre in datos["variables"]:
+        env[nombre] = locales[nombre]
+    env.update(datos.get("pisar", {}))
+    desde = time.monotonic()
+    try:
+        hecho = subprocess.run(shlex.split(datos["comando"]), cwd=destino, env=env, capture_output=True,
+                               text=True, timeout=datos["tope"])
+        salida = {"codigo": hecho.returncode, "stdout": hecho.stdout, "stderr": hecho.stderr}
+    except subprocess.TimeoutExpired as vencido:
+        salida = {"codigo": None, "stdout": vencido.stdout or "", "stderr": vencido.stderr or "", "no_termino": True}
+    salida["segundos"] = round(time.monotonic() - desde, 1)
+    print(json.dumps(salida))
+finally:
+    shutil.rmtree(destino, ignore_errors=True)
+`;
+
+// Lo que dice RAILWAY.md del servicio: el comando y el horario.
+function servicioSegunRailwayMd() {
+  const texto = readFileSync('RAILWAY.md', 'utf8');
+  const seccion = texto.slice(texto.indexOf('## 5. Reconciliador'));
+  const comando = seccion.match(/\*\*Comando de inicio \(Custom Start Command\):\*\* `([^`]+)`/);
+  const horario = seccion.match(/\*\*Horario \(Cron Schedule\):\*\* `([^`]+)`/);
+  assert(comando && horario, 'RAILWAY.md no tiene, en su sección 5, el comando de inicio y el horario del reconciliador');
+  return { comando: comando[1], horario: horario[1] };
+}
+
+// Lo que copia la imagen, leído del Dockerfile. El entrypoint va aparte: en la
+// imagen queda en /usr/local/bin, y acá en el PATH del comando.
+function copiasDeLaImagen() {
+  const copias = [];
+  for (const linea of readFileSync('backend/Dockerfile.railway', 'utf8').split(/\r?\n/)) {
+    const m = linea.match(/^COPY\s+(\S+)\s+(\S+)\s*$/);
+    if (m && m[1] !== 'railway-entrypoint.sh') copias.push([m[1], m[2]]);
+  }
+  assert(copias.some(([o]) => o === 'app'), 'backend/Dockerfile.railway no copia app/: no lo estoy leyendo bien');
+  return copias;
+}
+
+// Corre el servicio como en producción. `variables` son las que le da
+// RAILWAY.md; `pisar`, valores puestos a mano para probar un error.
+//
+// Sin bloquear: el doble de Mercado Pago vive en este mismo proceso, y un
+// `execFileSync` lo dejaría sin poder contestarle al reconciliador.
+async function correrElServicio({ variables = ['DATABASE_URL', 'JWT_SECRET', 'MP_TOKEN_KEY', 'MP_API_BASE_URL'], pisar = {}, tope = 90 } = {}) {
+  const { comando } = servicioSegunRailwayMd();
+  const entrada = JSON.stringify({
+    comando, copias: copiasDeLaImagen(), entrypoint: readFileSync('backend/railway-entrypoint.sh', 'utf8'),
+    variables, pisar, tope,
+  });
+  const salida = await correrEnLaApiSinBloquear(SERVICIO_DEL_RECONCILIADOR, entrada);
+  return JSON.parse(salida.trim().split('\n').pop());
+}
+
+function lineaDelBarrido(salida) {
+  const linea = salida.stdout.split(/\r?\n/).find((l) => l.startsWith('RECONCILIACION {'));
+  return linea ? JSON.parse(linea.slice('RECONCILIACION '.length)) : null;
+}
+
+const MIGRACIONES = /alembic|Running upgrade|Context impl/i;
+
+// 223. El comando del servicio es el reconciliador de verdad, y termina.
+await runCase(223, 'El servicio del reconciliador barre, dice RECONCILIACION y termina, sin migrar', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let cuentas = null;
+  try {
+    const { comando, horario } = servicioSegunRailwayMd();
+    const problemas = [];
+    const campos = horario.trim().split(/\s+/);
+    const cada = (campos[0].match(/^\*\/(\d+)$/) || [])[1];
+    if (campos.length !== 5 || !cada || Number(cada) < 5) {
+      problemas.push(`el horario de RAILWAY.md, «${horario}», no es «cada N minutos» con N de 5 o más, que es el mínimo de Railway`);
+    }
+
+    // Una compra por Mercado Pago que nadie pagó y cuyo link ya venció.
+    cuentas = await cuentasParaCobrar('servicio');
+    const { vendedor, producto } = cuentas;
+    const orden = await ordenMercadoPago(vendedor, { producto });
+    const reservadoAntes = reservadoDe(producto);
+    vencerElLink(orden.order_id);
+
+    const salida = await correrElServicio();
+    const barrido = lineaDelBarrido(salida);
+    if (salida.no_termino) problemas.push(`«${comando}» no terminó en 90 s`);
+    else if (salida.codigo !== 0) problemas.push(`«${comando}» salió con ${salida.codigo}: ${salida.stderr.trim().split('\n').pop()}`);
+    if (!barrido) problemas.push(`«${comando}» no imprimió «RECONCILIACION {…}»: ${JSON.stringify(salida.stdout.slice(-200))}`);
+    else if (!(barrido.vencida >= 1)) {
+      const deLaOrden = salida.stderr.split(/\r?\n/).filter((l) => l.includes(orden.order_number)).slice(-3);
+      problemas.push(`el barrido no cerró la orden vencida: ${JSON.stringify(barrido)}; de esa orden dijo `
+        + `${JSON.stringify(deLaOrden)}`);
+    }
+    const migro = `${salida.stdout}\n${salida.stderr}`.match(MIGRACIONES);
+    if (migro) problemas.push(`el servicio corrió migraciones: «${migro[0]}» en su salida`);
+
+    const estado = ordenEnLaBase(orden.order_id).estado;
+    if (estado !== 'cancelled') problemas.push(`la orden vencida quedó «${estado}»`);
+    if (reservaDe(orden.order_id) !== 'liberada') problemas.push(`la reserva quedó «${reservaDe(orden.order_id)}»`);
+    if (reservadoDe(producto) !== reservadoAntes - 1) {
+      problemas.push(`lo reservado pasó de ${reservadoAntes} a ${reservadoDe(producto)}: tenía que volver uno`);
+    }
+    if (!doble.vencida(orden.preferencia)) problemas.push('el link de la orden vencida no se apagó en Mercado Pago');
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return `«${comando}», con los archivos de backend/Dockerfile.railway, ENV=production y sin .env, barrió en `
+      + `${salida.segundos} s, dijo «RECONCILIACION ${JSON.stringify(barrido)}», salió con 0 y no migró; la orden `
+      + `vencida quedó cancelada, con su link apagado y su unidad de vuelta; el horario es «${horario}»`;
+  } finally {
+    await doble.cerrar();
+    if (cuentas) await desvincular(cuentas.vendedor.token).catch(() => {});
+    await comprador().catch(() => {});
+  }
+});
+
+// 224. Sin lo que necesita, el servicio no barre: lo dice en una línea y sale
+// con un código distinto de 0. Y con otra clave de cifrado no marca a ningún
+// vendedor para reconectar.
+await runCase(224, 'Sin sus variables, o con otra clave, el servicio no barre y dice por qué', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let cuentas = null;
+  try {
+    const problemas = [];
+    cuentas = await cuentasParaCobrar('servicioclave');
+    const { vendedor, producto } = cuentas;
+    const orden = await ordenMercadoPago(vendedor, { producto });
+    vencerElLink(orden.order_id);
+    const marcadas = () => Number(queryRows('SELECT count(*) FROM users WHERE mp_requiere_reconexion')[0][0]);
+    const antes = marcadas();
+    const otraClave = correrEnLaApi('from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())');
+
+    const escenas = [
+      ['sin JWT_SECRET', { variables: ['DATABASE_URL', 'MP_TOKEN_KEY', 'MP_API_BASE_URL'] }, /^RECONCILIACION NO CORRIO: faltan variables: JWT_SECRET\b/m],
+      ['sin MP_TOKEN_KEY', { variables: ['DATABASE_URL', 'JWT_SECRET', 'MP_API_BASE_URL'] }, /^RECONCILIACION NO CORRIO: falta MP_TOKEN_KEY\b/m],
+      ['con otra MP_TOKEN_KEY', { pisar: { MP_TOKEN_KEY: otraClave } }, /^RECONCILIACION NO CORRIO: MP_TOKEN_KEY no abre ninguna de las \d+ credenciales guardadas/m],
+    ];
+    const hechas = [];
+    for (const [escena, opciones, dice] of escenas) {
+      const salida = await correrElServicio(opciones);
+      const todo = `${salida.stdout}\n${salida.stderr}`;
+      if (salida.no_termino) problemas.push(`${escena}: no terminó`);
+      else if (salida.codigo === 0) problemas.push(`${escena}: salió con 0`);
+      if (!dice.test(salida.stderr)) problemas.push(`${escena}: no dijo por qué en una línea: ${JSON.stringify(salida.stderr.trim().slice(-240))}`);
+      if (/Traceback/.test(todo)) problemas.push(`${escena}: salió con una traza en vez de una línea`);
+      if (lineaDelBarrido(salida)) problemas.push(`${escena}: barrió igual: «${lineaDelBarrido(salida) && JSON.stringify(lineaDelBarrido(salida))}»`);
+      if (marcadas() !== antes) problemas.push(`${escena}: marcó ${marcadas() - antes} vendedor(es) para reconectar su cuenta de Mercado Pago`);
+      const estado = ordenEnLaBase(orden.order_id).estado;
+      if (estado !== 'placed' || reservaDe(orden.order_id) !== 'reservada') {
+        problemas.push(`${escena}: tocó la orden vencida (${estado}, ${reservaDe(orden.order_id)})`);
+      }
+      hechas.push(`${escena}: salida ${salida.codigo}, «${(salida.stderr.trim().split('\n').pop() || '').slice(0, 90)}…»`);
+    }
+    const vinculo = queryRows(`SELECT mp_requiere_reconexion FROM users WHERE id = ${sqlLiteral(vendedor.id)}`)[0][0];
+    if (vinculo !== 'f') problemas.push('la vendedora de la orden quedó marcada para reconectar');
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return `con una vendedora vinculada y una orden vencida esperando, el servicio no barrió en ninguna de las tres, `
+      + `no marcó a nadie para reconectar y no tocó la orden: ${hechas.join('; ')}`;
+  } finally {
+    await doble.cerrar();
+    if (cuentas) await desvincular(cuentas.vendedor.token).catch(() => {});
+    await comprador().catch(() => {});
+  }
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
