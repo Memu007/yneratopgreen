@@ -281,7 +281,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 
 ## Próxima secuencia
 
-1. **Emi verifica en incógnito** la ficha de la 1 (`https://yneratopgreen-production.up.railway.app/?section=product&id=5553bdcd-3804-4dd7-937a-97f7c9876ab0`): marca John Deere, modelo 5090E, año 2018, 90 HP, usado y origen «Dueño directo». En el Mercado, con «prueba» en el buscador, aparecen las 16, y con «Servicios», 5. Eso verifica también lo publicado el 26 y el 27/09 (modelo, año, origen y marca en la ficha). Queda la lista de la devolución de la clienta del 27/09.
+1. **Hecho (29/09):** Emi verificó en incógnito la ficha del John Deere de prueba (marca, modelo 5090E, año 2018, 90 HP, usado y «Dueño directo») y el Mercado: 16 con «prueba» y 5 con «Servicios». Con eso quedan verificados en producción los filtros de #7 y #9. De la devolución de la clienta quedan abiertos #15 (correo), #5 (Inicio, charla de Emi) y #12 (texto de la clienta), y la mejora de logística, por definir.
 2. **Mercado Pago:** Emi pasa lo que tiene para arrancarlo, sin claves. Antes de encender el cobro: crear el servicio del reconciliador con `RAILWAY.md`, sección 5, y decidir qué pasa con una orden cuyo vendedor se desvinculó. Dependen de Emi: cambiar las dos contraseñas, crearle la cuenta a la clienta desde el panel, la regla del teléfono, el correo (#15), cuentas de prueba de Mercado Pago, backups y la charla de Inicio (#5) con la clienta. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
