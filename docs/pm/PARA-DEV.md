@@ -38,13 +38,110 @@ difieren sólo en `docs/pm`. Evidencia en
   cerrada, que si la entrega baje el stock de la publicación. Hoy la unidad
   sigue a la venta.
 
-La publicación a `main` la decide Emi. No integres ni despliegues.
+Emi autorizó publicarla el 29/09: la publica PM. Vos no integres ni
+despliegues.
 
 ---
 
-## Tarea activa: ninguna
+## Tarea activa — RECONCILIADOR-PROGRAMADO-1
 
-No empieces nada. La próxima la asigno cuando Emi ordene la cola.
+**Decisión de Emi (29/09, «publicá y A»).** Es la última condición para
+habilitar Mercado Pago. La Fase 4 empieza el 16/10.
+
+**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
+
+### Problema
+
+`reconciliar.py` dice «Todavía **no** está programado en ningún lado», y
+`RAILWAY.md` no lo nombra. Sin barridos pasa esto:
+
+- las reservas de las órdenes de Mercado Pago que nadie paga no vencen;
+- el link que no se pudo apagar queda abierto, porque desde
+  `PAGO-ORDEN-CERRADA-1` el reintento es en el barrido siguiente;
+- un pago cuyo aviso se pierde no se reconcilia.
+
+### Qué entra
+
+1. **Un servicio aparte en Railway**, con la misma imagen del Backend, que
+   corre `python -m app.reconciliar` con horario. No va dentro de la API: el
+   reconciliador espera filas con el bloqueo síncrono, que en el proceso de la
+   API frenaría todo.
+2. **Su configuración en el repositorio:**
+   - build con `Dockerfile.railway`;
+   - el comando `railway-entrypoint python -m app.reconciliar`;
+   - el horario;
+   - sin `preDeployCommand`: las migraciones las corre sólo el Backend;
+   - sin una política de reinicio que lo relance al terminar.
+
+   Proponé la frecuencia, y justificala con la vigencia de la reserva y del
+   link.
+3. **Los pasos para Emi, en `RAILWAY.md`,** escritos para alguien que no
+   programa:
+   - crear el servicio y apuntarle el archivo de configuración;
+   - las variables, sólo por nombre: cuáles copia del Backend y por qué;
+   - cómo ver en Railway que corrió, y que el registro dice
+     «RECONCILIACION {…}».
+4. **Comprobación local, como en producción:** con los archivos que copia
+   `Dockerfile.railway` y `ENV=production`.
+   - El comando hace un barrido, imprime la línea y termina con 0.
+   - Si falta una variable, falla con un mensaje claro y un código distinto
+     de 0.
+   - Dos corridas a la vez no duplican nada: lo mira el 100.
+5. **La documentación de Railway, citada:** cómo se programa, si se puede
+   desde la configuración del repositorio, el intervalo mínimo, la zona
+   horaria, y qué pasa si la corrida anterior sigue en curso. Si algo no se
+   puede como lo pido acá, decilo con la cita.
+
+### Casos
+
+- **El comando del servicio**, con el entrypoint y `ENV=production` sobre la
+  base local: un barrido, la línea «RECONCILIACION», salida 0, y ninguna
+  migración.
+- **Una orden de Mercado Pago vencida y sin pago:** el barrido del comando la
+  cierra y suelta el stock. Así se ve que el comando es el reconciliador de
+  verdad.
+
+### Negativos
+
+Cada uno da rojo por su motivo y deja el árbol como estaba.
+
+- El comando no termina: el caso da rojo por tiempo.
+- El servicio corre las migraciones.
+- La configuración apunta a otro comando.
+
+### Fuera de alcance
+
+- **Tocar Railway:** lo hace Emi con tus pasos. Vos no entrás a Railway, ni
+  con la CLI.
+- Habilitar Mercado Pago y las credenciales reales.
+- Cambiar lo que decide el reconciliador.
+- Integración y despliegue.
+
+### Aceptación verificable
+
+1. Los casos y los negativos de arriba.
+2. Suite completa desde una base recién creada.
+3. Build, lint, tipos, `compileall`, `alembic check` y diff-check con
+   `cr-at-eol`.
+4. PM corre el comando como en producción, con los archivos del Dockerfile.
+
+### Frená y consultá
+
+- Si hace falta cambiar el Backend o su configuración en Railway.
+- Si el reconciliador necesita una variable secreta que el Backend hoy no
+  tiene.
+- Si programarlo exige otro plan de Railway o un costo nuevo.
+
+### Entrega en `PARA-PM.md`
+
+- el SHA;
+- los archivos de configuración, y la frecuencia con su porqué;
+- los pasos para Emi;
+- los casos y los negativos, con su salida;
+- la suite y las puertas;
+- los riesgos.
+
+No integres ni despliegues.
 
 ---
 
@@ -52,8 +149,6 @@ No empieces nada. La próxima la asigno cuando Emi ordene la cola.
 
 Lo decide la PM. Lo que depende de Emi puede reordenar la cola:
 
-- programar el reconciliador en Railway, condición para habilitar Mercado
-  Pago: pide tarea explícita y autorización de Emi;
 - la parte B de las publicaciones de prueba (el transportista y el flete),
   cuando ande el correo;
 - P3:
