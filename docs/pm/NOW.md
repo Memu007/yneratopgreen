@@ -10,7 +10,7 @@ Actualizado: 2026-09-27.
 - **`main`:** `65457cc`, publicado el 29/09 con autorización de Emi («publicá y A»), por fast-forward desde `58bb62b`. Suma `PAGO-ORDEN-CERRADA-1` y documentos de PM. Sin migraciones. La verificación previa fue sobre el mismo código (`b3b5f3c`, que difiere sólo en `docs/pm`): suite 221/222 (131 de entorno), puertas, auditorías y las dos guías verdes, sin secretos ni archivos prohibidos. La red de PM no llega a `railway.app`. **Mientras Mercado Pago no esté habilitado, no cambia nada visible:** Emi comprueba en incógnito que el sitio sigue andando (Inicio, el Mercado, una ficha e ingresar). Antes: `58bb62b` (28/09, `COBRO-CONCURRENTE-1`), que la Dev vio en producción.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`65457cc`) tiene todo lo aceptado. `RECONCILIADOR-PROGRAMADO-1` está asignada.
 - **Última decisión PM:** `PAGO-ORDEN-CERRADA-1` **ACEPTADA EN RAMA** (29/09, `b3b5f3c`, producto en `c1e7f0c`). El pago que llega a una orden cerrada y los dos cobros avisan a las dos partes con textos verdaderos, una vez por orden y por motivo. La pantalla ya no dice «más de un pago» cuando es un pago tras el cierre, y el reconciliador no espera a Mercado Pago con la fila de una publicación tomada. Casos 220 a 222 en 3/3; 10 negativos en rojo, dos de PM; suite 221/222 (131 de entorno); puertas, auditorías y guías verdes. **Publicada en `65457cc` el 29/09.** Evidencia en `REPRODUCCION-PAGO-ORDEN-CERRADA-1-2026-09-28.md`.
-- **Tarea activa:** `RECONCILIADOR-PROGRAMADO-1` (Emi, 29/09, «publicá y A»): un servicio aparte en Railway que corre el reconciliador con horario. La Dev prepara la configuración y los pasos; Emi los aplica en Railway. Es la última condición para habilitar Mercado Pago.
+- **Tarea activa:** `RECONCILIADOR-PROGRAMADO-1` (Emi, 29/09, «publicá y A»). La Dev frenó en el punto 2 con razón: Railway dejó Config as Code en desuso y los servicios nuevos no pueden usarlo. PM decidió que se programe desde el panel, cada 10 minutos, con las variables como referencia al Backend. Al arrancar comprueba `MP_TOKEN_KEY`: con una clave que no descifra, el reconciliador marcaría a los vendedores para reconectar. La Dev prepara los pasos y Emi los aplica. **Emi aprueba el costo del servicio nuevo antes de crearlo.** Es la última condición para habilitar Mercado Pago.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
@@ -163,6 +163,14 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   Dev. Cambiarlas queda pendiente por decisión de Emi: la suya con el programa
   de la consola que PM probó en local, y la de prueba desde el panel con
   «Restablecer contraseña».
+- **Railway — Config as Code en desuso, con corte el 01/12/2026:** según la
+  documentación de Railway (confirmado por el buscador, sin que PM ni la Dev
+  lleguen a la página), `/railway.toml` (Frontend) y `/backend/railway.toml`
+  (Backend) dejan de aplicarse el 01/12/2026. Ahí están el Dockerfile, la
+  migración antes de desplegar, el chequeo de salud y las rutas vigiladas. El
+  reemplazo es `.railway/railway.ts` (`railway config migrate`) o cargarlo en
+  el panel. **Pieza propia antes de esa fecha**, y alguien que llegue a
+  `docs.railway.com` la confirma.
 - **P3 — contraseñas (PM, 28/09):**
   - ingresar con una contraseña de más de 72 bytes da un error 500 en vez de
     «contraseña incorrecta», porque bcrypt no acepta más;

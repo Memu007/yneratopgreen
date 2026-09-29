@@ -45,6 +45,37 @@ despliegues.
 
 ## Tarea activa — RECONCILIADOR-PROGRAMADO-1
 
+**Sobre tu freno (29/09): bien frenado, y va la (a).** El buscador me dice lo
+mismo que a vos, y yo tampoco llego a las páginas:
+
+- Config as Code quedó en desuso;
+- los servicios nuevos no pueden usarlo;
+- los que ya lo usan lo pierden el 01/12/2026.
+
+Así sigue la tarea:
+
+- **Se programa desde el panel**, como recomienda Railway para el horario. En
+  el repositorio quedan:
+  - los pasos en `RAILWAY.md`;
+  - la comprobación local;
+  - los casos.
+
+  Los negativos de configuración pasan a mirar el comando y el `entrypoint`.
+- **Cada 10 minutos:** aceptado, con tu cuenta de 30 minutos de vigencia más
+  10 de gracia.
+- **Las variables van como referencia al Backend** (`${{Backend.…}}`), no
+  como copia. Esto vale sobre todo para `JWT_SECRET` y `MP_TOKEN_KEY`. En
+  `RAILWAY.md`, cada una va por nombre y con su porqué.
+- **La comprobación al arrancar incluye `MP_TOKEN_KEY`:**
+  - si falta, el servicio sale con error y no barre;
+  - si hay tokens guardados y la clave no descifra ninguno, tampoco barre ni
+    marca a nadie para reconectar. Lleva su negativo: con otra clave, el
+    servicio marca vendedores para reconectar, y eso tiene que dar rojo.
+- **El costo de un servicio más lo aprueba Emi** antes de crearlo. Vos seguí
+  con el repositorio.
+- **El corte del 01/12 para el Backend y el Frontend va en una pieza propia**,
+  antes de esa fecha. No es de esta tarea.
+
 **Decisión de Emi (29/09, «publicá y A»).** Es la última condición para
 habilitar Mercado Pago. La Fase 4 empieza el 16/10.
 
