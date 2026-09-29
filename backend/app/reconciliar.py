@@ -63,11 +63,19 @@ except ValidationError as error:
     # desde otro lado, el error sigue como siempre.
     if __name__ != "__main__":
         raise
-    faltan = sorted({str(e["loc"][0]) for e in error.errors() if e.get("type") == "missing"})
+    # Por nombre, nunca por valor: el valor puede ser un secreto, y la línea
+    # queda en el registro de Railway.
+    errores = error.errors()
+    faltan = sorted({str(e["loc"][0]) for e in errores if e.get("type") == "missing" and e.get("loc")})
+    no_sirven = sorted({str(e["loc"][0]) for e in errores if e.get("type") != "missing" and e.get("loc")})
+    partes = []
+    if faltan:
+        partes.append(f"faltan variables: {', '.join(faltan)}")
+    if no_sirven:
+        partes.append(f"variables con un valor que no sirve: {', '.join(no_sirven)}")
     _no_corre(
-        f"faltan variables: {', '.join(faltan)}. Van como referencia a las del "
-        "Backend (RAILWAY.md, sección 5)."
-        if faltan else f"la configuración no es válida: {error.error_count()} error(es)"
+        f"{'; '.join(partes)}. Van como referencia a las del Backend (RAILWAY.md, sección 5)."
+        if partes else f"la configuración no es válida: {error.error_count()} error(es)"
     )
 
 from app.core import cifrado

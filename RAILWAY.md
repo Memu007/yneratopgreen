@@ -198,6 +198,18 @@ frenaría entero.
 desuso los archivos `railway.toml` para los servicios nuevos, y para el horario
 recomienda el panel.
 
+### Cuándo se crea
+
+**El día que se habilita Mercado Pago**, con el Backend ya configurado para
+Mercado Pago y antes de encender el cobro. Antes no hace falta: sin Mercado
+Pago no hay compras que reconciliar.
+
+**Antes de crearlo, mirá el Backend.** En el servicio `Backend`, «Variables»,
+tiene que figurar `MP_TOKEN_KEY`. Alcanza con ver el nombre; no hace falta
+mirar el valor. **Si no está, no crees el Reconciliador**: primero se termina
+de configurar Mercado Pago en el Backend. Sin esa clave, el Reconciliador no
+barre nunca.
+
 ### Crear el servicio
 
 1. En el proyecto, «+ New» → «GitHub Repo» → este repositorio. Llamalo
@@ -210,7 +222,7 @@ recomienda el panel.
    - **Public Networking:** nada. No se le genera dominio.
    - **Healthcheck:** vacío. No atiende pedidos.
    - **Pre-deploy command:** vacío. Las migraciones las corre sólo el Backend.
-   - **Comando de inicio (Custom Start Command):** `railway-entrypoint python -m app.reconciliar`
+   - **Comando de inicio (Custom Start Command):** `railway-entrypoint timeout 540 python -m app.reconciliar`
    - **Horario (Cron Schedule):** `*/10 * * * *`
    - **Restart Policy:** «Never». Termina a propósito; no hay que relanzarlo.
 
@@ -218,6 +230,15 @@ El horario va en UTC, y Railway no permite menos de 5 minutos entre corridas.
 Cada 10 alcanza: el link y la reserva valen 30 minutos, el reconciliador espera
 10 más de gracia, y así una compra abandonada devuelve su mercadería entre los
 40 y los 50 minutos.
+
+**`timeout 540` es el tope de cada corrida: 9 minutos.** Railway no corta una
+corrida que no termina, y mientras siga activa saltea las siguientes: sin el
+tope, una corrida trabada dejaría al reconciliador sin correr, y sin avisar.
+Con el tope, la corrida se corta sola antes de la siguiente.
+
+Railway puede hacer un primer despliegue apenas conectás el repositorio, antes
+de que termines de cargar todo esto. Si ese primero falla, no pasa nada:
+cuando termines, «Redeploy».
 
 ### Variables
 
@@ -272,9 +293,13 @@ Si en cambio dice:
 RECONCILIACION NO CORRIO: falta MP_TOKEN_KEY. …
 ```
 
-no tocó nada, y la línea dice qué variable falta o está mal. Corregila en
-«Variables» y esperá la corrida siguiente.
+no tocó nada, y la línea dice qué variable falta o tiene un valor que no sirve
+(nombra la variable, nunca su valor).
 
-**Si una corrida queda «Active» más de 10 minutos, detenela a mano.** Railway
-no corta una corrida que no termina, y mientras siga activa **saltea las
-siguientes**: el reconciliador dejaría de correr sin avisar.
+- **Si es `MP_TOKEN_KEY`, mirá primero el Backend:** que en sus «Variables»
+  figure `MP_TOKEN_KEY`. Si el Backend no la tiene, el problema es de la
+  configuración de Mercado Pago, no de este servicio. Si la tiene, revisá que
+  acá esté escrita como `${{Backend.MP_TOKEN_KEY}}`.
+- Si es otra, corregila en «Variables» de este servicio, como referencia.
+
+Después esperá la corrida siguiente.
