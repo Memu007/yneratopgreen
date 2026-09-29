@@ -114,9 +114,9 @@ confirmación» y volver de Mercado Pago en el navegador no cambia nada.
 |--------|------|------|-------------|
 | GET | `/mp-oauth/status` | JWT | Estado del vínculo: `no_configurado`, `desconectado`, `conectado` o `requiere_reconexion`. Nunca devuelve credenciales. |
 | POST | `/mp-oauth/auth-url` | JWT | URL para iniciar OAuth con MP. Emite un `state` de un solo uso. |
-| GET | `/mp-oauth/callback` | — | Callback de MP tras autorización. |
+| GET | `/mp-oauth/callback` | — | Callback de MP tras autorización. Si es otra cuenta y el vendedor tiene cobros en curso, vuelve con `mp_error=otra_cuenta_con_cobros` y no toca las credenciales. |
 | POST | `/mp-oauth/refresh` | JWT | Renovar la credencial del vendedor. |
-| POST | `/mp-oauth/unlink` | JWT | Desvincular la cuenta MP del vendedor. |
+| POST | `/mp-oauth/unlink` | JWT | Desvincular la cuenta MP del vendedor. Con cobros en curso responde 409 con `detail: {"motivo": "cobros_en_curso", "cobros_en_curso": N}` y no borra nada. |
 
 ---
 

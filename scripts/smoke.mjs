@@ -5,6 +5,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
+import AxeBuilder from '@axe-core/playwright';
 
 import {
   CUENTA_INCOMPLETA, CUENTA_LENTA, CUENTA_RECHAZA, DETALLE_CRUDO, SECRETO_DE_ACCESO,
@@ -968,18 +969,36 @@ async function expectApiError(expectedStatus, callback) {
 const CASOS_PEDIDOS = (process.env.SMOKE_CASOS || '')
   .split(',').map((n) => Number(n.trim())).filter((n) => Number.isFinite(n) && n > 0);
 
+// Las veces que la limpieza de un caso quiso desvincular Mercado Pago y la API
+// no la dejó. Desde DESVINCULAR-CON-COBROS-1, con cobros en curso contesta 409,
+// y muchos casos desvinculan en un `finally` que no tapa el motivo real: el
+// 409 se perdería y la vendedora quedaría vinculada sin que nadie se entere.
+// `desvincular` lo anota y el caso que lo dejó falla por eso.
+const sinDesvincular = [];
+
+function loQueNoDesvinculo(desde) {
+  const quedaron = sinDesvincular.splice(desde);
+  return quedaron.length
+    ? `la limpieza no pudo desvincular Mercado Pago: ${quedaron.join('; ')}`
+    : '';
+}
+
 async function runCase(number, name, callback) {
   if (CASOS_PEDIDOS.length && !CASOS_PEDIDOS.includes(number)) return;
   const startedAt = Date.now();
+  const desvinculosAntes = sinDesvincular.length;
 
   try {
     const observation = await callback();
+    const quedo = loQueNoDesvinculo(desvinculosAntes);
+    if (quedo) throw new Error(quedo);
     const elapsed = Date.now() - startedAt;
     results.push({ number, name, passed: true, observation, elapsed });
     console.log(`[PASS] ${String(number).padStart(2, '0')} ${name} — ${observation} (${elapsed} ms)`);
   } catch (error) {
     const elapsed = Date.now() - startedAt;
-    const message = error instanceof Error ? error.message : String(error);
+    const quedo = loQueNoDesvinculo(desvinculosAntes);
+    const message = (error instanceof Error ? error.message : String(error)) + (quedo ? `; ${quedo}` : '');
     // Con SMOKE_STACK=1 se imprime la traza y la causa. El mensaje suelto de
     // un `fetch failed` no dice contra qué falló, y adivinarlo es perder una
     // corrida entera por vez.
@@ -6613,8 +6632,37 @@ async function estadoDelVinculo(token) {
   return datos;
 }
 
+// Con cobros en curso la API no desvincula: contesta 409 y se anota en
+// `sinDesvincular`, así el caso que lo dejó falla aunque lo llame en un
+// `finally`. Antes de desvincular, un caso con ventas de Mercado Pago las
+// termina con `terminarLosCobros`.
 async function desvincular(token) {
-  await pedirCrudo('/mp-oauth/unlink', { method: 'POST', header: token, body: {} });
+  const { status, datos } = await pedirCrudo('/mp-oauth/unlink', { method: 'POST', header: token, body: {} });
+  if (status === 409) sinDesvincular.push(`409 ${JSON.stringify(datos?.detail ?? datos)}`);
+}
+
+// Termina, como lo haría el producto, las ventas de Mercado Pago que una
+// vendedora de la suite todavía tiene en curso, para que pueda desvincularse.
+// Las reservadas las rechaza ella; el cierre pendiente y el link abierto de
+// una venta cobrada los resuelve el reconciliador. Necesita el doble del caso
+// levantado: es el que conoce esas preferencias. Lo deja contestando, como un
+// Mercado Pago que volvió.
+async function terminarLosCobros(vendedor, doble) {
+  doble.caer(false);
+  doble.revocar(false);
+  doble.fallarElCierre(0);
+  doble.soltarElCierre();
+  doble.soltarLaBusqueda();
+  doble.soltarLaPreferencia();
+  const reservadas = queryRows(`
+    SELECT id, 'reservada' FROM orders
+    WHERE seller_id = ${sqlLiteral(vendedor.id)} AND payment_method = 'mercadopago'
+      AND stock_reserva = 'reservada'
+  `);
+  for (const [id] of reservadas) {
+    await pedirCrudo(`/orders/${id}/cancel`, { method: 'POST', header: vendedor.token, body: {} });
+  }
+  await reconciliar();
 }
 
 const SECRETOS_DEL_DOBLE = [SECRETO_DE_ACCESO, SECRETO_DE_REFRESCO, DETALLE_CRUDO,
@@ -38130,6 +38178,438 @@ await runCase(224, 'Sin sus variables, o con otra clave, el servicio no barre y 
   } finally {
     await doble.cerrar();
     if (cuentas) await desvincular(cuentas.vendedor.token).catch(() => {});
+    await comprador().catch(() => {});
+  }
+});
+
+// DESVINCULAR-CON-COBROS-1. Con cobros de Mercado Pago en curso no se
+// desvincula ni se pasa a otra cuenta: sin el token de la vendedora nadie
+// puede preguntarle a Mercado Pago por esas compras, y la orden y la
+// mercadería quedaban trabadas sin que nadie supiera por qué.
+//
+// Los textos son los que lee Emi en el informe. Si cambian en el producto,
+// tienen que cambiar acá.
+const AVISO_AL_DESVINCULAR = 'Si después se devuelve un pago o hay un contracargo, AgroBoeda no se va a '
+  + 'enterar: la compra va a seguir figurando como pagada.';
+const PANEL_COBROS_EN_CURSO = {
+  1: 'Todavía no podés desvincular tu cuenta: tenés 1 venta con cobro de Mercado Pago en curso, y AgroBoeda '
+    + 'necesita tu cuenta para confirmar con Mercado Pago cómo termina. Vas a poder desvincularla cuando esa '
+    + 'venta se pague, se cancele o venza sin pago.',
+  2: 'Todavía no podés desvincular tu cuenta: tenés 2 ventas con cobro de Mercado Pago en curso, y AgroBoeda '
+    + 'necesita tu cuenta para confirmar con Mercado Pago cómo terminan. Vas a poder desvincularla cuando esas '
+    + 'ventas se paguen, se cancelen o venzan sin pago.',
+};
+const PODES_DESVINCULARLA = 'Podés desvincularla cuando quieras, salvo mientras tengas ventas con cobro de '
+  + 'Mercado Pago en curso';
+const VUELTA_OTRA_CUENTA = 'Tenés ventas con cobro de Mercado Pago en curso, y se terminan con la cuenta que ya '
+  + 'tenías vinculada: sigue vinculada esa. Vas a poder cambiarla cuando esas ventas se paguen, se cancelen o '
+  + 'venzan sin pago.';
+const PANTALLAS_DEL_PANEL = [
+  ['escritorio', { width: 1280, height: 900 }],
+  ['celular', { width: 390, height: 844 }],
+];
+const sinEspacios = (texto) => String(texto || '').replace(/\s+/g, ' ').trim();
+
+// axe sobre un pedazo de la pantalla, en el estado en que está. Cuenta lo
+// serio y lo crítico, contraste incluido: el mensaje nuevo sólo aparece
+// después de un 409, y las puertas de a11y y contraste no llegan a ese estado.
+async function axeEn(page, selector, donde, problemas) {
+  const { violations } = await new AxeBuilder({ page }).include(selector).analyze();
+  for (const v of violations.filter((x) => ['serious', 'critical'].includes(x.impact))) {
+    problemas.push(`${donde}: axe ${v.impact} ${v.id} en ${v.nodes.map((n) => n.target.join(' ')).join(', ').slice(0, 160)}`);
+  }
+}
+
+function pedirDesvincular(token) {
+  return pedirCrudo('/mp-oauth/unlink', { method: 'POST', header: token, body: {} });
+}
+
+// Lo que dice la API al desvincular con cobros en curso, y que no tocó nada.
+// Si desvinculó igual, se vuelve a vincular la misma cuenta, para que lo que
+// sigue del caso mire lo suyo y no la falta de vínculo.
+async function noDesvincula(vendedor, email, cuantos, donde, problemas) {
+  const antes = vinculoEnLaBase(email);
+  const r = await pedirDesvincular(vendedor.token);
+  if (r.status !== 409) {
+    problemas.push(`${donde}: desvincular respondió ${r.status} y no 409: ${JSON.stringify(r.datos).slice(0, 200)}`);
+  }
+  const detalle = r.datos?.detail;
+  if (detalle?.motivo !== 'cobros_en_curso' || detalle?.cobros_en_curso !== cuantos) {
+    problemas.push(`${donde}: el conflicto no dice «cobros_en_curso» y ${cuantos}: ${JSON.stringify(r.datos).slice(0, 200)}`);
+  }
+  const despues = vinculoEnLaBase(email);
+  if (JSON.stringify(despues) !== JSON.stringify(antes) || !despues.cuenta || !despues.acceso || !despues.refresco) {
+    problemas.push(`${donde}: las credenciales no quedaron como estaban (cuenta ${antes.cuenta} → ${despues.cuenta})`);
+  }
+  if (!despues.cuenta && antes.cuenta) await vincular(vendedor.token, `ok:${antes.cuenta}`);
+}
+
+async function desvincula(vendedor, email, donde, problemas) {
+  const r = await pedirDesvincular(vendedor.token);
+  if (r.status !== 200 || r.datos?.estado !== 'desconectado') {
+    problemas.push(`${donde}: desvincular respondió ${r.status}: ${JSON.stringify(r.datos).slice(0, 200)}`);
+  }
+  const tras = vinculoEnLaBase(email);
+  if (tras.cuenta || tras.acceso || tras.refresco) problemas.push(`${donde}: quedaron credenciales después de desvincular`);
+}
+
+// El panel «Mercado Pago — dónde cobrás», con la sesión de quien vende.
+async function panelDeMercadoPago(browser, viewport, cuenta) {
+  const contexto = await browser.newContext({ viewport });
+  await entrarConSesion(contexto, cuenta);
+  const page = await contexto.newPage();
+  const errores = [];
+  page.on('pageerror', (error) => errores.push(error.message));
+  await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Mi Perfil' }).waitFor({ timeout: 20_000 });
+  const seccion = page.locator('[class*="_mpSection_"]');
+  await seccion.waitFor({ state: 'visible', timeout: 15_000 });
+  return { contexto, page, seccion, errores };
+}
+
+// Intenta desvincular desde la pantalla: lee la confirmación, confirma y
+// devuelve lo que dijo el panel.
+async function desvincularDesdeElPanel(browser, nombre, viewport, cuenta, problemas) {
+  const { contexto, page, seccion, errores } = await panelDeMercadoPago(browser, viewport, cuenta);
+  try {
+    const vinculada = await seccion.getByText('Cuenta vinculada').waitFor({ state: 'visible', timeout: 15_000 })
+      .then(() => true, () => false);
+    if (!vinculada) {
+      problemas.push(`${nombre}: el panel no muestra la cuenta vinculada: «${sinEspacios(await seccion.innerText()).slice(0, 160)}»`);
+      return null;
+    }
+    await seccion.getByRole('button', { name: 'Desvincular cuenta' }).click();
+    // La confirmación común (`showConfirm`) no tiene rol de diálogo: se la
+    // busca por su clase.
+    const dialogo = page.locator('[class*="_confirmModal_"]');
+    await dialogo.waitFor({ state: 'visible', timeout: 10_000 });
+    const confirmacion = sinEspacios(await dialogo.innerText());
+    if (!confirmacion.includes(AVISO_AL_DESVINCULAR)) {
+      problemas.push(`${nombre}: la confirmación no avisa lo de las devoluciones: «${confirmacion.slice(0, 260)}»`);
+    }
+    await axeEn(page, '[class*="_confirmModal_"]', `${nombre}, la confirmación`, problemas);
+    await dialogo.getByRole('button', { name: 'Desvincular', exact: true }).click();
+    const motivo = seccion.getByRole('alert');
+    const dijo = await motivo.first().waitFor({ state: 'visible', timeout: 15_000 })
+      .then(async () => sinEspacios(await motivo.first().innerText()))
+      .catch(() => null);
+    if (dijo) await axeEn(page, '[class*="_mpSection_"]', `${nombre}, el panel con el motivo`, problemas);
+    const generico = await page.getByText('No se pudo desvincular la cuenta.').count();
+    if (generico) problemas.push(`${nombre}: dice «No se pudo desvincular la cuenta.»`);
+    const sigue = await seccion.getByText('Cuenta vinculada').isVisible();
+    if (!sigue) problemas.push(`${nombre}: el panel dejó de mostrar la cuenta vinculada`);
+    const [ancho, visible] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    if (ancho > visible + 1) problemas.push(`${nombre}: el panel desborda (${ancho} en ${visible})`);
+    if (errores.length) problemas.push(`${nombre}: errores de página: ${errores.join(' | ')}`);
+    return dijo;
+  } finally {
+    await contexto.close();
+  }
+}
+
+// 225. Con ventas reservadas no se desvincula. La API contesta un conflicto
+// con cuántas son y no toca las credenciales; la pantalla avisa en la
+// confirmación y dice por qué y hasta cuándo. Cuando terminan, desvincula.
+await runCase(225, 'Con ventas reservadas no se desvincula, la pantalla dice por qué, y al terminar desvincula', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const browser = await chromium.launch({ headless: true });
+  let cuentas = null;
+  try {
+    cuentas = await cuentasParaCobrar('desvincular');
+    const { vendedor, vende, producto, cuenta } = cuentas;
+    const problemas = [];
+    const una = await ordenMercadoPago(vendedor, { producto });
+    const otra = await ordenMercadoPago(vendedor, { producto });
+
+    await noDesvincula(vendedor, vende.email, 2, 'con dos reservadas', problemas);
+    const estado = await estadoDelVinculo(vendedor.token);
+    if (estado.estado !== 'conectado' || estado.mp_user_id !== cuenta) {
+      problemas.push(`el estado del vínculo cambió: ${JSON.stringify(estado)}`);
+    }
+    const [escritorio, celular] = PANTALLAS_DEL_PANEL;
+    const dijoConDos = await desvincularDesdeElPanel(browser, escritorio[0], escritorio[1], vende, problemas);
+    if (dijoConDos !== PANEL_COBROS_EN_CURSO[2]) problemas.push(`escritorio, con dos: el panel dice «${dijoConDos}»`);
+
+    // Una vence con el reconciliador: queda la otra, y el número la sigue.
+    vencerElLink(una.order_id);
+    await reconciliar();
+    if (reservaDe(una.order_id) !== 'liberada') problemas.push(`la vencida quedó ${reservaDe(una.order_id)}`);
+    await noDesvincula(vendedor, vende.email, 1, 'con una reservada', problemas);
+    const dijoConUna = await desvincularDesdeElPanel(browser, celular[0], celular[1], vende, problemas);
+    if (dijoConUna !== PANEL_COBROS_EN_CURSO[1]) problemas.push(`celular, con una: el panel dice «${dijoConUna}»`);
+
+    // La otra la cancela quien compra, y ahí desvincula.
+    const cancelada = await pedirCrudo(`/orders/${otra.order_id}/cancel`, { method: 'POST', header: state.buyerToken, body: {} });
+    if (cancelada.status !== 200 || reservaDe(otra.order_id) !== 'liberada') {
+      problemas.push(`cancelar la otra respondió ${cancelada.status} y la dejó ${reservaDe(otra.order_id)}`);
+    }
+    await desvincula(vendedor, vende.email, 'con las dos terminadas', problemas);
+
+    // Y la promesa de antes de vincular dice la condición.
+    const { contexto, seccion } = await panelDeMercadoPago(browser, escritorio[1], vende);
+    try {
+      await seccion.getByText('Cuenta no vinculada').waitFor({ state: 'visible', timeout: 15_000 });
+      const lista = sinEspacios(await seccion.locator('li').allInnerTexts().then((t) => t.join(' | ')));
+      if (!lista.includes(PODES_DESVINCULARLA)) problemas.push(`antes de vincular dice: «${lista}»`);
+    } finally {
+      await contexto.close();
+    }
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'con dos ventas reservadas desvincular da 409 «cobros_en_curso» con 2, y con una, 1; las credenciales no '
+      + 'cambian. La confirmación avisa lo de las devoluciones y el panel dice por qué y hasta cuándo, en escritorio '
+      + 'y celular. Vencida una por el reconciliador y cancelada la otra, desvincula';
+  } finally {
+    if (cuentas) {
+      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
+      await desvincular(cuentas.vendedor.token).catch(() => {});
+    }
+    await doble.cerrar();
+    try { await browser.close(); } catch { /* ya estaba cerrado */ }
+    await comprador().catch(() => {});
+  }
+});
+
+// 226. Con cierre pendiente tampoco: la orden terminó, pero su link no se
+// pudo apagar y la mercadería espera al reconciliador, que necesita la cuenta.
+await runCase(226, 'Con una venta en cierre pendiente no se desvincula', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let cuentas = null;
+  try {
+    cuentas = await cuentasParaCobrar('cierrependiente');
+    const { vendedor, vende, producto } = cuentas;
+    const problemas = [];
+    const orden = await ordenMercadoPago(vendedor, { producto });
+    doble.fallarElCierre(1);
+    const rechazo = await pedirCrudo(`/orders/${orden.order_id}/cancel`, { method: 'POST', header: vendedor.token, body: {} });
+    assert(rechazo.status === 200 && reservaDe(orden.order_id) === 'cierre_pendiente',
+      `rechazar con el cierre caído respondió ${rechazo.status} y dejó la reserva ${reservaDe(orden.order_id)}`);
+
+    await noDesvincula(vendedor, vende.email, 1, 'en cierre pendiente', problemas);
+
+    await reconciliar();
+    if (reservaDe(orden.order_id) !== 'liberada') problemas.push(`el reconciliador la dejó ${reservaDe(orden.order_id)}`);
+    await desvincula(vendedor, vende.email, 'con el cierre hecho', problemas);
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'rechazada con el cierre caído queda en cierre pendiente y desvincular da 409 con 1; cuando el '
+      + 'reconciliador apaga el link y suelta la mercadería, desvincula';
+  } finally {
+    if (cuentas) {
+      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
+      await desvincular(cuentas.vendedor.token).catch(() => {});
+    }
+    await doble.cerrar();
+    await comprador().catch(() => {});
+  }
+});
+
+// 227. Con un pago aprobado y el link abierto tampoco: el link se puede volver
+// a pagar, y apagarlo necesita la cuenta.
+await runCase(227, 'Con un pago aprobado y el link abierto no se desvincula', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let cuentas = null;
+  try {
+    cuentas = await cuentasParaCobrar('linkabierto');
+    const { vendedor, vende, producto, cuenta: CUENTA } = cuentas;
+    const problemas = [];
+    const orden = await ordenMercadoPago(vendedor, { producto });
+    const pago = pagarEnElDoble(doble, orden, CUENTA);
+    doble.fallarElCierre(1);
+    const aviso = await avisar({ dataId: pago.id, cuenta: CUENTA });
+    const [[, , , , estadoDelPago]] = pagosDe(orden.order_id);
+    assert(aviso.status === 200 && estadoDelPago === 'APPROVED' && !linkCerrado(orden.order_id)
+      && reservaDe(orden.order_id) === 'consolidada',
+    `el pago no quedó aprobado con el link abierto: aviso ${aviso.status}, ${estadoDelPago}, `
+      + `link ${linkCerrado(orden.order_id) ? 'cerrado' : 'abierto'}, reserva ${reservaDe(orden.order_id)}`);
+
+    await noDesvincula(vendedor, vende.email, 1, 'con el link abierto', problemas);
+
+    await reconciliar();
+    if (!linkCerrado(orden.order_id)) problemas.push('el reconciliador no apagó el link');
+    await desvincula(vendedor, vende.email, 'con el link apagado', problemas);
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'con el pago aprobado y el link sin apagar, desvincular da 409 con 1; cuando el reconciliador apaga el '
+      + 'link, la venta terminó y desvincula';
+  } finally {
+    if (cuentas) {
+      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
+      await desvincular(cuentas.vendedor.token).catch(() => {});
+    }
+    await doble.cerrar();
+    await comprador().catch(() => {});
+  }
+});
+
+// 228. Las ventas terminadas no frenan, y las de otra vendedora tampoco.
+await runCase(228, 'Con sólo ventas terminadas desvincula, y las ventas de otra vendedora no la frenan', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let cuentas = null;
+  let otras = null;
+  try {
+    cuentas = await cuentasParaCobrar('terminadas');
+    const { vendedor, vende, producto, cuenta: CUENTA } = cuentas;
+    const problemas = [];
+    const terminadas = [];
+
+    const cobrada = await ordenMercadoPago(vendedor, { producto });
+    const pago = pagarEnElDoble(doble, cobrada, CUENTA);
+    await avisar({ dataId: pago.id, cuenta: CUENTA });
+    terminadas.push(['cobrada con el link apagado', cobrada, 'consolidada']);
+
+    const cancelada = await ordenMercadoPago(vendedor, { producto });
+    await pedirCrudo(`/orders/${cancelada.order_id}/cancel`, { method: 'POST', header: state.buyerToken, body: {} });
+    terminadas.push(['cancelada por quien compra', cancelada, 'liberada']);
+
+    const vencida = await ordenMercadoPago(vendedor, { producto });
+    vencerElLink(vencida.order_id);
+    await reconciliar();
+    terminadas.push(['vencida por el reconciliador', vencida, 'liberada']);
+
+    for (const [escena, orden, reserva] of terminadas) {
+      if (reservaDe(orden.order_id) !== reserva) problemas.push(`${escena}: la reserva quedó ${reservaDe(orden.order_id)}`);
+    }
+    if (!linkCerrado(cobrada.order_id)) problemas.push('la cobrada quedó con el link abierto');
+
+    // Otra vendedora, con una venta reservada, mientras la primera desvincula.
+    otras = await cuentasParaCobrar('ajenas');
+    const ajena = await ordenMercadoPago(otras.vendedor, { producto: otras.producto });
+    if (reservaDe(ajena.order_id) !== 'reservada') problemas.push(`la venta ajena quedó ${reservaDe(ajena.order_id)}`);
+
+    await desvincula(vendedor, vende.email, 'con sólo ventas terminadas y una ajena reservada', problemas);
+    // La ajena sí frena a la suya.
+    await noDesvincula(otras.vendedor, otras.vende.email, 1, 'la otra vendedora', problemas);
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'con una venta cobrada y el link apagado, una cancelada y una vencida, desvincula aunque otra vendedora '
+      + 'tenga una venta reservada; a esa otra, su venta sí la frena (409 con 1)';
+  } finally {
+    for (const c of [cuentas, otras]) {
+      if (!c) continue;
+      await terminarLosCobros(c.vendedor, doble).catch(() => {});
+      await desvincular(c.vendedor.token).catch(() => {});
+    }
+    await doble.cerrar();
+    await comprador().catch(() => {});
+  }
+});
+
+// 229. Con cobros en curso no se pasa a otra cuenta desde la vuelta de Mercado
+// Pago: vuelve con su motivo y sigue la de antes. La misma cuenta reconecta y
+// renueva. Sin cobros en curso, pasar a otra cuenta vuelve a poder.
+await runCase(229, 'Con cobros en curso no se pasa a otra cuenta, y con la misma reconecta', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  const browser = await chromium.launch({ headless: true });
+  let cuentas = null;
+  try {
+    cuentas = await cuentasParaCobrar('otracuenta');
+    const { vendedor, vende, producto, cuenta: CUENTA } = cuentas;
+    const OTRA = `${CUENTA}9`;
+    const problemas = [];
+    const orden = await ordenMercadoPago(vendedor, { producto });
+
+    const antes = vinculoEnLaBase(vende.email);
+    const aOtra = await vincular(vendedor.token, `ok:${OTRA}`);
+    if (aOtra.motivo !== 'otra_cuenta_con_cobros' || aOtra.ok) {
+      problemas.push(`con otra cuenta volvió con «${aOtra.ok || aOtra.motivo}» (${aOtra.destino})`);
+    }
+    if (JSON.stringify(vinculoEnLaBase(vende.email)) !== JSON.stringify(antes)) {
+      problemas.push(`las credenciales cambiaron: cuenta ${antes.cuenta} → ${vinculoEnLaBase(vende.email).cuenta}`);
+    }
+    const estado = await estadoDelVinculo(vendedor.token);
+    if (estado.estado !== 'conectado' || estado.mp_user_id !== CUENTA) {
+      problemas.push(`después de volver con otra cuenta, el vínculo dice ${JSON.stringify(estado)}`);
+    }
+
+    // Lo que lee en la pantalla al volver.
+    const contexto = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await entrarConSesion(contexto, vende);
+    const page = await contexto.newPage();
+    try {
+      await page.goto(`${FRONTEND_URL}/?mp_error=otra_cuenta_con_cobros`, { waitUntil: 'domcontentloaded' });
+      await page.getByText(VUELTA_OTRA_CUENTA).waitFor({ state: 'visible', timeout: 15_000 })
+        .catch(async () => problemas.push(`la vuelta no dice el motivo: «${sinEspacios(await page.locator('body').innerText()).slice(0, 200)}»`));
+    } finally {
+      await contexto.close();
+    }
+
+    // La misma cuenta reconecta, y renovar sigue andando.
+    const misma = await vincular(vendedor.token, `ok:${CUENTA}`);
+    if (misma.ok !== 'vinculado') problemas.push(`con la misma cuenta volvió con «${misma.motivo}»`);
+    if (vinculoEnLaBase(vende.email).cuenta !== CUENTA) problemas.push('reconectar la misma cuenta cambió de cuenta');
+    const renovado = await pedirCrudo('/mp-oauth/refresh', { method: 'POST', header: vendedor.token, body: {} });
+    if (renovado.status !== 200 || renovado.datos?.estado !== 'conectado' || renovado.datos?.motivo) {
+      problemas.push(`renovar respondió ${renovado.status}: ${JSON.stringify(renovado.datos).slice(0, 200)}`);
+    }
+
+    // Terminada la venta, pasar a otra cuenta vuelve a poder.
+    vencerElLink(orden.order_id);
+    await reconciliar();
+    const despues = await vincular(vendedor.token, `ok:${OTRA}`);
+    if (despues.ok !== 'vinculado' || vinculoEnLaBase(vende.email).cuenta !== OTRA) {
+      problemas.push(`sin cobros en curso, pasar a otra cuenta volvió con «${despues.ok || despues.motivo}»`);
+    }
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'con una venta reservada, volver con otra cuenta dice «otra_cuenta_con_cobros», la pantalla lo explica y '
+      + 'las credenciales no cambian; la misma cuenta reconecta y renueva; vencida la venta, pasa a la otra cuenta';
+  } finally {
+    if (cuentas) {
+      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
+      await desvincular(cuentas.vendedor.token).catch(() => {});
+    }
+    await doble.cerrar();
+    try { await browser.close(); } catch { /* ya estaba cerrado */ }
+    await comprador().catch(() => {});
+  }
+});
+
+// 230. La carrera con una compra que se confirma mientras tanto. Desde que el
+// checkout escribe la orden, y aunque Mercado Pago todavía no haya devuelto el
+// link, desvincular ya la ve. La ventana que queda es la de la propia
+// sentencia de desvincular, y está en el informe.
+await runCase(230, 'Una compra ya escrita frena desvincular aunque su link todavía no exista', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let cuentas = null;
+  let compra = null;
+  try {
+    cuentas = await cuentasParaCobrar('carrera');
+    const { vendedor, vende, producto, cuenta: CUENTA } = cuentas;
+    const problemas = [];
+    doble.pausarLaPreferencia();
+    compra = ordenMercadoPago(vendedor, { producto });
+    compra.catch(() => {});
+    const escrita = () => queryRows(`
+      SELECT id, coalesce(stock_reserva, '${NULO}') FROM orders
+      WHERE seller_id = ${sqlLiteral(vendedor.id)} AND payment_method = 'mercadopago'
+    `);
+    await esperarA(async () => escrita().length === 1
+      && doble.pedidos.some((p) => p.ruta === 'preferencia' && p.cuerpo?.external_reference?.startsWith('topgreen-')),
+    'el checkout no llegó a pedir la preferencia');
+    const [[ordenId, reserva]] = escrita();
+    if (reserva !== 'reservada') problemas.push(`con el link en camino, la reserva está ${reserva}`);
+
+    await noDesvincula(vendedor, vende.email, 1, 'con el link todavía en camino', problemas);
+
+    doble.soltarLaPreferencia();
+    const orden = await compra;
+    const emitida = doble.emitidas.get(orden.preferencia);
+    if (orden.order_id !== ordenId || emitida?.cuenta !== CUENTA) {
+      problemas.push(`la preferencia no es de la cuenta vinculada: ${JSON.stringify(emitida && emitida.cuenta)}`);
+    }
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'con la creación del link retenida en Mercado Pago, la orden ya está escrita y reservada, y desvincular da '
+      + '409 con 1; el link sale después con la cuenta que sigue vinculada';
+  } finally {
+    doble.soltarLaPreferencia();
+    if (compra) await compra.catch(() => {});
+    if (cuentas) {
+      await terminarLosCobros(cuentas.vendedor, doble).catch(() => {});
+      await desvincular(cuentas.vendedor.token).catch(() => {});
+    }
+    await doble.cerrar();
     await comprador().catch(() => {});
   }
 });
