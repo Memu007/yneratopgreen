@@ -10,6 +10,32 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-29 — Desvincular: aviso por las devoluciones y carrera achicada
+
+La Dev frenó `DESVINCULAR-CON-COBROS-1` con dos hallazgos, que PM verificó en
+el código:
+
+- **Una devolución o un contracargo que llega con la cuenta desvinculada no se
+  registra.** El aviso de Mercado Pago da 503 porque no hay a quién
+  preguntarle, y quien compra sigue viendo «pagado». Con la cuenta vinculada
+  sí se registran.
+- **Una compra que se confirma justo mientras el vendedor desvincula puede
+  quedar trabada**: el checkout confirma la orden antes de leer el token.
+
+PM decidió:
+
+- **La regla queda como estaba:** sólo frenan los cobros en curso. Frenar por
+  ventas ya cobradas trabaría a quien vendió hace poco durante todo el plazo de
+  devoluciones, por un estado que la plataforma sólo muestra.
+- **La confirmación de desvincular avisa** que una devolución o un contracargo
+  posterior no se va a ver en AgroBoeda.
+- **La carrera se achica sin tocar el checkout** y queda como riesgo dicho: la
+  ventana es de milisegundos, Mercado Pago no está habilitado, y la orden se
+  destraba volviendo a vincular la misma cuenta.
+
+Motivo: cerrar lo que traba órdenes y stock sin agregarle a quien vende una
+traba larga ni tocar el checkout, que es lo más delicado del cobro.
+
 ## 2026-09-29 — No se desvincula Mercado Pago con cobros en curso
 
 Emi eligió asignar `DESVINCULAR-CON-COBROS-1` antes que el cambio de

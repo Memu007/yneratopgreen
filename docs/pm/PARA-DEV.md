@@ -35,6 +35,35 @@ integres ni despliegues.
 
 ## Tarea activa — DESVINCULAR-CON-COBROS-1
 
+**Sobre tu freno (29/09): bien frenado, y van la (a) y la (i).** Verifiqué
+las dos cosas en el código:
+
+- con la cuenta desvinculada, el aviso da 503 `sin_destinatario`
+  (`mp_webhook.py`). Con vínculo, la devolución y el contracargo sí se
+  registran (`cobro.py`, `DEVUELTO` y `CONTRACARGO`);
+- el checkout confirma la orden antes de leer el token (`checkout.py:428` y
+  `mp_preferencia.py:257`).
+
+Así sigue:
+
+- **(a) La regla como está pedida.** Con cobros en curso no se desvincula ni
+  se pasa a otra cuenta. Frenar también por ventas ya cobradas trabaría a quien
+  vendió hace poco durante todo el plazo de devoluciones, que ninguno de los
+  dos pudo confirmar. Y sería por un estado que la plataforma sólo muestra: la
+  plata va de cuenta a cuenta en Mercado Pago.
+- **El aviso va en la confirmación de desvincular**, y nombra las dos cosas:
+  «Si después se devuelve un pago o hay un contracargo, AgroBoeda no se va a
+  enterar: la compra va a seguir figurando como pagada.» Un caso lo mira. Emi
+  lo lee en tu informe.
+- **(i) La carrera se achica sin tocar el checkout:** contar y borrar en una
+  sola sentencia. Va como riesgo en el informe. Hoy Mercado Pago no está
+  habilitado, la ventana es de milisegundos, y una orden trabada así se
+  destraba volviendo a vincular la misma cuenta. Lo mismo vale para pasar a
+  otra cuenta desde la vuelta de Mercado Pago.
+- **Queda para después, sin tarea:** registrar lo que llegó mientras la cuenta
+  estaba desvinculada. Por ejemplo, revisar las ventas recientes cuando se
+  vuelve a vincular la misma cuenta.
+
 **Decisión de Emi (29/09, «1, pasale la de Mercado Pago»).** Prepara Mercado
 Pago sin depender de sus claves. Es condición para encender el cobro.
 
@@ -169,6 +198,9 @@ Lo decide la PM. Lo que depende de Emi puede reordenar la cola:
   - cambiar la propia contraseña desde la pantalla: la API tiene `/auth/change-password` y ninguna pantalla lo usa;
 - **antes del 01/12/2026:** sacar de `railway.toml` la configuración del
   Backend y del Frontend (Railway deja de leerla ese día). Pieza propia;
+- una devolución o un contracargo que llega con la cuenta desvinculada no
+  se registra: quien compra sigue viendo «pagado» (freno de
+  `DESVINCULAR-CON-COBROS-1`);
 - el correo (#15);
 - las cuentas de prueba de Mercado Pago;
 - la mejora de la logística en los filtros, por definir;
