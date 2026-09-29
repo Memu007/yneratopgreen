@@ -2,6 +2,73 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## RECONCILIADOR-PROGRAMADO-1: la vuelta
+
+| | |
+|---|---|
+| base | `edfd886` (tu devolución) |
+| producto | `1241b48` (`RAILWAY.md` y el import de `reconciliar.py`) |
+| casos y negativos | `8170d8b` |
+| no integrado, no desplegado | no entré a Railway |
+
+**Resultado: los cuatro cambios, y tus dos negativos en el script.**
+
+1. **`MP_TOKEN_KEY` en el Backend.** Tenías razón: escribí «Ninguna es un
+   secreto que el Backend no tenga» sin nada que lo sostuviera. Fue un error
+   mío. `RAILWAY.md`, sección 5, dice ahora:
+   - **cuándo se crea:** el día que se habilita Mercado Pago, con el Backend
+     ya configurado y antes de encender el cobro;
+   - **antes de crearlo:** mirar en «Variables» del Backend que figure
+     `MP_TOKEN_KEY`, sólo el nombre. Si no está, no se crea;
+   - **ante «NO CORRIO: falta MP_TOKEN_KEY»:** mirar primero el Backend; si
+     la tiene, revisar la referencia en este servicio.
+2. **El tope.** El comando es `railway-entrypoint timeout 540 python -m app.reconciliar`,
+   y salió el «detenela a mano». El 223 exige un `timeout` menor que el
+   intervalo del horario, y `sin-tope` da rojo. Una aclaración: `timeout` es de
+   coreutils, que viene en la imagen Debian de `python:3.11-slim`. Lo
+   comprobé en mi entorno, no dentro de la imagen, porque acá no hay Docker.
+3. **El horario, los cinco campos.** El 223 exige `*/N * * * *` con N ≥ 5.
+   Tu `pm-horario-restringido` da rojo.
+4. **La variable que no sirve se nombra, sin su valor.** El 224 tiene una
+   escena más: `MP_MINUTOS_DE_GRACIA=diez-minutos`. La línea dice
+   «variables con un valor que no sirve: MP_MINUTOS_DE_GRACIA», y el caso
+   comprueba que el valor no aparezca. `invalida-sin-nombre` da rojo.
+
+**La línea opcional del primer despliegue: la puse**, en condicional y sin
+verificar: «Railway puede hacer un primer despliegue apenas conectás el
+repositorio… Si ese primero falla, no pasa nada: cuando termines,
+«Redeploy»».
+
+**Lo que corrí**, como pediste para la vuelta:
+
+```text
+SMOKE_CASOS=100,210…224 node scripts/smoke.mjs
+→ 16/16 pasaron; 0 fallaron
+
+python3 scripts/sabotajes_reconciliador_programado_1.py
+→ los 10 [ROJO ESPERADO], en la primera corrida
+→ src, backend y RAILWAY.md después: como estaban
+→ todos dieron el rojo esperado
+
+git -c core.whitespace=cr-at-eol diff --check   → limpio
+compileall                                      → verde
+```
+
+| sabotaje nuevo | rojo |
+|---|---|
+| `sin-tope` | 223: «el comando de RAILWAY.md, «railway-entrypoint python -m app.reconciliar», no tiene un tope menor que el intervalo del horario (600 s)» |
+| `pm-horario-restringido` | 223: «el horario de RAILWAY.md, «*/10 3 * * *», no es «*/N * * * *» con N de 5 o más» |
+| `invalida-sin-nombre` | 224: «con MP_MINUTOS_DE_GRACIA inválida: no dijo por qué en una línea: "…la configuración no es válida: 1 error(es)"» |
+| `pm-avisa-pero-barre` | 224: sin clave, «salió con 0», «barrió igual» y «marcó 1 vendedor(es)»; con otra clave, «salió con 0» y «barrió igual» |
+
+Los 6 de antes siguen dando el mismo rojo.
+
+**No corrí:** la suite completa, porque sólo toqué lo que dijiste: `RAILWAY.md`,
+el import de `reconciliar.py` y los casos 223 y 224. Tampoco lint, tipos ni
+build: no hay cambios en `src/`.
+
+---
+
 ## RECONCILIADOR-PROGRAMADO-1: entrega
 
 | | |
