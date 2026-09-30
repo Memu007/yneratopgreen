@@ -1,6 +1,6 @@
 # Estado actual
 
-Actualizado: 2026-09-29.
+Actualizado: 2026-09-30.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
@@ -8,9 +8,9 @@ Actualizado: 2026-09-29.
 
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `5d8df5d`, publicado el 29/09 con autorización de Emi («Dale pública»), por fast-forward desde `65457cc`. Suma `RECONCILIADOR-PROGRAMADO-1` (los pasos de Railway en `RAILWAY.md`, sección 5, y la comprobación al arrancar de `reconciliar.py`) y documentos de PM. Sin migraciones ni cambios visibles: Railway vuelve a desplegar sólo el Backend. La verificación previa fue sobre el mismo código (`8170d8b`, que difiere sólo en `docs/pm`): suite 223/224 (131 de entorno), 12 negativos, el comando a mano como en producción y puertas verdes, sin secretos ni archivos prohibidos. La red de PM no llega a `railway.app`: **Emi lo comprobó en incógnito el 29/09 y anda todo** (Inicio, el Mercado, la ficha del John Deere de prueba e ingresar). Antes: `65457cc` (29/09, `PAGO-ORDEN-CERRADA-1`).
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`5d8df5d`) tiene todo lo aceptado. La Dev trabaja `DESVINCULAR-CON-COBROS-1` (asignada el 29/09).
-- **Última decisión PM:** `RECONCILIADOR-PROGRAMADO-1` **ACEPTADA EN RAMA** (29/09, `8170d8b`, producto en `d351306` y `1241b48`), después de una devolución el mismo día. Antes de barrer, el reconciliador comprueba que puede hacerlo sin daño: con una clave equivocada o sin clave no barre, no marca a ningún vendedor, lo dice en una línea que nombra la variable (nunca su valor) y sale con 2. `RAILWAY.md` tiene los pasos para Emi: se crea el día que se habilita Mercado Pago, mirando antes que el Backend tenga `MP_TOKEN_KEY`, con un tope de 9 minutos por corrida. Suite 223/224 (131 de entorno) sobre ese código; 12 negativos en rojo, 4 de PM; el comando corrido a mano como en producción; puertas verdes. Sin migraciones ni cambios visibles. **Publicada en `5d8df5d` el 29/09.** Evidencia en `REPRODUCCION-RECONCILIADOR-PROGRAMADO-1-2026-09-29.md`.
-- **Tarea activa:** `DESVINCULAR-CON-COBROS-1` (Emi, 29/09, «1, pasale la de Mercado Pago»). Mientras un vendedor tenga cobros de Mercado Pago en curso, no puede desvincular su cuenta ni pasar a otra, y la pantalla le explica por qué. Prepara Mercado Pago sin depender de sus claves. La Dev frenó antes de escribir código con dos hallazgos, verificados por PM: una devolución o un contracargo que llega con la cuenta desvinculada no se registra, y una compra que se confirma justo mientras el vendedor desvincula puede quedar trabada. PM decidió (29/09): la regla como estaba pedida, con un aviso al desvincular, y la carrera achicada sin tocar el checkout, como riesgo dicho. **Después viene Mercado Pago:** Emi va a pasar lo que tiene para arrancarlo. Las claves no van por el chat ni al repositorio: van directo a las variables del Backend en Railway. El servicio del reconciliador lo crea Emi ese día, con los pasos de `RAILWAY.md`, sección 5, y antes de encender el cobro; Emi aprobó su costo el 29/09 («Ok el costo»).
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`5d8df5d`) no tiene todavía `DESVINCULAR-CON-COBROS-1`, aceptada en rama el 30/09 (`777bee1`). La Dev no tiene tarea activa.
+- **Última decisión PM:** `DESVINCULAR-CON-COBROS-1` **ACEPTADA EN RAMA** (30/09, `777bee1`, producto en `bcc8ca5` y `a27fc7c`). Con cobros de Mercado Pago en curso no se desvincula ni se pasa a otra cuenta; renovar y reconectar la misma cuenta pasan siempre. La pantalla dice por qué y hasta cuándo, y la confirmación avisa que una devolución o un contracargo posterior no se va a ver. El criterio vive en un solo lugar y lo usa también el reconciliador. Suite 229/230 (131 de entorno); 9 negativos en rojo, 2 de PM; el punto 5 reproducido por PM con un caso propio; capturas, a11y, contraste, auditoría móvil y guías verdes. Sin migraciones. Visible en producción: la confirmación común de advertencia pasa a texto blanco sobre el marrón (también «Vaciar carrito»), que arregla un contraste de 2,28:1. Evidencia en `REPRODUCCION-DESVINCULAR-CON-COBROS-1-2026-09-30.md`. Antes: `RECONCILIADOR-PROGRAMADO-1`, publicada en `5d8df5d`.
+- **Tarea activa:** ninguna. `DESVINCULAR-CON-COBROS-1` espera que Emi autorice publicarla. **Después viene Mercado Pago:** Emi va a pasar lo que tiene para arrancarlo. Las claves no van por el chat ni al repositorio: van directo a las variables del Backend en Railway. El servicio del reconciliador lo crea Emi ese día, con los pasos de `RAILWAY.md`, sección 5, y antes de encender el cobro; Emi aprobó su costo el 29/09 («Ok el costo»).
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
 - **Devolución de la clienta del 20/09 — estado (27/09):**
@@ -176,12 +176,18 @@ Evidencia: `REPRODUCCION-FILTROS-MARCAS-2026-09-20.md`.
   corte se pierden el comando de inicio, el chequeo de salud y la política
   de reinicio. El reconciliador ya va sin archivo.
 - **Antes de habilitar Mercado Pago — orden de un vendedor desvinculado
-  (PM, 29/09; asignado el mismo día como `DESVINCULAR-CON-COBROS-1`):** si un vendedor desvincula su cuenta con una orden de
+  (PM, 29/09; resuelto en rama por `DESVINCULAR-CON-COBROS-1` el 30/09, sin publicar):** si un vendedor desvincula su cuenta con una orden de
   Mercado Pago abierta, la orden queda reservada hasta que vuelva a
   vincular. El reconciliador no puede preguntarle a Mercado Pago sin el
   token, y `/mp-oauth/unlink` no pregunta por órdenes abiertas. Viene de
   antes; en la base local quedaron 7 así. Se decide antes de encender el
   cobro.
+- **Antes de habilitar Mercado Pago — link abierto de un pago devuelto (PM, 30/09):**
+  un pago devuelto o con contracargo cuyo link no se pudo apagar queda fuera
+  del criterio de cobros en curso y del reconciliador, y el link queda
+  abierto. Pide dos fallas seguidas al apagarlo; leído en el código por la
+  Dev, sin reproducir. Pieza chica: que el link abierto mire los cuatro
+  estados con cobro.
 - **P3 — contraseñas (PM, 28/09):**
   - ingresar con una contraseña de más de 72 bytes da un error 500 en vez de
     «contraseña incorrecta», porque bcrypt no acepta más;
@@ -282,7 +288,7 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 ## Próxima secuencia
 
 1. **Hecho (29/09):** Emi verificó en incógnito la ficha del John Deere de prueba (marca, modelo 5090E, año 2018, 90 HP, usado y «Dueño directo») y el Mercado: 16 con «prueba» y 5 con «Servicios». Con eso quedan verificados en producción los filtros de #7 y #9. De la devolución de la clienta quedan abiertos #15 (correo), #5 (Inicio, charla de Emi) y #12 (texto de la clienta), y la mejora de logística, por definir.
-2. **Dev trabaja `DESVINCULAR-CON-COBROS-1`.** Después, **Mercado Pago:** Emi pasa lo que tiene para arrancarlo, sin claves. Antes de encender el cobro: `DESVINCULAR-CON-COBROS-1` publicada y el servicio del reconciliador creado con `RAILWAY.md`, sección 5. Dependen de Emi: cambiar las dos contraseñas, crearle la cuenta a la clienta desde el panel, la regla del teléfono, el correo (#15), cuentas de prueba de Mercado Pago, backups y la charla de Inicio (#5) con la clienta. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
+2. **Emi decide si se publica `DESVINCULAR-CON-COBROS-1`** (PM recomienda publicarla). Después, **Mercado Pago:** Emi pasa lo que tiene para arrancarlo, sin claves. Antes de encender el cobro: `DESVINCULAR-CON-COBROS-1` publicada y el servicio del reconciliador creado con `RAILWAY.md`, sección 5. Dependen de Emi: cambiar las dos contraseñas, crearle la cuenta a la clienta desde el panel, la regla del teléfono, el correo (#15), cuentas de prueba de Mercado Pago, backups y la charla de Inicio (#5) con la clienta. Después de cada publicación, Emi verifica en el sitio lo que la pieza cambió.
 3. Backup: no se exige mientras Railway sea demostrativo (decisión del 25/09). Es condición del lanzamiento real.
 4. Resolver SMTP del entorno antes de pedir otra revisión a la clienta: hoy no pudo registrarse y sólo revisó superficies públicas.
 5. Antes de cargar datos reales o de lanzar, Emi elige el backup administrado y su costo.
