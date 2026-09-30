@@ -38664,6 +38664,76 @@ await runCase(230, 'Una compra ya escrita frena desvincular aunque su link todav
   }
 });
 
+// 231. LINK-ABIERTO-DEVUELTO-1. Un pago devuelto, o con contracargo, cuyo link
+// no se pudo apagar ni al cobrar ni al llegar la novedad. El link sigue
+// sirviendo para volver a pagar, así que la orden sigue en curso: desvincular
+// frena, y el reconciliador lo apaga sin tocar el estado del pago ni el stock.
+await runCase(231, 'El link abierto de un pago devuelto o con contracargo lo apaga el reconciliador, y hasta entonces no se desvincula', async () => {
+  const doble = await levantarDoble(MP_PUERTO_DEL_DOBLE);
+  let cuentas = null;
+  try {
+    cuentas = await cuentasParaCobrar('linkdevuelto');
+    const { vendedor, vende, producto, cuenta: CUENTA } = cuentas;
+    const problemas = [];
+    const escenas = [
+      ['devolución', 'REFUNDED', (orden) => ({ status: 'refunded', transaction_amount_refunded: orden.amount })],
+      ['contracargo', 'CHARGED_BACK', () => ({ status: 'charged_back' })],
+    ];
+    const como = (orden) => {
+      const [[, , , , pago]] = pagosDe(orden.order_id);
+      return {
+        pago, orden: ordenEnLaBase(orden.order_id).estado, reserva: reservaDe(orden.order_id),
+        intentos: intentosDe(orden.order_id).map(([id, estado]) => `${id}:${estado}`).join(','),
+      };
+    };
+    const hechas = [];
+    for (const [escena, esperado, novedad] of escenas) {
+      const orden = await ordenMercadoPago(vendedor, { producto });
+      const pago = pagarEnElDoble(doble, orden, CUENTA);
+      doble.fallarElCierre(1);
+      await avisar({ dataId: pago.id, cuenta: CUENTA });
+      doble.actualizarPago(pago.id, { ...novedad(orden), date_last_updated: new Date().toISOString() });
+      doble.fallarElCierre(1);
+      const aviso = await avisar({ dataId: pago.id, cuenta: CUENTA });
+      const antes = como(orden);
+      assert(aviso.status === 200 && antes.pago === esperado && !linkCerrado(orden.order_id)
+        && antes.reserva === 'consolidada',
+      `${escena}: no quedó ${esperado} con el link abierto: aviso ${aviso.status}, ${antes.pago}, `
+        + `link ${linkCerrado(orden.order_id) ? 'cerrado' : 'abierto'}, reserva ${antes.reserva}`);
+      hechas.push({ escena, orden, antes });
+    }
+    const stockAntes = [stockDe(producto), reservadoDe(producto), ventasDe(producto)];
+
+    await noDesvincula(vendedor, vende.email, escenas.length, 'con los dos links abiertos', problemas);
+
+    await reconciliar();
+    for (const { escena, orden, antes } of hechas) {
+      if (!linkCerrado(orden.order_id) || !doble.vencida(orden.preferencia)) {
+        problemas.push(`${escena}: el reconciliador no apagó el link (${linkCerrado(orden.order_id) ? 'anotado' : 'sin anotar'}, `
+          + `${doble.vencida(orden.preferencia) ? 'vencido' : 'vivo'} en Mercado Pago)`);
+      }
+      const despues = como(orden);
+      for (const clave of Object.keys(antes)) {
+        if (despues[clave] !== antes[clave]) problemas.push(`${escena}: ${clave} cambió: ${antes[clave]} → ${despues[clave]}`);
+      }
+    }
+    const stockDespues = [stockDe(producto), reservadoDe(producto), ventasDe(producto)];
+    if (stockDespues.join() !== stockAntes.join()) {
+      problemas.push(`el stock se movió (stock, reservado, ventas): ${stockAntes.join('/')} → ${stockDespues.join('/')}`);
+    }
+    await desvincula(vendedor, vende.email, 'con los links apagados', problemas);
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'con el link sin apagar al cobrar ni al llegar la devolución y el contracargo, desvincular da 409 con 2; '
+      + 'el reconciliador apaga los dos links sin cambiar el estado del pago, la orden, la reserva ni el stock, '
+      + 'y después desvincula';
+  } finally {
+    if (cuentas) await desvincular(cuentas.vendedor.token).catch(() => {});
+    await doble.cerrar();
+    await comprador().catch(() => {});
+  }
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
