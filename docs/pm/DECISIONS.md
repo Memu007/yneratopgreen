@@ -10,6 +10,21 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-30 — Inicio muestra el ecosistema, con lo que viene como «Próximamente»
+
+Después de la presentación, la clienta pidió que Inicio muestre el ecosistema y no sólo el
+mercado, y que se saque «Quiénes somos». Emi eligió la propuesta de PM:
+
+- arriba, la idea del proyecto, con el texto del prototipo de la clienta;
+- después, lo que funciona hoy (el Mercado) y, como «Próximamente» y sin botones, los
+  servicios que vienen después del MVP: ruta productiva, trazabilidad, cumplimiento y
+  certificaciones, tecnología, noticias del agro, y charlas y capacitaciones.
+
+Motivo: se entiende hacia dónde va el proyecto sin prometer lo que todavía no existe. La
+clienta ya había marcado que el sitio «promete de más» (#14). Retoma la decisión #10, que el
+27/09 había quedado para más adelante. Mostrar esos servicios es chico; construirlos es otro
+proyecto, fuera del MVP.
+
 ## 2026-09-30 — Mercado Pago se prueba en el sitio publicado
 
 Emi eligió probar Mercado Pago en el sitio publicado, con cuentas de prueba, y

@@ -134,6 +134,10 @@ Lo decide la PM. Lo que depende de Emi puede reordenar la cola:
   la vinculación en Safari, Brave y Firefox (la cookie del Backend en otro
   sitio). Lo más probable es que alcance con un dominio propio, que es de Emi
   y de Railway, no de código;
+- **después de `LINK-ABIERTO-DEVUELTO-1`, cuando la clienta apruebe el texto:** Inicio con el
+  ecosistema (lo de hoy y lo que viene como «Próximamente») y sacar «Quiénes somos» del menú,
+  del pie y del sitio. La propuesta de texto de PM está en un documento que tiene Emi;
+  cuando se asigne, va entera en la tarea;
 - el correo (#15);
 - las cuentas de prueba de Mercado Pago;
 - la mejora de la logística en los filtros, por definir;
