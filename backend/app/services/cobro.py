@@ -663,7 +663,8 @@ def en_curso(vencida=None):
       pendiente, esperando que se confirme que el link se apagó. En las dos
       hay que preguntarle a Mercado Pago y apagar el link;
     - **hubo cobro y el link sigue abierto:** hay que apagarlo, y mientras
-      tanto se puede volver a pagar.
+      tanto se puede volver a pagar. Cualquier estado con cobro, también
+      devuelto o con contracargo: que la plata haya vuelto no apaga el link.
 
     Una orden terminada —cobrada con el link apagado, o cerrada con la
     mercadería de vuelta— no está. Si después llega una devolución o un
@@ -676,9 +677,7 @@ def en_curso(vencida=None):
     reserva_viva = Order.stock_reserva.in_([stock.RESERVADA, stock.CIERRE_PENDIENTE])
     if vencida is not None:
         reserva_viva = reserva_viva & vencida
-    link_abierto = Payment.link_cerrado.is_(False) & Payment.status.in_(
-        [PaymentStatus.APPROVED, PaymentStatus.EN_REVISION]
-    )
+    link_abierto = Payment.link_cerrado.is_(False) & Payment.status.in_(CON_COBRO)
     return (Order.payment_method == MEDIO_MERCADO_PAGO) & (reserva_viva | link_abierto)
 
 
