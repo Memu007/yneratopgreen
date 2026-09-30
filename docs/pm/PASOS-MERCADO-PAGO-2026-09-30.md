@@ -109,5 +109,5 @@ en el sitio publicado:
 - **Credenciales reales:** otra vez los pasos 4 a 7, en la aplicación de
   TopGreen y con sus credenciales de producción. La vinculación del vendedor de
   prueba deja de servir.
-- **Publicadas** `DESVINCULAR-CON-COBROS-1` y la pieza chica del link abierto
-  de un pago devuelto.
+- **Publicada la pieza chica del link abierto de un pago devuelto.**
+  `DESVINCULAR-CON-COBROS-1` ya está publicada (`2ab0a36`, 30/09).

@@ -5,7 +5,7 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre DESVINCULAR-CON-COBROS-1 — aceptada en rama
+## Decisión sobre DESVINCULAR-CON-COBROS-1 — aceptada y publicada
 
 Sobre `777bee1` (producto en `bcc8ca5` y `a27fc7c`). Tu informe `d1a6a3e`
 difiere sólo en `docs/pm`. Evidencia en
@@ -42,7 +42,8 @@ la base.
 alcanza con una credencial que no abre); el número del 409 se cuenta después de
 decidir y podría decir 0; la confirmación común sin rol de diálogo.
 
-La publica PM si Emi lo autoriza. Vos no integres ni despliegues.
+**Publicada por PM en `2ab0a36` el 30/09**, con autorización de Emi. Vos no
+integres ni despliegues.
 
 ---
 

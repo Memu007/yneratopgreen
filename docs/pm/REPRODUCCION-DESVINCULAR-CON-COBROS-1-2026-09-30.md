@@ -7,8 +7,9 @@ Fecha: 2026-09-30. Base `0495b31` (la respuesta de PM al freno).
   `777bee1`.
 - Informe: `d1a6a3e`, que difiere de `777bee1` sólo en `docs/pm`.
 
-`main` está en `5d8df5d`. **ACEPTADA EN RAMA**, sin integración ni
-despliegue.
+`main` estaba en `5d8df5d`. **ACEPTADA EN RAMA** y **publicada en `2ab0a36`
+el 30/09**, con autorización de Emi («Publicá así lo muestro»), por
+fast-forward.
 
 ## Qué cambia
 
