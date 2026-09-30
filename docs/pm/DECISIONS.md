@@ -10,6 +10,25 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-30 — Inicio v2 se programa sin esperar las respuestas de la clienta
+
+Emi aprobó la maqueta de Inicio versión 2 y pidió programarla sin esperar las cuatro respuestas
+de la clienta. La maqueta pone el ecosistema primero, con una tarjeta con foto por servicio, y
+el Mercado como una más. Pasa a la Dev como `INICIO-ECOSISTEMA-1`, después de
+`LINK-ABIERTO-DEVUELTO-1`.
+
+Mientras la clienta no diga otra cosa, valen:
+
+- los servicios y el orden de la maqueta;
+- el nombre «Mercado»;
+- las fotos del sitio, con crédito para las dos CC BY;
+- el texto del documento, versión 2.
+
+Si la clienta pide cambios, son una pieza chica aparte.
+
+Motivo: Emi quiere mostrarle el Inicio nuevo funcionando. Las preguntas cambian textos o fotos,
+no la estructura.
+
 ## 2026-09-30 — Inicio muestra el ecosistema, con lo que viene como «Próximamente»
 
 Después de la presentación, la clienta pidió que Inicio muestre el ecosistema y no sólo el
