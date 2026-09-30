@@ -13,6 +13,7 @@ fue recibido directamente de Emi el 07/09. Ninguno se sirve hoy tal como está:
 | `video-servicios.mp4` | 20,9 MB | El video con overlay que UX-2C retiró de Servicios. |
 | `AGROBOEDA-LOGO-FUENTE.png` | 1,2 MB | Fuente oficial recibida para la marca AgroBoeda. Monograma AB, 1536 × 1024, RGB sin transparencia; no es todavía un activo optimizado de cabecera. |
 | `DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.docx` | 5,5 MB | Devolución de la clienta sobre la revisión 01, con capturas anotadas. **Para leerla está `../DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.md`**, que la transcribe entera; el `.docx` queda como original. |
+| `PROTOTIPO-AGROCORE-V3_1-2026-09-30.html` | 72 KB | Prototipo funcional de la clienta («AgroBoeda — AgroCore»: Inicio, Mercado, Ruta productiva, Trazabilidad, Cumplimiento y Tecnología), recibido de Emi el 30/09. Es la fuente del texto que la clienta prefiere para Inicio. Guarda todo en el navegador (`localStorage`), sin enlaces externos ni datos personales. No se sirve. |
 
 Se mueven, no se borran: son material de la clienta y siguen siendo la fuente
 de los derivados aprobados. Acá quedan versionados y trazables, pero no se
@@ -36,4 +37,10 @@ Integridad de la devolución de la clienta:
 
 ```text
 e8be233a54907eaaf60b045cdec1f14701a9bb54d09a9522cddab54fa9321f02  DEVOLUCION-CLIENTA-REVISION-01-2026-09-20.docx
+```
+
+Integridad del prototipo de la clienta:
+
+```text
+58a69c4a62774658e2e0b3c7640e99b8de0d0ef490894897e6e38add9c5c5cd5  PROTOTIPO-AGROCORE-V3_1-2026-09-30.html
 ```
