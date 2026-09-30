@@ -1,0 +1,383 @@
+<!doctype html>
+<!--
+  Maqueta de Inicio, versión 2 (PM, 30/09/2026). Es una propuesta para mostrarle
+  a la clienta, no producto: se abre desde el repositorio y usa las fuentes y las
+  fotos de public/. El texto es el del documento «Inicio de AgroBoeda: propuesta
+  de texto», versión 2. Hasta que la clienta lo apruebe, no se programa.
+
+  Fotos: la de cosecha y la del relevamiento son de la clienta; las del catálogo
+  son CC0 o dominio público, salvo muestreo-suelo-recomendacion-fertilizacion y
+  sensores-humedad-suelo-iot, que son CC BY 2.0 y llevan crédito si quedan
+  (archivo/cerrados/INVENTARIO-FOTOS-CATALOGO-2026-09-09.md).
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maqueta de Inicio</title>
+<style>
+@font-face { font-family: 'Inter Tight'; src: url('../../../public/fuentes/InterTight.woff2') format('woff2-variations'); font-weight: 100 900; }
+@font-face { font-family: 'Inter'; src: url('../../../public/fuentes/Inter.woff2') format('woff2-variations'); font-weight: 100 900; }
+:root {
+  --display: 'Inter Tight', 'Inter', system-ui, sans-serif;
+  --ui: 'Inter', system-ui, sans-serif;
+  --canvas: #f7f6f2; --surface: #ffffff; --subtle: #edf0ec; --muted: #f0efe9;
+  --text: #1e2420; --text-2: #4c544b; --brand: #1e4a34; --brand-dark: #143526;
+  --accent: #8a671c; --signal: #c49a43; --steel: #5a6b60; --border: #d8dad2; --control: #79837a;
+  --ok: #1f6b4f; --ok-bg: #e7f3ed;
+  --gutter: 48px; --max: 1320px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--ui); color: var(--text); background: var(--canvas); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+img { display: block; }
+.contenedor { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; padding: 0 var(--gutter); }
+
+.maqueta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #fff7e0; color: #6b5314; font: 600 11px/1 var(--ui); letter-spacing: .12em; text-transform: uppercase; text-align: center; padding: 7px 16px; border-bottom: 1px solid #ecd9a3; }
+
+/* Cabecera: la del sitio, sin «Quiénes somos» */
+.header { background: var(--brand); color: #fff; border-bottom: 1px solid rgba(255,255,255,.14); }
+.header-fila { height: 64px; display: flex; align-items: stretch; }
+.logo { display: flex; align-items: center; gap: 14px; padding: 0 26px 0 var(--gutter); font: 700 22px var(--display); letter-spacing: -.01em; }
+.logo img { height: 34px; }
+.nav { display: flex; }
+.nav a { display: flex; align-items: center; padding: 0 22px; font: 500 15px var(--ui); border-left: 1px solid rgba(255,255,255,.14); }
+.nav a:last-child { border-right: 1px solid rgba(255,255,255,.14); }
+.nav a.activo { background: #fff; color: var(--text); font-weight: 600; }
+.ingresar { margin-left: auto; display: flex; align-items: center; padding: 0 22px; border-left: 1px solid rgba(255,255,255,.14); font: 500 15px var(--ui); }
+.nav-celular { display: none; }
+
+/* Rótulo de sección: la marca cereal y una regla */
+.ceja { display: flex; align-items: center; gap: 10px; font: 650 12px/1 var(--ui); letter-spacing: .13em; text-transform: uppercase; color: var(--accent); }
+.ceja::before { content: ""; flex: none; width: 14px; height: 3px; background: var(--signal); }
+.ceja::after { content: ""; flex: 1; max-width: 180px; height: 1px; background: var(--border); }
+.sobre-marca .ceja { color: rgba(255,255,255,.92); }
+.sobre-marca .ceja::after { background: rgba(255,255,255,.24); }
+
+/* Portada */
+.hero { background: var(--brand); color: #fff; display: grid; grid-template-columns: minmax(0, 47fr) minmax(0, 53fr); min-height: 600px; }
+.hero-copy { padding: 76px 56px 68px max(var(--gutter), calc((100vw - var(--max)) / 2)); display: flex; flex-direction: column; justify-content: center; }
+.hero h1 { font: 800 54px/1.03 var(--display); letter-spacing: -.024em; word-spacing: .03em; margin: 30px 0 24px; max-width: 620px; text-wrap: balance; }
+.hero .lead { font-size: 18px; line-height: 1.58; color: rgba(255,255,255,.86); max-width: 540px; }
+.acciones { display: flex; gap: 12px; margin-top: 38px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 52px; padding: 0 26px; font: 650 16px var(--ui); border-radius: 2px; border: 1px solid transparent; }
+.btn-claro { background: #fff; color: var(--brand); border-left: 4px solid var(--signal); }
+.btn-linea { border-color: rgba(255,255,255,.55); color: #fff; }
+.hero-nota { display: flex; align-items: center; gap: 10px; margin-top: 30px; font-size: 14px; color: rgba(255,255,255,.74); }
+.hero-nota::before { content: ""; width: 8px; height: 8px; background: var(--signal); flex: none; }
+.hero-foto { margin: 0; display: flex; flex-direction: column; min-height: 100%; }
+.hero-foto picture { flex: 1; display: block; min-height: 0; position: relative; }
+.hero-foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 60%; }
+.pie-foto { background: var(--brand-dark); color: rgba(255,255,255,.92); font: 700 11px/1 var(--ui); letter-spacing: .18em; text-transform: uppercase; padding: 15px 22px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.pie-foto i { width: 120px; height: 10px; flex: none; background: repeating-linear-gradient(90deg, var(--signal) 0 2px, transparent 2px 10px); }
+
+/* Ecosistema */
+.eco { padding: 96px 0 104px; }
+.cabeza { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 64px; align-items: end; margin-bottom: 44px; }
+.titulo { font: 800 48px/1.04 var(--display); letter-spacing: -.024em; word-spacing: .03em; margin-top: 22px; text-wrap: balance; }
+.intro { font-size: 17px; line-height: 1.6; color: var(--text-2); max-width: 560px; }
+.leyenda { display: flex; gap: 10px; margin-top: 18px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; font: 700 10.5px/1 var(--ui); letter-spacing: .13em; text-transform: uppercase; padding: 6px 9px; border-radius: 2px; white-space: nowrap; }
+.chip.hoy { background: var(--ok-bg); color: var(--ok); }
+.chip.hoy::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.chip.pronto { background: var(--muted); color: var(--steel); box-shadow: inset 0 0 0 1px #c3c6bc; }
+
+.grilla { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+.servicio { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
+.servicio .foto { aspect-ratio: 3 / 2; overflow: hidden; background: var(--subtle); }
+.servicio .foto img { width: 100%; height: 100%; object-fit: cover; }
+.cuerpo { padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.num { font: 700 12px/1 var(--ui); letter-spacing: .2em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.servicio h3 { font: 750 22px/1.15 var(--display); letter-spacing: -.012em; margin-top: 4px; }
+.servicio p { font-size: 14.5px; line-height: 1.55; color: var(--text-2); }
+.servicio.vivo { border: 2px solid var(--brand); }
+.entrar { margin-top: auto; padding-top: 13px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.entrar b { font: 650 15px var(--ui); color: var(--brand); }
+.cuenta { font-size: 13.5px; color: var(--text-2); margin-top: auto; }
+.cuenta b { font: 800 16px var(--display); color: var(--text); font-variant-numeric: tabular-nums; margin-right: 2px; }
+.cuenta + .entrar { margin-top: 0; }
+.cuerpo > p { margin-bottom: 4px; }
+
+.servicio.cta { background: var(--brand); border-color: var(--brand); color: #fff; padding: 30px 28px; justify-content: space-between; gap: 28px; }
+.servicio.cta h3 { font-size: 30px; line-height: 1.08; letter-spacing: -.02em; margin-top: 22px; }
+.servicio.cta p { color: rgba(255,255,255,.84); margin-top: 12px; font-size: 15px; }
+.btn-blanco { background: #fff; color: var(--brand); height: 48px; align-self: flex-start; }
+
+/* Cómo funciona */
+.ruta { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 96px 0 100px; }
+.pasos { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.paso { position: relative; padding: 46px 32px 0 0; }
+.paso::before { content: ""; position: absolute; top: 15px; left: 0; right: 0; height: 2px; background: repeating-linear-gradient(90deg, var(--control) 0 7px, transparent 7px 14px); }
+.paso:last-child::before { display: none; }
+.nodo { position: absolute; top: 8px; left: 0; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--control); }
+.paso.vivo .nodo { background: var(--brand); border-color: var(--brand); box-shadow: 0 0 0 5px var(--ok-bg); }
+.paso h3 { font: 750 24px/1.1 var(--display); letter-spacing: -.015em; margin: 12px 0 10px; }
+.paso p { font-size: 15px; line-height: 1.55; color: var(--text-2); max-width: 220px; }
+.de { display: inline-block; margin-top: 18px; font: 650 11.5px/1.3 var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--steel); }
+.paso.vivo .de { color: var(--ok); }
+
+/* Principio */
+.principio-marco { padding: 96px 0; }
+.principio { background: var(--brand); color: #fff; border-radius: 4px; padding: 64px; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 72px; align-items: center; }
+.principio blockquote { font: 800 46px/1.06 var(--display); letter-spacing: -.024em; word-spacing: .04em; margin-top: 24px; text-wrap: balance; }
+.principio blockquote em { font-style: normal; color: var(--signal); }
+.principio p { font-size: 17px; line-height: 1.62; color: rgba(255,255,255,.86); }
+.niveles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 34px; padding-top: 26px; border-top: 1px solid rgba(255,255,255,.2); }
+.barras { display: flex; flex-direction: column-reverse; gap: 5px; margin-bottom: 14px; }
+.barras i { height: 9px; background: rgba(255,255,255,.14); }
+.barras i.si { background: var(--signal); }
+.nivel b { display: block; font: 650 14px/1.3 var(--ui); }
+.nivel span { display: block; margin-top: 6px; font: 600 11px/1.3 var(--ui); letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.66); }
+
+/* Pie */
+.footer { background: var(--brand); color: #fff; padding: 56px 0 0; }
+.footer-cols { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 32px; padding-bottom: 48px; }
+.footer .logo { padding: 0; font-size: 26px; }
+.lema { margin-top: 12px; font-size: 14px; line-height: 1.5; color: rgba(255,255,255,.75); max-width: 310px; }
+.footer h5 { font: 700 16px var(--ui); margin-bottom: 14px; }
+.footer li { list-style: none; font-size: 16px; margin-bottom: 11px; color: rgba(255,255,255,.95); }
+.footer li.gris { color: rgba(255,255,255,.7); }
+.legal { border-top: 1px solid rgba(255,255,255,.18); padding: 18px 0 22px; font-size: 13px; color: rgba(255,255,255,.85); }
+
+@media (max-width: 700px) {
+  :root { --gutter: 16px; }
+  .header-fila { height: 56px; }
+  .logo { padding: 0 16px; font-size: 19px; gap: 10px; }
+  .logo img { height: 28px; }
+  .nav { display: none; }
+  .nav-celular { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid rgba(255,255,255,.14); }
+  .nav-celular a { display: flex; align-items: center; justify-content: center; height: 44px; font: 500 14px var(--ui); border-right: 1px solid rgba(255,255,255,.14); }
+  .nav-celular a:last-child { border-right: 0; }
+  .nav-celular a.activo { background: #fff; color: var(--text); font-weight: 600; }
+  .ingresar { padding: 0 16px; font-size: 14px; }
+
+  .hero { grid-template-columns: 1fr; min-height: 0; }
+  .hero-copy { padding: 40px 16px 36px; }
+  .maqueta { font-size: 10px; letter-spacing: .08em; }
+  .hero h1 { font-size: 34px; line-height: 1.05; margin: 22px 0 18px; }
+  .hero .lead { font-size: 16.5px; }
+  .acciones { flex-direction: column; margin-top: 30px; }
+  .btn { width: 100%; height: 50px; }
+  .hero-nota { font-size: 13.5px; margin-top: 24px; align-items: flex-start; }
+  .hero-nota::before { margin-top: 5px; }
+  .hero-foto picture { aspect-ratio: 4 / 3; flex: none; }
+  .pie-foto { font-size: 9.5px; padding: 12px 16px; letter-spacing: .14em; }
+  .pie-foto i { width: 60px; }
+
+  .eco { padding: 56px 0 64px; }
+  .cabeza { grid-template-columns: 1fr; gap: 16px; margin-bottom: 28px; }
+  .titulo { font-size: 34px; margin-top: 18px; }
+  .intro { font-size: 16px; }
+  .grilla { grid-template-columns: 1fr; gap: 12px; }
+  .servicio { display: grid; grid-template-columns: 108px minmax(0, 1fr); }
+  .servicio .foto { aspect-ratio: auto; height: 100%; }
+  .cuerpo { padding: 14px 16px 16px; gap: 7px; }
+  .servicio h3 { font-size: 19px; margin-top: 2px; }
+  .servicio p { font-size: 14px; line-height: 1.5; }
+  .chip { font-size: 9.5px; padding: 5px 7px; }
+  .num { font-size: 11px; }
+  .entrar { padding-top: 10px; }
+  .servicio.cta { display: flex; padding: 26px 20px; gap: 22px; }
+  .servicio.cta h3 { font-size: 26px; margin-top: 18px; }
+
+  .ruta { padding: 56px 0 60px; }
+  .pasos { grid-template-columns: 1fr; }
+  .paso { padding: 0 0 30px 38px; }
+  .paso::before { top: 18px; bottom: -8px; left: 7px; right: auto; width: 2px; height: auto; background: repeating-linear-gradient(180deg, var(--control) 0 7px, transparent 7px 14px); }
+  .nodo { top: 2px; }
+  .paso h3 { font-size: 21px; margin: 8px 0 6px; }
+  .paso p { max-width: none; }
+  .de { margin-top: 10px; }
+  .paso:last-child { padding-bottom: 0; }
+
+  .principio-marco { padding: 0 0 56px; }
+  .principio { padding: 40px 20px; grid-template-columns: 1fr; gap: 24px; }
+  .principio blockquote { font-size: 33px; margin-top: 18px; }
+  .principio p { font-size: 16px; }
+  .niveles { gap: 10px; }
+  .nivel b { font-size: 13px; }
+  .nivel span { font-size: 10px; letter-spacing: .06em; }
+
+  .footer { padding-top: 40px; }
+  .footer-cols { grid-template-columns: 1fr; gap: 28px; }
+}
+</style>
+</head>
+<body>
+<div class="maqueta">Maqueta de la propuesta · no es el sitio publicado</div>
+
+<header class="header">
+  <div class="header-fila">
+    <a class="logo" href="#"><img src="../../../public/marca/agroboeda-monograma-alfa.png" alt="">AgroBoeda</a>
+    <nav class="nav">
+      <a class="activo" href="#">Inicio</a>
+      <a href="#">Mercado</a>
+      <a href="#">Contacto</a>
+    </nav>
+    <a class="ingresar" href="#">Ingresar</a>
+  </div>
+  <nav class="nav-celular">
+    <a class="activo" href="#">Inicio</a>
+    <a href="#">Mercado</a>
+    <a href="#">Contacto</a>
+  </nav>
+</header>
+
+<section class="hero sobre-marca">
+  <div class="hero-copy">
+    <p class="ceja">Bienvenido a AgroBoeda</p>
+    <h1>Producción, mercado, cumplimiento y tecnología en una misma ruta.</h1>
+    <p class="lead">La plataforma parte de tu producción y su destino para determinar qué registrar, qué validar, qué tecnología realmente necesitás y cómo llevar la producción al mercado.</p>
+    <div class="acciones">
+      <a class="btn btn-claro" href="#ecosistema">Conocé el ecosistema</a>
+      <a class="btn btn-linea" href="#">Entrar al Mercado</a>
+    </div>
+    <p class="hero-nota">Hoy funciona el Mercado. El resto del ecosistema se suma por etapas.</p>
+  </div>
+  <figure class="hero-foto">
+    <picture>
+      <source media="(max-width: 700px)" srcset="../../../public/media/comercial/home-cosecha-hero-1200.webp">
+      <img src="../../../public/media/comercial/home-cosecha-hero-1920.webp" alt="Cosecha y descarga de grano en un campo argentino">
+    </picture>
+    <figcaption class="pie-foto"><span>Cosecha y descarga de grano · Campo argentino</span><i aria-hidden="true"></i></figcaption>
+  </figure>
+</section>
+
+<section class="eco" id="ecosistema">
+  <div class="contenedor">
+    <div class="cabeza">
+      <div>
+        <p class="ceja">El ecosistema AgroBoeda</p>
+        <h2 class="titulo">¿Qué querés hacer?</h2>
+      </div>
+      <div>
+        <p class="intro">Definí qué producís y dónde querés colocar la producción. AgroBoeda relaciona la ruta productiva con mercado, trazabilidad, cumplimiento, certificaciones y tecnología.</p>
+      </div>
+    </div>
+
+    <div class="grilla">
+      <article class="servicio">
+        <div class="foto"><img src="../../../public/catalogo/planificacion-riego-fertirriego.webp" alt=""></div>
+        <div class="cuerpo">
+          <div class="meta"><span class="num">01</span><span class="chip pronto">Próximamente</span></div>
+          <h3>Ruta productiva</h3>
+          <p>Construí una ruta según producción, destino y mercado objetivo.</p>
+        </div>
+      </article>
+      <article class="servicio vivo">
+        <div class="foto"><img src="../../../public/catalogo/servicio-cosecha-monitor-rendimiento.webp" alt=""></div>
+        <div class="cuerpo">
+          <div class="meta"><span class="num">02</span><span class="chip hoy">Disponible hoy</span></div>
+          <h3>Mercado</h3>
+          <p>Buscá productos, maquinaria, insumos, tierras y servicios o publicá una oferta.</p>
+          <p class="cuenta"><b>242</b> publicaciones disponibles</p>
+          <a class="entrar" href="#"><b>Entrar al Mercado</b><b aria-hidden="true">→</b></a>
+        </div>
+      </article>
+      <article class="servicio">
+        <div class="foto"><img src="../../../public/catalogo/terneros-angus-lote-20.webp" alt=""></div>
+        <div class="cuerpo">
+          <div class="meta"><span class="num">03</span><span class="chip pronto">Próximamente</span></div>
+          <h3>Trazabilidad</h3>
+          <p>Generá eventos, datos y evidencias vinculados a la ruta y al lote.</p>
+        </div>
+      </article>
+      <article class="servicio">
+        <div class="foto"><img src="../../../public/catalogo/muestreo-suelo-recomendacion-fertilizacion.webp" alt=""></div>
+        <div class="cuerpo">
+          <div class="meta"><span class="num">04</span><span class="chip pronto">Próximamente</span></div>
+          <h3>Cumplimiento y certificaciones</h3>
+          <p>Controlá requisitos, documentos y certificaciones aplicables.</p>
+        </div>
+      </article>
+      <article class="servicio">
+        <div class="foto"><img src="../../../public/catalogo/sensores-humedad-suelo-iot.webp" alt=""></div>
+        <div class="cuerpo">
+          <div class="meta"><span class="num">05</span><span class="chip pronto">Próximamente</span></div>
+          <h3>Tecnología</h3>
+          <p>Separá tecnología necesaria de mejoras opcionales y calculá inversión.</p>
+        </div>
+      </article>
+      <article class="servicio">
+        <div class="foto"><img src="../../../public/media/comercial/servicios-relevamiento-hero-960.webp" alt=""></div>
+        <div class="cuerpo">
+          <div class="meta"><span class="num">06</span><span class="chip pronto">Próximamente</span></div>
+          <h3>Noticias del agro</h3>
+          <p>Lo que pasa en el mundo agropecuario, en un solo lugar.</p>
+        </div>
+      </article>
+      <article class="servicio">
+        <div class="foto"><img src="../../../public/catalogo/dron-pulverizador-agricola-20l.webp" alt=""></div>
+        <div class="cuerpo">
+          <div class="meta"><span class="num">07</span><span class="chip pronto">Próximamente</span></div>
+          <h3>Charlas y capacitaciones</h3>
+          <p>Encuentros con especialistas para producir y vender mejor.</p>
+        </div>
+      </article>
+      <aside class="servicio cta sobre-marca">
+        <div>
+          <p class="ceja">Por etapas</p>
+          <h3>¿Te interesa alguno?</h3>
+          <p>Cada servicio se suma por etapas, después del Mercado.</p>
+        </div>
+        <a class="btn btn-blanco" href="#">Escribinos</a>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="ruta">
+  <div class="contenedor">
+    <div class="cabeza">
+      <div>
+        <p class="ceja">Cómo funciona</p>
+        <h2 class="titulo">Una misma producción puede seguir distintas rutas.</h2>
+      </div>
+      <p class="intro">Cada paso de la ruta tiene su servicio en el ecosistema. El último, comercializar, ya funciona en el Mercado.</p>
+    </div>
+    <ol class="pasos">
+      <li class="paso"><span class="nodo"></span><span class="num">01</span><h3>Producir</h3><p>Qué producto, dónde, escala y etapa.</p><span class="de">Ruta productiva</span></li>
+      <li class="paso"><span class="nodo"></span><span class="num">02</span><h3>Destinar</h3><p>Consumo, industria, exportación u otro destino.</p><span class="de">Ruta productiva</span></li>
+      <li class="paso"><span class="nodo"></span><span class="num">03</span><h3>Cumplir</h3><p>Requisitos, documentos, controles y certificaciones.</p><span class="de">Trazabilidad y cumplimiento</span></li>
+      <li class="paso"><span class="nodo"></span><span class="num">04</span><h3>Tecnologizar</h3><p>Lo necesario, recomendable y avanzado.</p><span class="de">Tecnología</span></li>
+      <li class="paso vivo"><span class="nodo"></span><span class="num">05</span><h3>Comercializar</h3><p>Oferta, comprador, logística y operación.</p><span class="de">Mercado · Disponible hoy</span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="principio-marco">
+  <div class="contenedor">
+    <div class="principio sobre-marca">
+      <div>
+        <p class="ceja">Principio de AgroBoeda</p>
+        <blockquote>La tecnología se decide <em>por la ruta</em>, no al revés.</blockquote>
+      </div>
+      <div>
+        <p>Una materia prima destinada a una industria puede requerir un esquema de registros y controles diferente al de una producción destinada a consumo humano directo o a un mercado de exportación exigente. AgroBoeda va a adaptar la gestión a la ruta seleccionada.</p>
+        <div class="niveles" aria-hidden="true">
+          <div class="nivel"><div class="barras"><i class="si"></i><i></i><i></i></div><b>Registro esencial</b><span>Ruta industrial</span></div>
+          <div class="nivel"><div class="barras"><i class="si"></i><i class="si"></i><i></i></div><b>Registro ampliado</b></div>
+          <div class="nivel"><div class="barras"><i class="si"></i><i class="si"></i><i class="si"></i></div><b>Registro exhaustivo</b><span>Ruta exportación</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="contenedor">
+    <div class="footer-cols">
+      <div>
+        <a class="logo" href="#"><img src="../../../public/marca/agroboeda-monograma-alfa.png" alt="">AgroBoeda</a>
+        <p class="lema">Mercado agropecuario: productos, servicios y logística.</p>
+      </div>
+      <div><h5>Mercado</h5><ul><li>Publicaciones</li><li>Servicios</li></ul></div>
+      <div><h5>AgroBoeda</h5><ul><li>Inicio</li><li>Contacto</li></ul></div>
+      <div><h5>Contacto</h5><ul><li>Escribinos</li><li>+54 9 223 348 5801</li><li>WhatsApp</li><li class="gris">Mar del Plata, Argentina</li></ul></div>
+    </div>
+    <div class="legal">© 2026 AgroBoeda. Todos los derechos reservados.</div>
+  </div>
+</footer>
+</body>
+</html>
