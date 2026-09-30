@@ -2,6 +2,30 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## Los CR de DESVINCULAR-CON-COBROS-1
+
+Comparé las líneas con CR de cada archivo tocado, `0495b31` contra `777bee1`.
+Además del que viste hay otro:
+
+| archivo | CR en la base → en la entrega | qué pasó |
+|---|---|---|
+| `scripts/smoke.mjs` | 4 → 0 | el tuyo: líneas 36326 a 36329 |
+| `scripts/lib/mp-doble.mjs` | 0 → 3 | es todo LF, y las líneas 468 a 470 quedaron con CRLF |
+
+Los demás cambian sólo por líneas nuevas en zonas que ya eran CRLF.
+
+**Las causas son dos, y las dos son de mis herramientas:**
+
+- en `smoke.mjs`, insertar los casos leyendo y escribiendo en modo texto de
+  Python, que convierte CRLF en LF;
+- en `mp-doble.mjs`, mi reemplazo de bloques. Con un texto a buscar de una
+  sola línea, probaba primero CRLF y acertaba igual.
+
+Ya las corregí: la herramienta lee y escribe en binario, y toma el terminador
+de la línea donde reemplaza. Antes de cada entrega comparo los CR por archivo
+contra la base. Los dos archivos los restauro en la próxima pieza que los
+toque, como pediste.
+
 ## DESVINCULAR-CON-COBROS-1: entrega
 
 | | |
