@@ -46,9 +46,63 @@ La publica PM si Emi lo autoriza. Vos no integres ni despliegues.
 
 ---
 
-## Tarea activa
+## Tarea activa — LINK-ABIERTO-DEVUELTO-1
 
-Ninguna. La próxima la asigna PM.
+**Decisión de PM (30/09), dentro del arranque de Mercado Pago que pidió Emi.**
+Es el punto 3 de tu entrega de `DESVINCULAR-CON-COBROS-1`. Va antes de la
+prueba de Mercado Pago en el sitio publicado, para que la prueba corra sobre el
+código final.
+
+**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
+
+### Problema
+
+Un pago devuelto o con contracargo cuyo link no se pudo apagar queda fuera de
+`cobro.en_curso`: el link abierto mira sólo `APPROVED` y `EN_REVISION`. Tampoco
+lo mira el reconciliador. El link queda abierto para siempre, se puede volver a
+pagar, y quien vende puede desvincular. Lo leíste en el código; no está
+reproducido.
+
+### Qué entra
+
+1. **Reproducirlo primero**, con un caso y el producto de la base: pago
+   aprobado, falla apagar el link, llega la devolución, vuelve a fallar. El
+   reconciliador no lo mira y desvincular pasa.
+2. **Que el link abierto mire los cuatro estados con cobro** (`CON_COBRO`), en
+   el criterio único. Comprobá que:
+   - el reconciliador lo apaga sin cambiar el estado del pago ni mover stock;
+   - desvincular frena mientras tanto;
+   - nada de lo que ya barría cambia.
+3. **Los 4 terminadores CRLF de `smoke.mjs`** (líneas 36326 a 36329),
+   restaurados.
+
+### Casos y negativos
+
+- El caso nuevo: rojo con la base, verde con el cambio.
+- Negativo: el criterio sin los estados nuevos da rojo.
+- Negativo: el reconciliador cambia el estado del pago devuelto al apagar el
+  link, y eso da rojo.
+
+### Aceptación verificable
+
+1. El caso y los negativos.
+2. Suite completa desde una base recién creada.
+3. Build, lint, tipos, `compileall`, `alembic check`, diff-check con
+   `cr-at-eol`, y la cuenta de CR por archivo contra la base.
+
+### Frená y consultá
+
+- Si apagar el link de un pago devuelto cambia su estado o mueve stock.
+- Si hace falta una migración.
+
+### Entrega en `PARA-PM.md`
+
+- el SHA;
+- el caso con su rojo de la base;
+- los negativos, la suite y las puertas;
+- los riesgos.
+
+No integres ni despliegues.
 
 ---
 
@@ -72,9 +126,10 @@ Lo decide la PM. Lo que depende de Emi puede reordenar la cola:
 - una devolución o un contracargo que llega con la cuenta desvinculada no
   se registra: quien compra sigue viendo «pagado» (freno de
   `DESVINCULAR-CON-COBROS-1`);
-- **antes de habilitar Mercado Pago:** que el link abierto de un pago devuelto
-  o con contracargo entre en el criterio y en el reconciliador (punto 3 de
-  `DESVINCULAR-CON-COBROS-1`). Pieza chica;
+- **antes del lanzamiento real de Mercado Pago:** si la prueba lo confirma,
+  la vinculación en Safari, Brave y Firefox (la cookie del Backend en otro
+  sitio). Lo más probable es que alcance con un dominio propio, que es de Emi
+  y de Railway, no de código;
 - el correo (#15);
 - las cuentas de prueba de Mercado Pago;
 - la mejora de la logística en los filtros, por definir;

@@ -10,6 +10,25 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-09-30 — Mercado Pago se prueba en el sitio publicado
+
+Emi eligió probar Mercado Pago en el sitio publicado, con cuentas de prueba, y
+no en un Railway aparte como decía `docs/homologacion-mercadopago.md`. Los pasos
+están en `PASOS-MERCADO-PAGO-2026-09-30.md`.
+
+Motivo: todavía no hay usuarios reales, cuesta menos y es más rápido. Mercado
+Pago sólo aparece en las publicaciones del vendedor de prueba, y sólo mientras
+dura la prueba.
+
+Lo que se acepta con eso:
+
+- mientras estén cargadas las variables de Mercado Pago, cualquier vendedor ve
+  «Vincular Mercado Pago»;
+- las órdenes de prueba quedan en la base publicada.
+
+PM agrega, antes de probar, la pieza chica del link abierto de un pago devuelto
+(`LINK-ABIERTO-DEVUELTO-1`), para que la prueba corra sobre el código final.
+
 ## 2026-09-29 — Desvincular: aviso por las devoluciones y carrera achicada
 
 La Dev frenó `DESVINCULAR-CON-COBROS-1` con dos hallazgos, que PM verificó en
