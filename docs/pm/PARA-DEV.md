@@ -73,8 +73,11 @@ reproducido.
    - el reconciliador lo apaga sin cambiar el estado del pago ni mover stock;
    - desvincular frena mientras tanto;
    - nada de lo que ya barría cambia.
-3. **Los 4 terminadores CRLF de `smoke.mjs`** (líneas 36326 a 36329),
-   restaurados.
+3. **Los terminadores de las dos piezas anteriores, restaurados:** los 4
+   CRLF de `smoke.mjs` (líneas 36326 a 36329) y las 3 líneas de
+   `scripts/lib/mp-doble.mjs` (468 a 470), que tienen que volver a LF.
+   Lo de `mp-doble.mjs` lo encontraste vos después de mi revisión: bien
+   visto, a mí se me había pasado.
 
 ### Casos y negativos
 

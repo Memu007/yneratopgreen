@@ -101,8 +101,11 @@ Los negativos de la Dev:
   reconciliador, y el link queda abierto (punto 3 de la Dev, leído en el
   código y sin reproducir). Pide dos fallas seguidas al apagarlo. La propuesta
   de la Dev: que el link abierto mire los cuatro estados con cobro.
-- **`smoke.mjs` perdió 4 terminadores CRLF** fuera de la zona de la pieza. Se
-  restauran en la próxima pieza que toque ese archivo.
+- **`smoke.mjs` perdió 4 terminadores CRLF** fuera de la zona de la pieza.
+  **`scripts/lib/mp-doble.mjs`, que es todo LF, quedó con 3 líneas CRLF**
+  (468 a 470): lo encontró la Dev después de esta revisión (`d386409`), y PM
+  no lo había mirado. Las dos cosas se restauran en
+  `LINK-ABIERTO-DEVUELTO-1`.
 - **`sin_vinculo` en el reintento del link quedó sin caso.** El 76 ya no lo
   alcanza desvinculando; se alcanza con una credencial que no abre.
 - **El número del 409 se cuenta después de decidir.** Si justo termina una
