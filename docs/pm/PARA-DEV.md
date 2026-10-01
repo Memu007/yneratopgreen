@@ -28,8 +28,8 @@ Sobre `cac729d` (producto en `4b02fec`). Tu informe `5af8ccf` difiere sólo en
 **Tus riesgos:** aceptados. Ya pasaban con un pago aprobado, y hoy no hay
 ninguna vendedora con un link así.
 
-**Sin publicar:** la publica PM cuando Emi la autorice. Vos no integres ni
-despliegues.
+**Publicada por PM en `77d3d2c` el 01/10**, con autorización de Emi. Vos no
+integres ni despliegues.
 
 ---
 

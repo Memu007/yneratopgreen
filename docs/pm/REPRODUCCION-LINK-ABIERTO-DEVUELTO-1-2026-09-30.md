@@ -6,8 +6,9 @@ Fecha: 2026-09-30. Base `487114f` (la asignación de PM).
 - Caso, negativos y terminadores: `cac729d`.
 - Informe: `5af8ccf`, que difiere de `cac729d` sólo en `docs/pm`.
 
-`main` está en `2ab0a36`. **ACEPTADA EN RAMA.** No está publicada: espera la
-autorización de Emi.
+`main` estaba en `2ab0a36`. **ACEPTADA EN RAMA** y **publicada en `77d3d2c`
+el 01/10**, con autorización de Emi («Dale»), por fast-forward. Lo publicado
+difiere de lo probado (`cac729d`) sólo en `docs/pm`.
 
 ## Qué cambia
 
