@@ -130,6 +130,14 @@ async function refreshAccessToken(): Promise<ResultadoDeRenovacion> {
   // credenciales, y son justamente los dos estados que aparecen cuando el otro
   // lado está sobrecargado, no cuando la sesión se venció.
   if (response.status === 401 || response.status === 403) {
+    // Mientras se preguntaba, el sitio pudo guardar una sesión nueva —en esta
+    // pestaña o en otra—: es lo que hace cambiar la contraseña, que cierra las
+    // sesiones de antes y le da otra a quien la cambió. El rechazo es del
+    // token viejo, no de ésa: tirarla dejaba afuera a quien acababa de
+    // cambiarla. Con la nueva guardada, se reintenta con ella.
+    if (tokenStorage.getRefreshToken() !== refreshToken) {
+      return 'renovado';
+    }
     tokenStorage.clearTokens();
     return 'rechazado';
   }

@@ -29,8 +29,11 @@ from app.core.security import (
 )
 from sqlalchemy import func
 from app.core.dependencies import (
+    SESION_CERRADA,
     bearer_del_header,
+    cerrar_las_sesiones,
     get_current_user,
+    sesion_vigente,
 )
 from app.core.config import settings
 from app.api.notifications import notify_welcome
@@ -66,6 +69,41 @@ MOTIVO_PENDIENTE = (
     "Tu cuenta todavía no está confirmada. Buscá el correo que te enviamos o "
     "pedí un enlace nuevo."
 )
+
+
+def _abrir_sesion(
+    response: Response, user: User, version: int | None = None
+) -> tuple[str, str]:
+    """Los dos tokens de una sesión, con sus cookies HttpOnly.
+
+    Llevan la versión de sesiones de la cuenta (`sv`): cuando la cuenta cierra
+    sus sesiones, la versión sube y estos tokens dejan de servir. `version`
+    es la que dejó un cierre recién confirmado; sin ella, la de la cuenta.
+    """
+    if version is None:
+        version = user.sesion_version or 0
+    datos = {"sub": user.id, "sv": version}
+    access_token = create_access_token(data=datos)
+    refresh_token = create_refresh_token(data=datos)
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_MINUTES * 60,
+        samesite="none",
+        secure=True
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        max_age=settings.REFRESH_TOKEN_DAYS * 24 * 60 * 60,
+        samesite="none",
+        secure=True
+    )
+    return access_token, refresh_token
 
 
 @router.post(
@@ -311,28 +349,8 @@ def login_user(
         user.last_login = datetime.utcnow()
         db.commit()
     
-        # Crear tokens
-        access_token = create_access_token(data={"sub": user.id})
-        refresh_token = create_refresh_token(data={"sub": user.id})
-    
-        # Setear cookies HttpOnly
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            max_age=settings.ACCESS_TOKEN_MINUTES * 60,
-            samesite="none",
-            secure=True
-        )
-    
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            max_age=settings.REFRESH_TOKEN_DAYS * 24 * 60 * 60,
-            samesite="none",
-            secure=True
-        )
+        # Crear tokens y setear cookies HttpOnly
+        access_token, refresh_token = _abrir_sesion(response, user)
     
         # Calcular ventas y compras reales
         sales_count = db.query(func.count(Order.id)).filter(
@@ -495,6 +513,13 @@ def refresh_access_token(
             detail="Usuario no válido"
         )
 
+    # Una renovación de una sesión que la cuenta ya cerró no emite otra.
+    if not sesion_vigente(payload, user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=SESION_CERRADA,
+        )
+
     # Un refresh token emitido antes de esta pieza no puede servir para saltear
     # la confirmación.
     if not user.is_verified:
@@ -503,28 +528,8 @@ def refresh_access_token(
             detail=MOTIVO_PENDIENTE,
         )
 
-    # Crear nuevos tokens
-    access_token = create_access_token(data={"sub": user.id})
-    new_refresh_token = create_refresh_token(data={"sub": user.id})
-    
-    # Setear cookies
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=settings.ACCESS_TOKEN_MINUTES * 60,
-        samesite="none",
-        secure=True
-    )
-    
-    response.set_cookie(
-        key="refresh_token",
-        value=new_refresh_token,
-        httponly=True,
-        max_age=settings.REFRESH_TOKEN_DAYS * 24 * 60 * 60,
-        samesite="none",
-        secure=True
-    )
+    # Crear nuevos tokens y setear cookies
+    access_token, new_refresh_token = _abrir_sesion(response, user)
     
     # Calcular ventas y compras reales
     sales_count = db.query(func.count(Order.id)).filter(
@@ -764,11 +769,15 @@ def update_current_user(
 @router.post("/change-password")
 def change_password(
     password_data: ChangePasswordRequest,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Cambiar contraseña del usuario actual
+
+    Cierra todas las sesiones de la cuenta, y a la que la cambió le devuelve
+    tokens nuevos: sigue adentro sin ingresar otra vez.
     """
     # Verificar contraseña actual
     if not verify_password(password_data.current_password, current_user.password_hash):
@@ -777,10 +786,27 @@ def change_password(
             detail="Contraseña actual incorrecta"
         )
     
-    # Actualizar contraseña
+    # Actualizar contraseña y cerrar las sesiones abiertas. La sesión con la
+    # que se pidió tiene que seguir abierta al cambiar: si mientras tanto el
+    # panel restableció la contraseña o desactivó la cuenta, este cambio no le
+    # gana.
     current_user.password_hash = hash_password(password_data.new_password)
+    version = cerrar_las_sesiones(
+        db, current_user, si_sigue_en=current_user.sesion_version or 0
+    )
+    if version is None:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=SESION_CERRADA,
+        )
     current_user.updated_at = datetime.utcnow()
     
     db.commit()
-    
-    return {"message": "Contraseña actualizada exitosamente"}
+
+    access_token, refresh_token = _abrir_sesion(response, current_user, version)
+    return {
+        "message": "Contraseña actualizada exitosamente",
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+    }

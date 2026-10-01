@@ -12,7 +12,7 @@ from app.db.base import get_db
 from app.models.user import User, UserRole
 from app.models.product import Product, ProductStatus
 from app.models.order import Order, OrderStatus
-from app.core.dependencies import get_current_user
+from app.core.dependencies import cerrar_las_sesiones, get_current_user
 from app.core.security import hash_password
 from app.schemas.auth import ClaveNueva, UserResponse
 
@@ -191,6 +191,10 @@ def update_user(
     if update_data.role is not None:
         user.role = update_data.role
     if update_data.is_active is not None:
+        # Cambiar el estado cierra sus sesiones: las de antes de desactivarla
+        # no vuelven a servir cuando se reactiva.
+        if update_data.is_active != user.is_active:
+            cerrar_las_sesiones(db, user)
         user.is_active = update_data.is_active
     
     user.updated_at = datetime.utcnow()
@@ -215,6 +219,10 @@ def toggle_user_active(
         raise HTTPException(status_code=400, detail="No puedes desactivar tu propia cuenta")
     
     user.is_active = not user.is_active
+    # Cambiar el estado cierra sus sesiones: las de antes de desactivarla no
+    # vuelven a servir cuando se reactiva. También al reactivar, por las
+    # cuentas que ya estaban inactivas antes de que existiera el cierre.
+    cerrar_las_sesiones(db, user)
     user.updated_at = datetime.utcnow()
     db.commit()
     
@@ -243,6 +251,7 @@ def reset_user_password(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     user.password_hash = hash_password(new_password.password)
+    cerrar_las_sesiones(db, user)
     user.updated_at = datetime.utcnow()
     db.commit()
     

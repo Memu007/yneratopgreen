@@ -3,7 +3,9 @@ Dependencies de Autenticación - Para proteger endpoints
 """
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import update
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 from typing import Optional
 
 from app.core.security import decode_token
@@ -12,6 +14,50 @@ from app.models.user import User, UserRole
 
 
 security = HTTPBearer(auto_error=False)
+
+# Lo que contesta una sesión que ya no vale: la contraseña cambió, se
+# restableció desde el panel o la cuenta se desactivó.
+SESION_CERRADA = "Tu sesión se cerró. Ingresá de nuevo."
+
+
+def sesion_vigente(payload: dict, user: User) -> bool:
+    """¿El token es de la versión de sesiones que tiene hoy la cuenta?
+
+    Un token emitido antes de que existiera la versión no la lleva: cuenta como
+    0, que es con lo que nace toda cuenta. Así nadie pierde la sesión al
+    desplegar, y sí la pierde en cuanto su cuenta cierra las sesiones.
+    """
+    return payload.get("sv", 0) == (user.sesion_version or 0)
+
+
+def cerrar_las_sesiones(
+    db: Session, user: User, si_sigue_en: Optional[int] = None
+) -> Optional[int]:
+    """Deja sin valor todos los tokens de la cuenta emitidos hasta ahora.
+
+    Suma en la base y no en Python. Leído y sumado acá, dos cierres a la vez
+    —la persona cambia la contraseña mientras el panel se la restablece—
+    escribían el mismo número, y la sesión que uno de ellos tenía que cerrar
+    seguía sirviendo. En la base el segundo espera al primero y suma otra vez.
+
+    Con `si_sigue_en`, cierra sólo si la versión sigue siendo ésa: quien pide
+    con una sesión que otro pedido cerró mientras tanto no gana. Si no la
+    encuentra, no toca nada y devuelve None.
+
+    Devuelve la versión que dejó, para firmar con ella una sesión nueva. Lo
+    confirma el `commit` de quien llama, junto con lo que lo motiva.
+    """
+    consulta = update(User).where(User.id == user.id)
+    if si_sigue_en is not None:
+        consulta = consulta.where(User.sesion_version == si_sigue_en)
+    version = db.execute(
+        consulta.values(sesion_version=User.sesion_version + 1)
+        .returning(User.sesion_version)
+        .execution_options(synchronize_session=False)
+    ).scalar_one_or_none()
+    if version is not None:
+        set_committed_value(user, "sesion_version", version)
+    return version
 
 # La cookie NO autentica rutas protegidas. Es una credencial ambiental: el
 # navegador la manda sola, sin que la página lo pida, y eso alcanzaba para que
@@ -113,6 +159,13 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario no encontrado",
+        )
+
+    if not sesion_vigente(payload, user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=SESION_CERRADA,
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
     if not user.is_active:
@@ -237,6 +290,8 @@ def get_current_user_optional(
             User.is_active == True,
             User.is_verified == True,
         ).first()
+        if user and not sesion_vigente(payload, user):
+            return None
         return user
     except:
         return None

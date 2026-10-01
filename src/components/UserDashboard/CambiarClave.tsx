@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from './UserDashboard.module.css';
 import { useToast } from '../../hooks/useToast';
-import { apiPost } from '../../utils/api';
+import { apiPost, tokenStorage } from '../../utils/api';
 
 /**
  * Cambiar la propia contraseña, para cualquier rol.
@@ -32,7 +32,11 @@ export const CambiarClave: React.FC = () => {
     setError(null);
     setEnviando(true);
     try {
-      await apiPost('/auth/change-password', { current_password: actual, new_password: nueva });
+      const sesion = await apiPost<{ access_token?: string; refresh_token?: string }>(
+        '/auth/change-password', { current_password: actual, new_password: nueva });
+      // Cambiarla cierra todas las sesiones de la cuenta, también ésta: con los
+      // tokens nuevos que devuelve la API, sigue abierta sin ingresar de nuevo.
+      if (sesion.access_token) tokenStorage.setTokens(sesion.access_token, sesion.refresh_token);
       setActual('');
       setNueva('');
       setRepetida('');
