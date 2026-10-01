@@ -10,6 +10,29 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-01 — Inicio cuenta el concepto: «Por qué AgroBoeda» (maqueta v3)
+
+La clienta le pidió a Emi que Inicio haga entender mejor el concepto, y le pasó su documento
+«Propuesta de MVP Marketplace» (2025). La idea central del documento es que gran parte de la
+maquinaria no genera datos, que un kit de conectividad la actualiza sin cambiarla, y que esos
+datos dan labores verificables, trazabilidad e historial técnico. Emi eligió la opción A:
+sumar debajo de la portada una sección «Por qué AgroBoeda», que cuente eso en tres pasos y
+con un diagrama propio, sin rehacer el resto de Inicio.
+
+- **Las imágenes del documento no se usan.** Son de 470 px de ancho y de origen desconocido.
+  El diagrama de la página 10 se le pregunta a la clienta. La maqueta usa uno propio, en
+  SVG.
+- **No se muestra** lo del documento que choca con reglas del proyecto: criptomonedas,
+  contratos inteligentes y financiamiento.
+- **La maqueta** es `maquetas/INICIO-CONCEPTO-V3-2026-10-01.html`, con capturas en 1440. Sólo
+  escritorio: la versión de celular viene cuando la clienta la apruebe. Incluye la portada
+  más baja de `HERO-COMPACTO-1`.
+- **`HERO-COMPACTO-1` queda en espera.** Cuando la clienta apruebe, se programa junto con la
+  sección nueva, en una sola pieza.
+
+Motivo: la clienta quiere que se entienda el problema que AgroBoeda resuelve, y el Inicio
+publicado habla de la ruta productiva sin nombrarlo.
+
 ## 2026-10-01 — La portada de Inicio se achica
 
 Emi miró el Inicio publicado (`30f9791`) en su notebook: la portada ocupa toda la pantalla, el

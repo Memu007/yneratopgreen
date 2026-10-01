@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Buscador Agro - Productos con Marcas por Potencia</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f4f8f0;
+            color: #1c3b1a;
+            padding: 28px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.9rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1f5e1f, #0f3c0e);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .descripcion {
+            color: #4b6e46;
+            margin-bottom: 2rem;
+            border-left: 4px solid #6da35c;
+            padding-left: 16px;
+            font-weight: 500;
+        }
+
+        .buscador-card {
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+            padding: 1.8rem 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid #ddecd4;
+        }
+
+        .selector-group {
+            margin-bottom: 2rem;
+        }
+
+        .selector-group label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: #2a5727;
+        }
+
+        .filtros-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px dashed #cbe0c0;
+        }
+
+        .filtro-extra {
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .filtro-extra label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            color: #2a5727;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px 18px;
+            font-size: 0.95rem;
+            border-radius: 60px;
+            border: 1px solid #c2ddb4;
+            background-color: #ffffff;
+            cursor: pointer;
+            font-weight: 500;
+            color: #1d391b;
+            transition: all 0.2s;
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="%234a7544" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>');
+            background-repeat: no-repeat;
+            background-position: right 18px center;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #6da35c;
+            box-shadow: 0 0 0 3px rgba(97, 168, 78, 0.2);
+        }
+
+        .resultado-final {
+            background: #eef6e9;
+            border-radius: 28px;
+            padding: 1.4rem 1.8rem;
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border: 1px solid #cbe3bf;
+            word-break: break-word;
+        }
+
+        .resultado-final span {
+            font-weight: 800;
+            color: #185a18;
+            background: white;
+            padding: 5px 12px;
+            border-radius: 50px;
+            display: inline-block;
+            margin: 4px 0;
+        }
+
+        .badge-extra {
+            display: inline-block;
+            background: #d4e8cb;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin: 0 4px;
+            color: #2a5e28;
+        }
+
+        .btn-reset {
+            background: none;
+            border: 1px solid #bed8b0;
+            padding: 8px 24px;
+            border-radius: 40px;
+            font-weight: 600;
+            color: #3b6e37;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.85rem;
+            margin-top: 12px;
+        }
+
+        .btn-reset:hover {
+            background: #e0f0d8;
+            border-color: #7fb06e;
+        }
+
+        hr {
+            margin: 20px 0;
+            border: none;
+            height: 1px;
+            background: linear-gradient(to right, #d4e8ca, transparent);
+        }
+
+        footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #6f8f68;
+            margin-top: 48px;
+        }
+
+        /* Estilos uniformes */
+        .boton-principal {
+            background: #eef3ea;
+            border: 1px solid #cfe2c4;
+            border-radius: 16px;
+            padding: 14px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #2b5027;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .boton-principal:hover {
+            background: #d4e8cb;
+            border-color: #8bbb7a;
+            transform: translateX(4px);
+        }
+
+        .boton-principal .arrow {
+            font-size: 1rem;
+        }
+
+        .categorias-lista-vertical {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .subcategorias-container {
+            margin-top: 8px;
+            margin-left: 20px;
+            margin-bottom: 12px;
+            padding-left: 16px;
+            border-left: 2px solid #cde2c0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .subcat-boton {
+            background: #eef3ea;
+            border: 1px solid #cfe2c4;
+            border-radius: 14px;
+            padding: 10px 18px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #2b5027;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .subcat-boton:hover {
+            background: #d4e8cb;
+            border-color: #8bbb7a;
+            transform: translateX(4px);
+        }
+
+        /* Items de potencia (compacto, estándar, alta) */
+        .items-lista {
+            padding: 12px 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-left: 20px;
+        }
+
+        .item-chip {
+            background: #eef3ea;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1px solid #cfe2c4;
+            color: #2b5027;
+        }
+
+        .item-chip:hover {
+            background: #cde2c0;
+            transform: scale(0.97);
+        }
+
+        .item-chip.seleccionado {
+            background: #2c6e2f;
+            color: white;
+            border-color: #1d4a1a;
+        }
+
+        /* Contenedor de marcas (debajo de los items de potencia) */
+        .marcas-container {
+            margin-top: 16px;
+            margin-left: 40px;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: #f9fcf7;
+            border-radius: 20px;
+            border: 1px solid #d4e8ca;
+        }
+
+        .marcas-titulo {
+            font-weight: 700;
+            color: #2a5727;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .marcas-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+        }
+
+        .marcas-grid.open {
+            max-height: 600px;
+        }
+
+        .marca-chip {
+            background: #eef3ea;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1px solid #cfe2c4;
+            color: #2b5027;
+        }
+
+        .marca-chip:hover {
+            background: #cde2c0;
+        }
+
+        .marca-chip.seleccionada {
+            background: #2c6e2f;
+            color: white;
+            border-color: #1d4a1a;
+        }
+
+        /* Servicios */
+        .servicios-lista-vertical {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .servicio-item {
+            background: #eef3ea;
+            border: 1px solid #cfe2c4;
+            border-radius: 16px;
+            padding: 14px 20px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #2b5027;
+            width: 100%;
+        }
+
+        .servicio-item:hover {
+            background: #d4e8cb;
+            border-color: #8bbb7a;
+            transform: translateX(4px);
+        }
+
+        .servicio-item.seleccionado {
+            background: #2c6e2f;
+            color: white;
+            border-color: #1d4a1a;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🌾 Buscador Inteligente · Productos & Servicios</h1>
+    <div class="descripcion">Primero elegí PRODUCTOS o SERVICIOS. En PRODUCTOS, navegá por categorías → subcategorías → potencia → y luego elegí MARCA.</div>
+
+    <div class="buscador-card">
+        <div class="selector-group">
+            <label>🎯 Tipo de búsqueda</label>
+            <select id="tipoSelect">
+                <option value="">-- Elegí una opción --</option>
+                <option value="productos">📦 PRODUCTOS</option>
+                <option value="servicios">🤝 SERVICIOS</option>
+            </select>
+        </div>
+
+        <!-- SECCIÓN PRODUCTOS -->
+        <div id="seccionProductos" style="display: none;">
+            <div class="filtros-row">
+                <div class="filtro-extra">
+                    <label>🔧 Condición</label>
+                    <select id="condicionSelect">
+                        <option value="">Elegí una opción</option>
+                        <option value="Nuevo">✨ Nuevo</option>
+                        <option value="Usado">🔄 Usado</option>
+                    </select>
+                </div>
+                <div class="filtro-extra">
+                    <label>🏢 Origen</label>
+                    <select id="origenSelect">
+                        <option value="">Elegí una opción</option>
+                        <option value="Agencia">🏭 Agencia / Concesionaria</option>
+                        <option value="Dueño directo">👤 Dueño directo</option>
+                    </select>
+                </div>
+            </div>
+            <div id="categoriasProductosLista" class="categorias-lista-vertical"></div>
+        </div>
+
+        <!-- SECCIÓN SERVICIOS -->
+        <div id="seccionServicios" style="display: none;">
+            <div class="selector-group">
+                <label>🌟 Servicios disponibles</label>
+                <div class="servicios-lista-vertical" id="serviciosLista"></div>
+            </div>
+        </div>
+
+        <div class="resultado-final" id="resultadoTexto">
+            ✅ Aquí aparecerá tu selección<br>
+            <span>Ej: MAQUINARIA AGRÍCOLA / Tractores / compacto · Marca: John Deere · Nuevo · Agencia</span>
+        </div>
+        <button class="btn-reset" id="resetBtn">⟳ Reiniciar búsqueda</button>
+    </div>
+    <hr>
+    <footer>🔽 Seleccioná "Tractores" → elegí una potencia → luego elegí una MARCA.</footer>
+</div>
+
+<script>
+    // --------------------------------------------------------------
+    // LISTADO DE MARCAS (ordenado alfabéticamente)
+    // --------------------------------------------------------------
+    const marcasLista = [
+        "Agrinar", "Antonio Carraro", "Apache", "Belarus", "Bronco", "Case", "Case IH",
+        "Chery", "Chery Bylion", "Claas", "Deutz", "Deutz-Fahr", "Dongfeng", "Eisen",
+        "Farmtrac", "Ferrari", "Fiat", "Fiat Someca", "Foton", "Grosspal", "Hanomag",
+        "Husqvarna", "Jhon Deere", "Jinma", "John Deere", "Kioti", "Kubota", "Lamborghini Trattori",
+        "Landini", "Lovol", "Mahindra", "Massey Ferguson", "McCormick", "New Holland",
+        "Pasquali", "Pauny", "Roland H", "SAME", "Shibaura", "Someca", "Sonalika",
+        "Universal", "Valpadana", "Valtra", "Yanmar", "Yard Machines", "Zanello", "Zoomlion"
+    ].sort();
+
+    // --------------------------------------------------------------
+    // ESTRUCTURA DE PRODUCTOS
+    // --------------------------------------------------------------
+    const categoriasProductos = [
+        {
+            nombre: "MAQUINARIA AGRÍCOLA",
+            subcategorias: [
+                { nombre: "Tractores", items: ["compacto (<60 HP)", "estándar (60-120 HP)", "alta (>120 HP)"] },
+                { nombre: "Preparación del suelo", items: ["arados", "rastras", "cultivadores", "subsoladores", "otros"] },
+                { nombre: "Siembra y plantación", items: ["sembradoras de precisión", "neumáticas", "hortalizas", "granos gruesos/finos", "otros"] },
+                { nombre: "Fertilización y protección", items: ["pulverizadoras autopropulsadas", "de arrastre", "fertilizadoras centrífugas", "de disco", "aviones", "drones", "otros"] },
+                { nombre: "Cosecha", items: ["cosechadoras de granos", "forrajes", "algodón", "caña", "café", "frutales", "hortalizas", "otros"] },
+                { nombre: "Postcosecha", items: ["limpiadoras", "secadoras", "ensacadoras", "silos", "otros"] },
+                { nombre: "Forrajes y ganadería", items: ["picadoras", "embolsadoras", "enfardadoras", "mezcladoras", "otros"] }
+            ]
+        },
+        {
+            nombre: "RIEGO Y DRENAJE",
+            subcategorias: [
+                { nombre: "Riego por aspersión", items: ["pivotes", "cañones", "laterales"] },
+                { nombre: "Riego localizado", items: ["goteo", "microaspersión", "cintas"] },
+                { nombre: "Riego superficial y subterráneo", items: ["superficial", "subterráneo"] },
+                { nombre: "Bombas, motobombas y accesorios hidráulicos", items: ["bombas centrífugas", "motobombas", "accesorios hidráulicos"] },
+                { nombre: "Drenaje y control hídrico", items: ["drenaje subsuperficial", "canales", "control de nivel"] },
+                { nombre: "Otros", items: ["accesorios para riego"] }
+            ]
+        },
+        {
+            nombre: "INSUMOS AGRÍCOLAS",
+            subcategorias: [
+                { nombre: "Semillas y plántulas", items: ["cultivos extensivos", "hortícolas", "forrajeras", "forestales"] },
+                { nombre: "Fertilizantes", items: ["orgánicos", "minerales", "líquidos", "liberación controlada"] },
+                { nombre: "Correctivos", items: ["cal", "yeso", "enmiendas"] },
+                { nombre: "Agroinsumos biológicos", items: ["biofertilizantes", "biocontroladores", "microorganismos"] },
+                { nombre: "Agroquímicos", items: ["herbicidas", "insecticidas", "fungicidas", "acaricidas"] },
+                { nombre: "Sustratos y coberturas", items: ["mulch", "mallas", "films"] },
+                { nombre: "Otros", items: ["otros insumos"] }
+            ]
+        },
+        {
+            nombre: "GANADERÍA Y FORRAJES",
+            subcategorias: [
+                { nombre: "Cercas y bebederos", items: ["eléctricas", "portátiles", "hidrantes"] },
+                { nombre: "Manejo animal", items: ["corrales", "mangas", "balanzas", "caravanas"] },
+                { nombre: "Ordeño y sanidad", items: ["ordeñadoras mecánicas", "tanques de leche", "equipos de baño"] },
+                { nombre: "Suplementación", items: ["comederos", "tolvas", "silos de grano"] },
+                { nombre: "Otros", items: ["equipos varios"] }
+            ]
+        },
+        {
+            nombre: "REPUESTOS Y MANTENIMIENTO",
+            subcategorias: [
+                { nombre: "Neumáticos y cámaras", items: ["neumáticos agrícolas", "cámaras"] },
+                { nombre: "Filtros, correas, cuchillas, cadenas", items: ["filtros", "correas", "cuchillas", "cadenas"] },
+                { nombre: "Sistemas hidráulicos", items: ["mangueras", "racores", "bombas hidráulicas"] },
+                { nombre: "Sistemas electrónicos y sensores", items: ["monitores", "GPS", "piloto automático"] },
+                { nombre: "Lubricantes y baterías", items: ["lubricantes", "baterías"] },
+                { nombre: "Otros", items: ["accesorios generales"] }
+            ]
+        },
+        {
+            nombre: "AGRICULTURA DE PRECISIÓN Y TECNOLOGÍA",
+            subcategorias: [
+                { nombre: "Sistemas de guiado y GNSS", items: ["antenas", "pantallas", "corrección por señal"] },
+                { nombre: "Sensores de cultivo", items: ["clorofila", "humedad", "temperatura"] },
+                { nombre: "Drones y VANTs", items: ["multiespectrales", "térmicos", "aplicadores"] },
+                { nombre: "Software y plataformas", items: ["gestión de flota", "prescripción variable", "rendimiento"] }
+            ]
+        },
+        {
+            nombre: "TIERRAS Y PARCELAS",
+            subcategorias: [
+                { nombre: "Compra-venta definitiva", items: ["Campo agrícola (secano/riego)", "Campo ganadero (pasturas naturales/mejoradas)", "Parcela hortícola/frutícola", "Campo mixto", "Otros"] },
+                { nombre: "Mejoras de infraestructura (compra)", items: ["Alambrados", "Aguadas", "Electrificación", "Molinos", "Monte", "Galpones", "Silos", "Caminos internos", "Otros"] },
+                { nombre: "Alquiler por campaña (1-12 meses)", items: ["Siembra directa", "Siembra convencional", "Con/sin mejora de suelos", "Otros"] },
+                { nombre: "Mejoras infraestructura (alquiler)", items: ["Agua instalada", "Energía", "Infraestructura operativa", "Otros"] },
+                { nombre: "Alquiler por uso transitorio", items: ["Pastoreo rotativo", "Ensayos agrícolas", "Producción estacional", "Agricultura regenerativa", "Agricultura experimental", "Otros"] },
+                { nombre: "Mejoras (alquiler transitorio)", items: ["Corrales temporales", "Bebederos", "Accesos operativos", "Otros"] },
+                { nombre: "Alquiler con opción a compra", items: ["Leasing de tierra"] },
+                { nombre: "Mejoras (leasing)", items: ["Alambrados", "Aguadas", "Electrificación", "Molinos", "Monte", "Galpones", "Silos", "Caminos internos", "Otros"] }
+            ]
+        }
+    ];
+
+    const serviciosData = ["Asesoramiento", "Contratistas", "Logística", "Acopio", "Inversores"];
+
+    // Estado
+    let currentTipo = null;
+    let selectedProducto = null; // { categoria, subcategoria, potencia, marca }
+    let selectedServicio = null;
+    let categoriasAbiertas = {};
+    let subcategoriasAbiertas = {};
+    let marcasAbiertas = {};
+
+    // Elementos DOM
+    const tipoSelect = document.getElementById('tipoSelect');
+    const seccionProductos = document.getElementById('seccionProductos');
+    const seccionServicios = document.getElementById('seccionServicios');
+    const categoriasProductosLista = document.getElementById('categoriasProductosLista');
+    const serviciosListaDiv = document.getElementById('serviciosLista');
+    const resultadoDiv = document.getElementById('resultadoTexto');
+    const resetBtn = document.getElementById('resetBtn');
+    const condicionSelect = document.getElementById('condicionSelect');
+    const origenSelect = document.getElementById('origenSelect');
+
+    // Renderizar marcas (debajo de los botones de potencia)
+    function renderMarcas(containerPadre, categoriaNombre, subcategoriaNombre, potenciaSeleccionada) {
+        const marcaKey = `${categoriaNombre}|${subcategoriaNombre}|${potenciaSeleccionada}`;
+        const isOpen = marcasAbiertas[marcaKey] || false;
+        
+        const marcasDiv = document.createElement('div');
+        marcasDiv.className = 'marcas-container';
+        
+        const titulo = document.createElement('div');
+        titulo.className = 'marcas-titulo';
+        titulo.innerHTML = `<span>🏷️ Seleccioná una MARCA (${marcasLista.length} marcas disponibles)</span><span class="arrow">${isOpen ? '▼' : '▶'}</span>`;
+        titulo.addEventListener('click', () => {
+            marcasAbiertas[marcaKey] = !marcasAbiertas[marcaKey];
+            renderProductosLista();
+        });
+        
+        const marcasGrid = document.createElement('div');
+        marcasGrid.className = `marcas-grid ${isOpen ? 'open' : ''}`;
+        
+        marcasLista.forEach(marca => {
+            const marcaChip = document.createElement('span');
+            marcaChip.className = `marca-chip ${selectedProducto && selectedProducto.marca === marca ? 'seleccionada' : ''}`;
+            marcaChip.textContent = marca;
+            marcaChip.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedProducto && selectedProducto.marca === marca) {
+                    selectedProducto.marca = null;
+                } else {
+                    selectedProducto.marca = marca;
+                }
+                renderProductosLista();
+                updateResultadoProductos();
+            });
+            marcasGrid.appendChild(marcaChip);
+        });
+        
+        marcasDiv.appendChild(titulo);
+        marcasDiv.appendChild(marcasGrid);
+        containerPadre.appendChild(marcasDiv);
+    }
+
+    // Renderizar productos
+    function renderProductosLista() {
+        categoriasProductosLista.innerHTML = '';
+        
+        categoriasProductos.forEach((categoria) => {
+            const catKey = categoria.nombre;
+            const isCatOpen = categoriasAbiertas[catKey] || false;
+            
+            const catBtn = document.createElement('div');
+            catBtn.className = 'boton-principal';
+            catBtn.innerHTML = `<span>${categoria.nombre}</span><span class="arrow">${isCatOpen ? '▼' : '▶'}</span>`;
+            
+            const subcatsContainer = document.createElement('div');
+            subcatsContainer.className = 'subcategorias-container';
+            subcatsContainer.style.display = isCatOpen ? 'flex' : 'none';
+            
+            categoria.subcategorias.forEach(sub => {
+                const subKey = `${catKey}|${sub.nombre}`;
+                const isSubOpen = subcategoriasAbiertas[subKey] || false;
+                
+                const subcatBtn = document.createElement('div');
+                subcatBtn.className = 'subcat-boton';
+                subcatBtn.innerHTML = `<span>📌 ${sub.nombre}</span><span class="sub-arrow">${isSubOpen ? '▼' : '▶'}</span>`;
+                
+                // Contenedor para items (potencias) y marcas
+                const itemsWrapper = document.createElement('div');
+                itemsWrapper.style.display = isSubOpen ? 'block' : 'none';
+                
+                if (isSubOpen) {
+                    // Items de potencia
+                    const itemsList = document.createElement('div');
+                    itemsList.className = 'items-lista';
+                    
+                    sub.items.forEach(potencia => {
+                        const chip = document.createElement('span');
+                        chip.className = 'item-chip';
+                        chip.textContent = potencia;
+                        const isSelected = (selectedProducto && 
+                                            selectedProducto.categoria === categoria.nombre &&
+                                            selectedProducto.subcategoria === sub.nombre &&
+                                            selectedProducto.potencia === potencia);
+                        if (isSelected) chip.classList.add('seleccionado');
+                        chip.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (selectedProducto && selectedProducto.potencia === potencia && selectedProducto.subcategoria === sub.nombre) {
+                                selectedProducto = null;
+                            } else {
+                                selectedProducto = {
+                                    categoria: categoria.nombre,
+                                    subcategoria: sub.nombre,
+                                    potencia: potencia,
+                                    marca: null
+                                };
+                            }
+                            renderProductosLista();
+                            updateResultadoProductos();
+                        });
+                        itemsList.appendChild(chip);
+                    });
+                    itemsWrapper.appendChild(itemsList);
+                    
+                    // Si hay un producto seleccionado con esta categoría/subcategoría y tiene potencia, mostrar marcas
+                    if (selectedProducto && 
+                        selectedProducto.categoria === categoria.nombre && 
+                        selectedProducto.subcategoria === sub.nombre &&
+                        selectedProducto.potencia) {
+                        renderMarcas(itemsWrapper, categoria.nombre, sub.nombre, selectedProducto.potencia);
+                    }
+                }
+                
+                subcatBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    subcategoriasAbiertas[subKey] = !subcategoriasAbiertas[subKey];
+                    renderProductosLista();
+                });
+                
+                subcatsContainer.appendChild(subcatBtn);
+                subcatsContainer.appendChild(itemsWrapper);
+            });
+            
+            catBtn.addEventListener('click', () => {
+                categoriasAbiertas[catKey] = !categoriasAbiertas[catKey];
+                renderProductosLista();
+            });
+            
+            categoriasProductosLista.appendChild(catBtn);
+            categoriasProductosLista.appendChild(subcatsContainer);
+        });
+    }
+
+    function updateResultadoProductos() {
+        if (!selectedProducto || !selectedProducto.potencia) {
+            resultadoDiv.innerHTML = `📦 PRODUCTOS - Navegá por las categorías y seleccioná una potencia.<br><span style="background:transparent;">Luego elegí una MARCA.</span>`;
+            return;
+        }
+        const condicion = condicionSelect.value;
+        const origen = origenSelect.value;
+        let extras = [];
+        if (condicion && condicion !== "") extras.push(condicion);
+        if (origen && origen !== "") extras.push(origen);
+        if (selectedProducto.marca) extras.push(`Marca: ${selectedProducto.marca}`);
+        
+        let textoExtras = extras.length ? ` · ${extras.join(" · ")}` : "";
+        resultadoDiv.innerHTML = `✅ PRODUCTO seleccionado:<br> <span>${selectedProducto.categoria} / ${selectedProducto.subcategoria} / ${selectedProducto.potencia}</span>${textoExtras ? `<span class="badge-extra">${extras.join("</span> <span class='badge-extra'>")}</span>` : ""}`;
+    }
+
+    // Servicios
+    function renderServiciosLista() {
+        serviciosListaDiv.innerHTML = '';
+        serviciosData.forEach(serv => {
+            const servItem = document.createElement('div');
+            servItem.className = `servicio-item ${selectedServicio === serv ? 'seleccionado' : ''}`;
+            servItem.textContent = serv;
+            servItem.addEventListener('click', () => {
+                selectedServicio = serv;
+                renderServiciosLista();
+                updateResultadoServicios();
+            });
+            serviciosListaDiv.appendChild(servItem);
+        });
+    }
+
+    function updateResultadoServicios() {
+        if (!selectedServicio) {
+            resultadoDiv.innerHTML = `🤝 SERVICIOS - Elegí una opción de la lista.<br><span style="background:transparent;">Asesoramiento · Contratistas · Logística · Acopio · Inversores</span>`;
+            return;
+        }
+        resultadoDiv.innerHTML = `✅ SERVICIO seleccionado:<br> <span>SERVICIOS / ${selectedServicio}</span>`;
+    }
+
+    // Cambio entre modos
+    function onTipoChange() {
+        const tipo = tipoSelect.value;
+        currentTipo = tipo;
+        if (tipo === 'productos') {
+            seccionProductos.style.display = 'block';
+            seccionServicios.style.display = 'none';
+            selectedProducto = null;
+            selectedServicio = null;
+            categoriasAbiertas = {};
+            subcategoriasAbiertas = {};
+            marcasAbiertas = {};
+            condicionSelect.value = "";
+            origenSelect.value = "";
+            renderProductosLista();
+            updateResultadoProductos();
+        } else if (tipo === 'servicios') {
+            seccionProductos.style.display = 'none';
+            seccionServicios.style.display = 'block';
+            selectedProducto = null;
+            selectedServicio = null;
+            renderServiciosLista();
+            updateResultadoServicios();
+        } else {
+            seccionProductos.style.display = 'none';
+            seccionServicios.style.display = 'none';
+            resultadoDiv.innerHTML = `✅ Elegí "PRODUCTOS" o "SERVICIOS" para comenzar.`;
+        }
+    }
+
+    function onExtraFiltersChange() {
+        if (currentTipo === 'productos') {
+            updateResultadoProductos();
+        }
+    }
+
+    function resetAll() {
+        tipoSelect.value = "";
+        seccionProductos.style.display = 'none';
+        seccionServicios.style.display = 'none';
+        currentTipo = null;
+        selectedProducto = null;
+        selectedServicio = null;
+        categoriasAbiertas = {};
+        subcategoriasAbiertas = {};
+        marcasAbiertas = {};
+        condicionSelect.value = "";
+        origenSelect.value = "";
+        resultadoDiv.innerHTML = `✅ Búsqueda reiniciada.<br><span style="background:transparent;">Seleccioná PRODUCTOS o SERVICIOS</span>`;
+        renderProductosLista();
+        renderServiciosLista();
+    }
+
+    // Eventos
+    tipoSelect.addEventListener('change', onTipoChange);
+    condicionSelect.addEventListener('change', onExtraFiltersChange);
+    origenSelect.addEventListener('change', onExtraFiltersChange);
+    resetBtn.addEventListener('click', resetAll);
+
+    // Inicializar
+    renderProductosLista();
+    renderServiciosLista();
+    resetAll();
+
+    // ============================================================
+    // CONEXIÓN CON LA API REAL
+    // ============================================================
+    const API_URL = 'http://localhost:8000/api/search/';
+
+    async function buscarEnAPI(query) {
+        try {
+            const response = await fetch(`${API_URL}?q=${encodeURIComponent(query)}`);
+            if (!response.ok) throw new Error('Error en la búsqueda');
+            return await response.json();
+        } catch (error) {
+            console.error('Error:', error);
+            return { results: [], total: 0 };
+        }
+    }
+
+    // Modificar updateResultadoProductos para que use la API
+    const updateResultadoProductosOriginal = updateResultadoProductos;
+    updateResultadoProductos = async function() {
+        if (!selectedProducto || !selectedProducto.potencia) {
+            resultadoDiv.innerHTML = `📦 PRODUCTOS - Navegá por las categorías y seleccioná una potencia.<br><span style="background:transparent;">Luego elegí una MARCA.</span>`;
+            return;
+        }
+
+        const condicion = condicionSelect.value;
+        const origen = origenSelect.value;
+        let query = selectedProducto.potencia;
+
+        // Construir la consulta
+        if (selectedProducto.marca) {
+            query += ` ${selectedProducto.marca}`;
+        }
+        if (selectedProducto.categoria) {
+            query += ` ${selectedProducto.categoria}`;
+        }
+        if (selectedProducto.subcategoria) {
+            query += ` ${selectedProducto.subcategoria}`;
+        }
+
+        resultadoDiv.innerHTML = `🔍 Buscando...`;
+
+        const data = await buscarEnAPI(query);
+
+        if (data.total === 0) {
+            resultadoDiv.innerHTML = `❌ No se encontraron resultados para: <span>${query}</span>`;
+            return;
+        }
+
+        let html = `✅ <span>${data.total}</span> resultado(s) encontrado(s) para: <span>${query}</span><br><br>`;
+        data.results.forEach(item => {
+            html += `
+                <div style="background:#f8fbf8; border-radius:12px; padding:12px; margin-bottom:8px; text-align:left; border:1px solid #ddecd4;">
+                    <strong>${item.producto_nombre}</strong><br>
+                    📦 Lote: ${item.codigo_lote}<br>
+                    👤 Productor: ${item.productor_nombre}<br>
+                    📍 Ubicación: ${item.ubicacion_nombre}<br>
+                    📊 Cantidad: ${item.cantidad} ${item.unidad_medida}<br>
+                    ${item.certificaciones ? `🏷️ Certificación: ${item.certificaciones}` : ''}
+                </div>
+            `;
+        });
+        resultadoDiv.innerHTML = html;
+    };
+</script>
+</body>
+</html>

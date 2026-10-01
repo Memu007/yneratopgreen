@@ -5,129 +5,30 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre INICIO-ECOSISTEMA-1 — aceptada en rama
+## Decisión sobre CAMBIAR-CONTRASENA-1 — aceptada en rama
 
-Sobre `69068d9` (producto en `b5daa24` y `7d7d808`). Evidencia en
-`REPRODUCCION-INICIO-ECOSISTEMA-1-2026-10-01.md`.
+Sobre `02e82e3` (producto en `f7340f5` y `001507f`). Evidencia en
+`REPRODUCCION-CAMBIAR-CONTRASENA-1-2026-10-01.md`.
 
-- **Capturas:** coinciden con la maqueta, y las diferencias son las que
-  declaraste.
-- **Casos:** 232, 233 y 234 en 3/3.
-- **Negativos:** tus seis dan rojo. También dan rojo los tres míos:
-  - el título sin «cumplimiento»;
-  - dos servicios cambiados de lugar;
-  - las fotos sin carga diferida.
-- **Suite completa desde base nueva:** 233/234. Sólo cae el 169, de entorno.
+- **El 235:** 1/1.
+- **Negativos:** tus cuatro dan rojo. También dan rojo los tres míos:
+  - el alta del panel con su regla vieja;
+  - un error que borra lo escrito;
+  - el filtro del 422 que mira sólo `password` y no `new_password`.
+- **Suite completa desde base nueva:** 234/235. Sólo cae el 169, de entorno.
 - **Auditorías y las dos guías:** verdes.
-- **La banda en 390 y los casos retirados:** aceptados.
-- **El camino para publicar sin sesión:** Emi eligió que «Vender» se vea
-  siempre. Es `VENDER-SIN-SESION-1`, abajo, después de esta tarea.
-
-Buen cierre de una pieza empezada por otra cuenta. Rehacer la evidencia era
-lo correcto.
+- **Tus riesgos:** aceptados.
+- **Sacar la contraseña del 422:** bien visto, y se queda.
 
 La publicación a `main` la decide Emi. No integres ni despliegues.
 
----
-
-## Tarea activa — CAMBIAR-CONTRASENA-1
-
-**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
-
-### Respuesta al freno (01/10, `3f9f2e5`)
-
-- **Opción A.** Una sola regla en la API, de 6 caracteres a 72 bytes, y la
-  usan los cuatro lugares: registro, cambio, alta desde el panel y
-  restablecer desde el panel. Sin cambiar cómo se guarda nada.
-- **Los 72 bytes:** se acepta lo que elegiste.
-  - En el registro, el cambio y el panel: 422 con un mensaje claro.
-  - En el ingreso: «Email o contraseña incorrectos».
-  - Sin truncar y sin hash previo.
-
-  El mensaje final va en la entrega.
-- **Las sesiones abiertas:** gracias por medirlo. Va como pieza propia,
-  `SESIONES-AL-CAMBIAR-1`, apenas entregues ésta y antes de
-  `VENDER-SIN-SESION-1`. En esta pieza no se toca.
-- **El caso y la guía:** suman el alta y el restablecer desde el panel con
-  más de 72 bytes, sin 500.
-
-Seguí.
-
-### Problema y prioridad
-
-Nadie puede cambiar su propia contraseña desde el sitio.
-
-- La API tiene `/auth/change-password`, pero ninguna pantalla lo usa.
-- El panel no deja restablecer la propia.
-- Hay dos contraseñas que quedaron escritas en chats el 28/09: la de
-  administración de Emi y la de `prueba@example.com`. Hoy Emi sólo puede
-  cambiarlas desde la consola de Railway.
-- La clienta va a recibir una cuenta creada desde el panel, con una
-  contraseña que eligió otra persona.
-
-Además, ingresar con una contraseña de más de 72 bytes da un error 500 en
-vez de «contraseña incorrecta», porque bcrypt no acepta más.
-
-### Qué entra
-
-1. **«Cambiar contraseña» en «Mi cuenta»,** para cualquier rol.
-   - Pide la contraseña actual, la nueva y su repetición.
-   - Muestra los mensajes de la API en «vos».
-   - Sin la actual correcta no cambia nada, y el error se puede corregir sin
-     perder lo escrito en los otros campos.
-2. **Las mismas reglas que el registro** para la contraseña nueva, en la API
-   y no sólo en la pantalla.
-3. **Más de 72 bytes**, en el ingreso, en el registro y en el cambio: un
-   mensaje claro, nunca un 500. Decí en el informe cuál elegiste y por qué.
-4. **La guía de uso** suma el paso, y `guia-usuario.mjs` lo comprueba. Si
-   la guía del panel nombra cómo cambiar la contraseña, también.
-
-### Fuera de alcance
-
-- Recuperar la contraseña por correo (espera el #15).
-- Cambiar las dos contraseñas reales: eso lo hace Emi en el sitio.
-- Cerrar las otras sesiones abiertas al cambiar la contraseña. Si hoy
-  siguen valiendo, decilo en el informe con cuánto duran, para que PM
-  decida.
-- Integración y despliegue.
-
-### Aceptación verificable
-
-1. **Caso nuevo, en escritorio y celular:**
-   - cambiar la contraseña;
-   - salir, entrar con la nueva y ver que la vieja ya no entra.
-2. **Errores:**
-   - con la actual mal, no cambia nada y los otros campos siguen escritos;
-   - si las dos nuevas no coinciden, no se manda nada;
-   - una nueva que no cumple las reglas, rechazada por la API llamada
-     directo.
-3. **73 bytes** en el ingreso, el registro y el cambio: ningún 500.
-4. **Negativos:**
-   - la API sin validar la nueva da rojo;
-   - la pantalla que no pide la actual da rojo.
-5. Suite completa desde base nueva, a11y, contraste, móvil, las dos guías y
-   las puertas de siempre.
-
-### Frená y consultá
-
-- Si las reglas del registro no están en un solo lugar de la API.
-- Si el límite de 72 bytes obliga a cambiar cómo se guardan las contraseñas
-  ya creadas.
-
-### Entrega en `PARA-PM.md`
-
-- SHA;
-- los casos y los negativos;
-- las guías;
-- las puertas;
-- lo de las sesiones abiertas;
-- los riesgos.
+`INICIO-ECOSISTEMA-1` está publicada en `30f9791`.
 
 ---
 
-## Siguiente — SESIONES-AL-CAMBIAR-1 (apenas entregues CAMBIAR-CONTRASENA-1)
+## Tarea activa — SESIONES-AL-CAMBIAR-1
 
-**Prioridad:** antes de `VENDER-SIN-SESION-1`. Entregala por separado.
+**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM. Va antes de `VENDER-SIN-SESION-1`.
 
 ### Problema
 
@@ -175,7 +76,15 @@ hubiera entrado.
 
 ---
 
-## Después — HERO-COMPACTO-1 (apenas entregues SESIONES-AL-CAMBIAR-1)
+## En espera — HERO-COMPACTO-1 (no empezar)
+
+**En espera desde el 01/10.** La clienta pidió que Inicio explique mejor el
+concepto, y Emi eligió sumar una sección «Por qué AgroBoeda» debajo de la
+portada (maqueta v3, `maquetas/INICIO-CONCEPTO-V3-2026-10-01.html`). Cuando
+la clienta la apruebe, esta pieza y la sección nueva van juntas en una sola
+tarea. Va a cambiar el criterio de qué tiene que verse sin bajar. Lo de abajo
+queda como referencia.
+
 
 **Decisión de Emi (01/10), opción A.** Emi miró el Inicio publicado en su
 notebook: la portada ocupa toda la pantalla, y los servicios del ecosistema,
@@ -220,7 +129,7 @@ Entregala por separado.
 
 ---
 
-## Después — VENDER-SIN-SESION-1 (empezala apenas entregues HERO-COMPACTO-1)
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues SESIONES-AL-CAMBIAR-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.
