@@ -695,9 +695,12 @@
     padding: 12px var(--tg-gutter-mobile);
   }
 
+  /* En 390 la banda no entra en una línea: se parte, como en la maqueta, en
+     vez de cortarse con puntos suspensivos. */
   .fotoBanda span {
     font-size: 9.5px;
     letter-spacing: 0.14em;
+    white-space: normal;
   }
 
   .fotoBanda i {
