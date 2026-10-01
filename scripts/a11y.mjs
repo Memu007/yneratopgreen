@@ -117,7 +117,7 @@ const pestaniaActiva = (page, nombre) => page
 async function publicas(page, medida) {
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
   await revisar(page, 'inicio', medida,
-    page.getByRole('heading', { name: /seguir produciendo/ }));
+    page.getByRole('heading', { name: /en una misma ruta/ }));
 
   await page.getByRole('button', { name: 'Ingresar' }).first().click();
   await revisar(page, 'ingreso', medida,
@@ -174,12 +174,6 @@ async function publicas(page, medida) {
   await revisar(page, 'vuelta de Mercado Pago', medida,
     page.getByRole('button', { name: 'Ir al marketplace' }));
   await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-
-  // las otras tres públicas están a un clic del encabezado y el barrido de
-  // contraste ya las cubre; sin ellas las dos puertas medirían distinto
-  await page.getByRole('button', { name: 'Quiénes somos', exact: true }).first().click();
-  await revisar(page, 'quienes somos', medida,
-    page.getByRole('heading', { name: 'Publicá o buscá en el Mercado agropecuario' }));
 
   // Los servicios ya no son una página: son el Mercado filtrado, al que lleva
   // «Servicios» del pie. Se mide cuando la grilla ya es la de servicios.

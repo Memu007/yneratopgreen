@@ -12893,7 +12893,7 @@ await runCase(122, 'Sin conexión se dice sin conexión, y una caída del servid
       'la falla sigue confundiéndose con un catálogo vacío');
 
     // 2. Con el error a la vista, la navegación sigue viva: no se silencia nada.
-    await page.getByRole('button', { name: 'Quiénes somos', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Contacto', exact: true }).first().click();
     await page.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Mercado', exact: true }).first().click();
     await aviso.waitFor({ state: 'visible', timeout: 20_000 });
@@ -12992,8 +12992,8 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
     const publica = await anonimo.newPage();
 
     await publica.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await publica.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
-    await medir(publica, 'inicio', publica.getByRole('button', { name: 'Ir al Mercado' }));
+    await publica.getByRole('heading', { name: /en una misma ruta/, level: 1 }).waitFor({ timeout: 20_000 });
+    await medir(publica, 'inicio', publica.getByRole('button', { name: 'Entrar al Mercado' }).first());
 
     // Servicios ya no es una página: es el Mercado con el filtro de servicios,
     // y se llega desde el pie. Se mide ahí, con la acción de una tarjeta.
@@ -13001,12 +13001,12 @@ await runCase(123, 'Al 200 % de zoom las cinco pantallas siguen siendo usables',
     await medir(publica, 'servicios', publica.getByRole('button', { name: /Contratar|Solicitar cotización|Ingresar para continuar/ }));
 
     await publica.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
-    await publica.locator('article').first().waitFor({ timeout: 20_000 });
+    await publica.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
     await medir(publica, 'catálogo', publica.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
 
     // La ficha es una página desde PRODUCT-DETAIL-PAGE-1, no un diálogo: se
     // mide cuando terminó de buscar la publicación y se deja con Atrás.
-    await publica.locator('article').first().click();
+    await publica.locator('article[class*="card"]').first().click();
     const ficha = publica.locator('main[aria-busy="false"]:has(#detalle-titulo)');
     await ficha.waitFor({ timeout: 20_000 });
     await medir(publica, 'detalle', ficha.getByRole('button', { name: /Agregar|Agregar al carrito|Contratar|Solicitar cotización|Sin stock|Ingresar para continuar/ }));
@@ -13076,9 +13076,10 @@ await runCase(124, 'Inicio dice cuántas publicaciones hay, con el total de la A
   // y confianza respaldada por alianzas— que el producto no demuestra.
   //
   // Desde REV1-PENDIENTES-1 no muestra publicaciones (la clienta, 20/09): sólo
-  // el total. El 209 mira la página entera en los dos anchos.
+  // el total. Desde INICIO-ECOSISTEMA-1 el total va en la tarjeta del Mercado, y
+  // «Bienvenido a AgroBoeda» vuelve como rótulo de la portada, aprobado por la
+  // clienta (30/09): deja de ser un claim. El 232 mira la página entera.
   const CLAIMS = [
-    /Bienvenido a AgroBoeda/i,
     /inteligencia artificial/i,
     /MECANIZACIÓN/,
     /CONFIANZA/,
@@ -13097,7 +13098,7 @@ await runCase(124, 'Inicio dice cuántas publicaciones hay, con el total de la A
     const pedidos = [];
     page.on('request', (r) => pedidos.push(r.url()));
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: /en una misma ruta/, level: 1 }).waitFor({ timeout: 20_000 });
 
     const texto = await page.locator('main, body').first().innerText();
     for (const claim of CLAIMS) {
@@ -13111,7 +13112,7 @@ await runCase(124, 'Inicio dice cuántas publicaciones hay, con el total de la A
     //    estilo. Se busca el párrafo entero, sin distinguir mayúsculas, y se
     //    exige que la cifra sea EXACTAMENTE el total de la API: que lo
     //    contenga no alcanza, porque «155» contiene «15».
-    const medidor = page.locator('p', { hasText: /publicaci(ón|ones) disponibles? ahora/i }).first();
+    const medidor = page.locator('p', { hasText: /^\s*\d+\s+publicaci(ón|ones) disponibles?\s*$/i }).first();
     await medidor.waitFor({ state: 'visible', timeout: 20_000 });
     const conteo = (await medidor.innerText()).replace(/\s+/g, ' ').trim();
     assert(new RegExp(`(^|\\D)${total}(\\D|$)`).test(conteo),
@@ -13152,19 +13153,19 @@ await runCase(124, 'Inicio dice cuántas publicaciones hay, con el total de la A
     await page.route('**/api/catalog/products*', (route) => route.fulfill({
       status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'caída controlada' }),
     }));
-    await page.getByRole('button', { name: 'Ir al Mercado', exact: true }).click();
+    await page.getByRole('button', { name: 'Entrar al Mercado', exact: true }).first().click();
     await page.getByRole('button', { name: 'Inicio', exact: true }).first().click();
-    await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
-    await esperarA(async () => (await page.locator('p', { hasText: /disponibles? ahora/i }).count()) === 0,
+    await page.getByRole('heading', { name: /en una misma ruta/, level: 1 }).waitFor({ timeout: 20_000 });
+    await esperarA(async () => (await page.locator('p', { hasText: /publicaci(ón|ones) disponibles?\s*$/i }).count()) === 0,
       'con la API caída, Inicio sigue mostrando un total', 20_000);
-    assert(await page.getByRole('button', { name: 'Ir al Mercado', exact: true }).isVisible(),
+    assert(await page.getByRole('button', { name: 'Entrar al Mercado', exact: true }).first().isVisible(),
       'con la API caída, Inicio perdió el acceso al Mercado');
 
     // 6. Vuelve la API y, al volver a Inicio, el total es otra vez el de verdad.
     await page.unroute('**/api/catalog/products*');
-    await page.getByRole('button', { name: 'Ir al Mercado', exact: true }).click();
+    await page.getByRole('button', { name: 'Entrar al Mercado', exact: true }).first().click();
     await page.getByRole('button', { name: 'Inicio', exact: true }).first().click();
-    const deVuelta = page.locator('p', { hasText: /publicaci(ón|ones) disponibles? ahora/i }).first();
+    const deVuelta = page.locator('p', { hasText: /^\s*\d+\s+publicaci(ón|ones) disponibles?\s*$/i }).first();
     await deVuelta.waitFor({ state: 'visible', timeout: 20_000 });
     const recuperado = (await deVuelta.innerText()).replace(/\s+/g, ' ').trim();
     assert(new RegExp(`(^|\\D)${total}(\\D|$)`).test(recuperado),
@@ -13497,7 +13498,7 @@ await runCase(127, 'El conteo del Mercado sale del total de la API y no de la p�
     + `a las ${queryRows("SELECT COUNT(*)::text, 'fin' FROM products WHERE status = 'ACTIVE' AND publication_type = 'servicio'")[0][0]} que hay en la base`;
 });
 
-await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Quiénes somos, y sólo el Mercado suma la banda de búsqueda', async () => {
+await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Contacto, y sólo el Mercado suma la banda de búsqueda', async () => {
   // Dos propiedades en un caso, porque son la misma cabecera.
   //
   // La primera: la banda de identidad no cambia de sección a sección. Al entrar
@@ -13521,8 +13522,9 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Quiénes somos,
     ['tablet', 768, 1024],
     ['celular', 390, 844],
   ];
-  // Servicios dejó de ser una sección con MERCADO-UNICO-1: son cuatro.
-  const SECCIONES = ['Inicio', 'Mercado', 'Quiénes somos', 'Contacto'];
+  // Servicios dejó de ser una sección con MERCADO-UNICO-1, y Quiénes somos
+  // con INICIO-ECOSISTEMA-1: son tres.
+  const SECCIONES = ['Inicio', 'Mercado', 'Contacto'];
 
   // Lo que describe a la banda de identidad: dónde está, cuánto mide, con qué
   // marca y con qué celdas, en ese orden. Si dos secciones devuelven lo mismo,
@@ -13569,25 +13571,25 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Quiénes somos,
 
       const inicio = await retratar('Inicio');
       const mercado = await retratar('Mercado');
-      const nosotros = await retratar('Quiénes somos');
+      const contacto = await retratar('Contacto');
 
-      for (const [nombre, retrato] of [['Inicio', inicio], ['Mercado', mercado], ['Quiénes somos', nosotros]]) {
+      for (const [nombre, retrato] of [['Inicio', inicio], ['Mercado', mercado], ['Contacto', contacto]]) {
         assert(JSON.stringify(retrato) === JSON.stringify(inicio),
           `${nombreAncho}: la banda de identidad de ${nombre} no es la de Inicio\n`
           + `  Inicio:  ${JSON.stringify(inicio)}\n`
           + `  ${nombre}: ${JSON.stringify(retrato)}`);
         assert(!retrato.buscadorAdentro,
           `${nombreAncho}/${nombre}: el buscador está adentro de la banda de identidad`);
-        assert(retrato.celdas.length >= 6,
+        assert(retrato.celdas.length >= 5,
           `${nombreAncho}/${nombre}: la banda tiene ${retrato.celdas.length} celdas y faltan destinos`);
         // El orden de lectura es el mismo en los tres anchos: la marca, después
-        // la sesión, después los cuatro destinos. Se comprueba en el documento,
+        // la sesión, después los tres destinos. Se comprueba en el documento,
         // que es lo que recorren el teclado y un lector de pantalla, y no en la
         // posición dibujada, que cambia con el ancho.
         assert(retrato.celdas[0] === 'AgroBoeda',
           `${nombreAncho}/${nombre}: la banda no arranca por la marca: ${retrato.celdas[0]}`);
         assert(JSON.stringify(retrato.celdas.slice(-SECCIONES.length)) === JSON.stringify(SECCIONES),
-          `${nombreAncho}/${nombre}: los cuatro destinos no cierran la banda en orden: `
+          `${nombreAncho}/${nombre}: los tres destinos no cierran la banda en orden: `
           + JSON.stringify(retrato.celdas));
       }
 
@@ -13611,8 +13613,8 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Quiénes somos,
 
       assert(await dondeEstaElBuscador('Inicio') === null,
         `${nombreAncho}: Inicio dibuja un buscador que no filtra nada`);
-      assert(await dondeEstaElBuscador('Quiénes somos') === null,
-        `${nombreAncho}: Quiénes somos dibuja un buscador que no filtra nada`);
+      assert(await dondeEstaElBuscador('Contacto') === null,
+        `${nombreAncho}: Contacto dibuja un buscador que no filtra nada`);
 
       const enMercado = await dondeEstaElBuscador('Mercado');
       assert(enMercado, `${nombreAncho}: el Mercado se quedó sin buscador`);
@@ -13670,7 +13672,7 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Quiénes somos,
         await cabecera.waitFor({ state: 'visible', timeout: 20_000 });
         await page.getByLabel('Buscar en el mercado').waitFor({ state: 'visible', timeout: 20_000 });
 
-        // 1. Los cuatro destinos siguen ahí y se ven: ni escondidos con
+        // 1. Los tres destinos siguen ahí y se ven: ni escondidos con
         //    `display: none` ni empujados a un scroll horizontal.
         for (const seccion of SECCIONES) {
           const destino = cabecera.getByRole('button', { name: seccion, exact: true }).first();
@@ -13724,10 +13726,10 @@ await runCase(128, 'La cabecera es la misma en Inicio, Mercado y Quiénes somos,
     await browser.close();
   }
 
-  return `banda de identidad idéntica en Inicio, Mercado y Quiénes somos en ${paridades.length} anchos `
+  return `banda de identidad idéntica en Inicio, Mercado y Contacto en ${paridades.length} anchos `
     + '—misma posición, mismo alto, misma marca y las mismas celdas en el mismo orden—, con el '
     + 'buscador sólo en el Mercado, debajo de esa banda, filtrando el catálogo desde ahí; y '
-    + `${revisados.length} combinaciones de rol y ancho con los cuatro destinos visibles, todas `
+    + `${revisados.length} combinaciones de rol y ancho con los tres destinos visibles, todas `
     + 'las acciones del rol con 44 px de alto —«Salir» incluido—, el nombre real en escritorio '
     + 'y «Cuenta» en celular, el buscador con su texto por ancho y cero desborde horizontal';
 });
@@ -18169,8 +18171,9 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
   //
   // Este caso recorre las secciones por la interfaz y contrasta AL MISMO
   // TIEMPO lo que dice la barra, lo que marca la cabecera y lo que hay dibujado.
-  // Desde MERCADO-UNICO-1 son cuatro: Servicios es el Mercado con el filtro de
-  // servicios, y el enlace viejo lo prueba el caso 193.
+  // Desde MERCADO-UNICO-1 eran cuatro: Servicios es el Mercado con el filtro de
+  // servicios, y el enlace viejo lo prueba el caso 193. Desde INICIO-ECOSISTEMA-1
+  // son tres: Quiénes somos salió, y su enlace viejo lo prueba el 234.
 
   const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
   const sello = Date.now();
@@ -18220,15 +18223,13 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
   assert(altaDelProducto.status < 400, `no se pudo publicar: HTTP ${altaDelProducto.status}`);
 
   const TITULO_DE = {
-    home: /Equipos, insumos y servicios/,
+    home: /en una misma ruta/,
     marketplace: /Publicaciones disponibles/,
-    about: /Información/,
     contact: /^Contacto$/,
   };
   const CELDA_DE = {
     home: 'Inicio',
     marketplace: 'Mercado',
-    about: 'Quiénes somos',
     contact: 'Contacto',
   };
 
@@ -18265,12 +18266,11 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
       await enLaSeccion(seccion, url, momento);
     };
 
-    // --- A. las cuatro secciones, ida y vuelta ----------------------------
+    // --- A. las tres secciones, ida y vuelta ----------------------------
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
     await enLaSeccion('home', '/', 'al entrar');
     const RECORRIDO = [
       ['marketplace', '/?section=marketplace'],
-      ['about', '/?section=about'],
       ['contact', '/?section=contact'],
     ];
     for (const [seccion, url] of RECORRIDO) await irA(seccion, url, `recorrido a ${seccion}`);
@@ -18279,7 +18279,6 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
     // Atras siguiente se quedaria en Contacto en vez de volver.
     await irA('contact', '/?section=contact', 'Contacto de nuevo');
     const vuelta = [
-      ['about', '/?section=about'],
       ['marketplace', '/?section=marketplace'],
       ['home', '/'],
     ];
@@ -18290,7 +18289,7 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
     await page.goForward();
     await enLaSeccion('marketplace', '/?section=marketplace', 'Adelante');
 
-    // --- B. las cuatro URL canonicas, abiertas y recargadas ----------------
+    // --- B. las tres URL canonicas, abiertas y recargadas ----------------
     for (const [seccion, url] of [['home', '/'], ...RECORRIDO]) {
       await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
       await enLaSeccion(seccion, url, `enlace directo a ${url}`);
@@ -18321,7 +18320,7 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
     }, `el filtro no dejo sola a «${publicacion}»: ${JSON.stringify(await titulosDeLasTarjetas())}`,
     20_000);
 
-    await irA('about', '/?section=about', 'salir del Mercado filtrado');
+    await irA('contact', '/?section=contact', 'salir del Mercado filtrado');
     await page.goBack();
     await enLaSeccion('marketplace', conFiltros, 'volver al Mercado filtrado');
     // No alcanza con la direccion: los controles y los resultados tambien.
@@ -18378,7 +18377,7 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
         `${momento}: la ficha marca ${JSON.stringify(await celdaMarcada())} en la cabecera`);
     };
     const abrirLaFichaDe = async (nombre, momento) => {
-      const tarjeta = page.locator('article').filter({ hasText: nombre }).first();
+      const tarjeta = page.locator('article[class*="card"]').filter({ hasText: nombre }).first();
       await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
       await tarjeta.getByRole('link', { name: nombre, exact: true }).click();
       await enLaFicha(nombre, momento);
@@ -18414,20 +18413,20 @@ await runCase(147, 'La barra dice que seccion se mira, y Atras vuelve adonde est
 
     // Y salir con la propia interfaz no deja una entrada fantasma: despues de
     // «Volver al Mercado», UN Atras tiene que llevar a la seccion anterior.
-    await irA('about', '/?section=about', 'ir a Quiénes somos para el fantasma');
+    await irA('contact', '/?section=contact', 'ir a Contacto para el fantasma');
     await irA('marketplace', conFiltros, 'volver al Mercado para el fantasma');
     await abrirLaFichaDe(publicacion, 'ficha para el fantasma');
     await salidaDeLaFicha(page).click();
     await enLaSeccion('marketplace', conFiltros, 'Mercado despues de «Volver al Mercado»');
     await page.goBack();
-    await enLaSeccion('about', '/?section=about',
+    await enLaSeccion('contact', '/?section=contact',
       'un Atras despues de salir con la interfaz');
 
     await contexto.close();
-    return 'las cuatro secciones publicas se dicen en la barra —«/» y «?section=…»—, el '
-      + 'recorrido por la cabecera deja tres entradas de verdad que Atras y Adelante '
+    return 'las tres secciones publicas se dicen en la barra —«/» y «?section=…»—, el '
+      + 'recorrido por la cabecera deja dos entradas de verdad que Atras y Adelante '
       + 'recorren con la pantalla y la celda marcada, elegir la seccion activa no agrega '
-      + 'ninguna, las cuatro URL canonicas abren y recargan en su seccion, el Mercado '
+      + 'ninguna, las tres URL canonicas abren y recargan en su seccion, el Mercado '
       + `filtrado vuelve con Atras a «${conFiltros}» con el buscador, el tipo y su unico `
       + 'resultado, las cuatro pantallas de llegada normalizan el pathname al salir y no '
       + 'reviven al recargar, y la ficha abierta desde el Mercado de servicios y el '
@@ -18599,7 +18598,7 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
     const revisarElDetalle = async (pantalla, url, nombre) => {
       for (const forma of ['Atras', 'Volver']) {
         await page.goto(`${FRONTEND_URL}${url}`, { waitUntil: 'domcontentloaded' });
-        const tarjeta = page.locator('article').filter({ hasText: nombre }).first();
+        const tarjeta = page.locator('article[class*="card"]').filter({ hasText: nombre }).first();
         await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
         const disparador = tarjeta.getByRole('link', { name: 'Ver detalle' });
         // Se espera a que la tarjeta termine de dibujarse: en el Mercado la
@@ -18637,7 +18636,7 @@ await runCase(148, 'Cada capa se cierra sola y devuelve el foco a su disparador'
     // vuelve a «Ver perfil del vendedor». Un segundo Escape ya no tiene capa
     // que cerrar y no saca de la página: salir de una página es Atrás.
     await page.goto(`${FRONTEND_URL}/?section=marketplace&type=servicios`, { waitUntil: 'domcontentloaded' });
-    const tarjetaDelServicio = page.locator('article').filter({ hasText: servicio }).first();
+    const tarjetaDelServicio = page.locator('article[class*="card"]').filter({ hasText: servicio }).first();
     await tarjetaDelServicio.waitFor({ state: 'visible', timeout: 20_000 });
     const verDetalle = tarjetaDelServicio.getByRole('link', { name: 'Ver detalle' });
     await verDetalle.click();
@@ -20018,7 +20017,7 @@ await runCase(152, 'La ubicación publicada tiene una sola verdad: el padrón', 
 
     await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(conUbicacion)}`,
       { waitUntil: 'domcontentloaded' });
-    const tarjeta = page.locator('article').filter({ hasText: conUbicacion }).first();
+    const tarjeta = page.locator('article[class*="card"]').filter({ hasText: conUbicacion }).first();
     await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
     await esperarA(async () => (await tarjeta.innerText()).includes(rosario.nombre),
       `la tarjeta del Mercado no dice ${rosario.nombre}`, 20_000);
@@ -20036,11 +20035,11 @@ await runCase(152, 'La ubicación publicada tiene una sola verdad: el padrón', 
     await esperarA(async () => (await filtro.locator('option').count()) > 1,
       'el filtro de provincia no cargo el padron', 20_000);
     await filtro.selectOption(rosario.provinciaId);
-    await esperarA(async () => (await page.locator('article')
+    await esperarA(async () => (await page.locator('article[class*="card"]')
       .filter({ hasText: conUbicacion }).count()) === 1,
     `filtrando por ${rosario.provincia} la publicacion no aparece`, 20_000);
     await filtro.selectOption(pergamino.provinciaId);
-    await esperarA(async () => (await page.locator('article')
+    await esperarA(async () => (await page.locator('article[class*="card"]')
       .filter({ hasText: conUbicacion }).count()) === 0,
     `filtrando por ${pergamino.provincia} la publicacion sigue apareciendo`, 20_000);
     comprobados.push('editor, tarjeta, detalle y filtros describen la misma localidad');
@@ -21051,7 +21050,10 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
         const estorbo = await accion.evaluate((el) => {
           const r = el.getBoundingClientRect();
           if (r.width === 0 || r.height === 0) return 'no tiene superficie';
-          if (r.top < 0 || r.bottom > window.innerHeight) return 'queda fuera de la ventana';
+          // Con 1 px de tolerancia: un borde en 844,03 de 844 está a la vista, y
+          // pasa cuando la cabecera mide una fracción distinta (medido con la
+          // cabecera de una sola fila de INICIO-ECOSISTEMA-1).
+          if (r.top < -1 || r.bottom > window.innerHeight + 1) return 'queda fuera de la ventana';
           const encima = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
           return el.contains(encima) || el === encima
             ? '' : `la tapa <${encima?.tagName.toLowerCase()}>`;
@@ -21289,10 +21291,11 @@ await runCase(155, 'El Mercado tiene dos vistas elegibles y ninguna geometría a
       const page = await contexto.newPage();
       for (const [seccion, url] of [['Inicio', `${FRONTEND_URL}/`]]) {
         await page.goto(url, { waitUntil: 'domcontentloaded' });
-        await page.getByText(/publicaci(ón|ones) disponibles? ahora/i).first()
+        await page.getByText(/^\d+\s+publicaci(ón|ones) disponibles?$/).first()
           .waitFor({ state: 'visible', timeout: 25_000 });
         const previa = await page.evaluate(() => ({
-          tarjetas: document.querySelectorAll('article').length,
+          // Las de publicaciones: las de los servicios de Inicio no son una previa.
+          tarjetas: document.querySelectorAll('article[class*="card"]').length,
           selectores: document.querySelectorAll('input[name="vista-del-mercado"]').length,
         }));
         assert(previa.tarjetas === 0, `${seccion}: dibuja ${previa.tarjetas} tarjetas`);
@@ -21336,7 +21339,9 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
   mkdirSync(CAPTURAS, { recursive: true });
   const capturas = [];
   const medidos = [];
-  const VIEJO = /TopGreen|(?<!Agro)BOEDA/;
+  // «AGRO» también: el rótulo de Inicio va en mayúsculas por estilo y dice
+  // «AGROBOEDA», que es la marca.
+  const VIEJO = /TopGreen|(?<!Agro|AGRO)BOEDA/;
 
   // Las apariciones en minúscula que SÍ se conservan, y dónde. Renombrarlas
   // rompería algo que no es la marca: una referencia externa de Mercado Pago,
@@ -21352,7 +21357,6 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
     ['backend/app/services/mp_preferencia.py', 'topgreen-'],
     ['backend/app/services/storage.py', 'topgreen/'],
     ['src/components/Footer/Footer.tsx', 'info@topgreen.com.ar'],
-    ['src/components/Pages/AboutPage.tsx', 'video-topgreen.mp4'],
     ['src/components/Pages/ContactPage.tsx', 'service_topgreen'],
     ['src/components/Pages/ContactPage.tsx', 'info@topgreen.com.ar'],
     // Las plantillas de entorno: el remitente VISIBLE se migra, pero el nombre
@@ -21520,7 +21524,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
   try {
     const rastroDelViejo = async (page) => {
       const texto = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
-      const encontrado = texto.match(/.{0,60}(TopGreen|(?<!Agro)BOEDA).{0,60}/);
+      const encontrado = texto.match(/.{0,60}(TopGreen|(?<!Agro|AGRO)BOEDA).{0,60}/);
       return encontrado ? encontrado[0] : '';
     };
     const desborde = (page) => page.evaluate(() => (
@@ -21548,7 +21552,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       const page = await contexto.newPage();
       const donde = `${medida.n} ${medida.width}x${medida.height}`;
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: /seguir produciendo/ })
+      await page.getByRole('heading', { name: /en una misma ruta/ })
         .waitFor({ timeout: 25_000 });
 
       const marca = page.getByRole('button', { name: 'AgroBoeda', exact: true }).first();
@@ -21591,11 +21595,11 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       // enlace «Inicio» que ya vive en otra columna del pie: lo que se prueba
       // es la marca. Y se empieza fuera de Inicio, porque volver a donde ya se
       // está no demuestra que se vuelva.
-      const enQuienesSomos = page
-        .getByRole('button', { name: 'Quiénes somos', exact: true }).first();
-      await enQuienesSomos.click();
-      await esperarA(async () => (await enQuienesSomos.getAttribute('aria-current')) === 'page',
-        `${donde}: no se llegó a Quiénes somos para probar la marca del pie`, 25_000);
+      const enContacto = page
+        .getByRole('button', { name: 'Contacto', exact: true }).first();
+      await enContacto.click();
+      await esperarA(async () => (await enContacto.getAttribute('aria-current')) === 'page',
+        `${donde}: no se llegó a Contacto para probar la marca del pie`, 25_000);
 
       const marcaDelPie = pie.getByRole('button', { name: 'AgroBoeda', exact: true });
       const cuantas = await marcaDelPie.count();
@@ -21641,7 +21645,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
         + `contra el fondo (${focoDelPie.color} sobre ${focoDelPie.fondo}): no se ve`);
 
       await page.keyboard.press('Enter');
-      await esperarA(async () => (await page.getByRole('heading', { name: /seguir produciendo/ })
+      await esperarA(async () => (await page.getByRole('heading', { name: /en una misma ruta/ })
         .count()) > 0, `${donde}: la marca del pie no lleva a Inicio con el teclado`, 20_000);
       await esperarA(async () => (await page.evaluate(() => window.scrollY)) === 0,
         `${donde}: la marca del pie lleva a Inicio pero no deja la página arriba`, 10_000);
@@ -21673,14 +21677,14 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       assert(!/none/.test(anillo) && !/^\S+ 0px$/.test(anillo),
         `${donde}: la marca enfocada con el teclado no muestra foco (${anillo})`);
       await page.keyboard.press('Enter');
-      await esperarA(async () => (await page.getByRole('heading', { name: /seguir produciendo/ })
+      await esperarA(async () => (await page.getByRole('heading', { name: /en una misma ruta/ })
         .count()) > 0, `${donde}: la marca no lleva a Inicio con el teclado`, 20_000);
 
-      for (const seccion of ['Mercado', 'Quiénes somos', 'Contacto']) {
+      for (const seccion of ['Mercado', 'Contacto']) {
         const destino = page.getByRole('button', { name: seccion, exact: true }).first();
         await destino.click();
         // La sección llegó cuando su celda queda marcada como la actual: es el
-        // propio producto diciéndolo, y sirve igual para las cuatro.
+        // propio producto diciéndolo, y sirve igual para las tres.
         await esperarA(async () => (await destino.getAttribute('aria-current')) === 'page',
           `${donde}: no se llegó a ${seccion}`, 25_000);
         await page.getByRole('heading').first().waitFor({ state: 'visible', timeout: 25_000 });
@@ -21730,7 +21734,7 @@ await runCase(156, 'La identidad pública es AgroBoeda, sin renombrar lo que no 
       await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await abrir(page);
       const texto = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
-      const encontrado = texto.match(/.{0,60}(TopGreen|(?<!Agro)BOEDA).{0,60}/);
+      const encontrado = texto.match(/.{0,60}(TopGreen|(?<!Agro|AGRO)BOEDA).{0,60}/);
       assert(!encontrado,
         `${quien} sigue mostrando el nombre viejo: «${encontrado && encontrado[0]}»`);
       await contexto.close();
@@ -22291,13 +22295,14 @@ await runCase(158, 'Todo el pie muestra el foco de teclado, y el pie no se mueve
 
       // Y uno interno se ejerce de verdad: la regla es de color, no puede
       // haberle cambiado el destino.
-      const interno = page.locator('footer').getByRole('link', { name: 'Quiénes somos' }).first();
-      assert((await interno.count()) === 1, `${donde}: el pie perdió el enlace a Quiénes somos`);
+      // Era «Quiénes somos», que salió del sitio con INICIO-ECOSISTEMA-1.
+      const interno = page.locator('footer').getByRole('link', { name: 'Contacto', exact: true }).first();
+      assert((await interno.count()) === 1, `${donde}: el pie perdió el enlace a Contacto`);
       await interno.click();
       await esperarA(async () => (await page.locator('header').first()
-        .getByRole('button', { name: 'Quiénes somos', exact: true }).first()
+        .getByRole('button', { name: 'Contacto', exact: true }).first()
         .getAttribute('aria-current')) === 'page',
-      `${donde}: el enlace del pie a Quiénes somos dejó de llevar ahí`, 25_000);
+      `${donde}: el enlace del pie a Contacto dejó de llevar ahí`, 25_000);
 
       await contexto.close();
     }
@@ -22309,7 +22314,7 @@ await runCase(158, 'Todo el pie muestra el foco de teclado, y el pie no se mueve
     + `su contorno se ve contra el fondo real: ${medidos.join('; ')}. El anillo conserva ancho, `
     + 'estilo y desplazamiento globales, así que ningún foco mueve la geometría del pie ni hace '
     + 'desbordar la página. La marca sigue teniendo un único nombre «AgroBoeda», los enlaces de '
-    + 'contacto conservan su mailto/tel/wa.me sin abrirlos y el enlace interno a Quiénes somos '
+    + 'contacto conservan su mailto/tel/wa.me sin abrirlos y el enlace interno a Contacto '
     + 'sigue llevando ahí';
 });
 
@@ -22627,7 +22632,7 @@ await runCase(159, 'El monograma se integra con la banda: sin placa, sin halo y 
       assert(!/none/.test(anillo) && !/ 0px$/.test(anillo),
         `${donde}: la marca enfocada no muestra foco (${anillo})`);
       await page.keyboard.press('Enter');
-      await esperarA(async () => (await page.getByRole('heading', { name: /seguir produciendo/ })
+      await esperarA(async () => (await page.getByRole('heading', { name: /en una misma ruta/ })
         .count()) > 0, `${donde}: la marca dejó de llevar a Inicio`, 20_000);
 
       await contexto.close();
@@ -23716,7 +23721,7 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
 
   const browser = await chromium.launch({ headless: true });
   try {
-    const leerTarjetas = (pagina) => pagina.locator('article').evaluateAll((tarjetas) => tarjetas
+    const leerTarjetas = (pagina) => pagina.locator('article[class*="card"]').evaluateAll((tarjetas) => tarjetas
       .map((tarjeta) => {
         const banda = tarjeta.querySelector('[class*="_media_"]');
         const imagen = banda && banda.querySelector('img');
@@ -23747,7 +23752,7 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
       await pagina.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
       await pagina.locator('header').first()
         .getByRole('button', { name: 'Mercado', exact: true }).first().click();
-      await esperarA(async () => (await pagina.locator('article').count()) > 4,
+      await esperarA(async () => (await pagina.locator('article[class*="card"]').count()) > 4,
         'el Mercado no dibujó tarjetas', 30_000);
       await esperarA(async () => {
         const vistas = await leerTarjetas(pagina);
@@ -23817,7 +23822,7 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
     // --- C3. El detalle, y el crédito donde se ve la obra -----------------
     const abrirDetalle = async (texto, slugEsperado) => {
       await buscarEn(page, texto);
-      await page.locator('article').first().click();
+      await page.locator('article[class*="card"]').first().click();
       await esperarA(async () => (await fichaCargada(page).count()) > 0,
         `no abrió la ficha de «${texto}»`, 20_000);
       const imagen = page.locator('[class*="_imagenPrincipal_"] img');
@@ -23893,7 +23898,7 @@ await runCase(162, 'El catálogo demostrativo resuelve la foto del aviso, con cr
     const enBusqueda = await buscarEn(chico, 'Recepción, Secado');
     assert(enBusqueda.some((t) => /Recepci/i.test(t.titulo)),
       `la búsqueda del servicio en móvil trajo ${enBusqueda.map((t) => t.titulo).join(' | ')}`);
-    await chico.locator('article').first().click();
+    await chico.locator('article[class*="card"]').first().click();
     await esperarA(async () => (await fichaCargada(chico).count()) > 0,
       'no abrió la ficha del servicio en móvil', 20_000);
     await esperarA(async () => (await chico.locator('[class*="_credito_"]').count()) === 1,
@@ -24241,11 +24246,11 @@ await runCase(163, 'Mi cuenta es una página del sitio: URL propia, historial, s
     // Y con un destino de otra sección, el destino también es exacto.
     await ensuciarElPerfil('Para descartar a otra sección');
     await page.locator('header').first()
-      .getByRole('button', { name: 'Quiénes somos', exact: true }).click();
+      .getByRole('button', { name: 'Contacto', exact: true }).click();
     await esperarA(async () => (await pregunta(page).count()) === 1,
-      'la salida a Quiénes somos no preguntó', 20_000);
+      'la salida a Contacto no preguntó', 20_000);
     await page.getByRole('button', { name: 'Descartar cambios' }).click();
-    await esperarA(async () => seccionDe(page) === 'about',
+    await esperarA(async () => seccionDe(page) === 'contact',
       `descartar no fue al destino pedido: quedó en ${seccionDe(page)}`, 20_000);
     await irALaCuenta(page);
     medidos.push('descartar va al destino pedido —pestaña o sección— y suelta el trabajo local');
@@ -25722,6 +25727,7 @@ await runCase(166, 'La cotización llega a Contacto con su publicación, y prepa
 // reintentar en vez de atribuirle al mercado un cero que nadie midió; y que
 // cada CTA de publicación de Inicio y Quiénes somos abra el Login real y retome el
 // formulario si —y sólo si— la persona entra, sin escribir nada por el camino.
+// Esa última parte se retiró con INICIO-ECOSISTEMA-1: los dos CTA salieron.
 //
 // R6 SÍ está acá, y la primera versión de este caso no lo tenía por un error
 // mío: informé que el borde no se reproducía porque medí «¿aparece el aviso sin
@@ -26043,181 +26049,11 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
       await login(pagina).getByRole('button', { name: 'Ingresar', exact: true }).click();
     };
 
-    for (const pantalla of [
-      { seccion: 'home', cta: 'Publicar una oferta', aviso: 'Iniciá sesión para publicar una oferta' },
-      // Servicios tenía su CTA «Publicar un servicio»; la página dejó de
-      // existir con MERCADO-UNICO-1.
-      //
-      // Quiénes somos entró después: era la pantalla que había quedado con el
-      // Login sin continuidad —y sin aviso— cuando las otras dos ya lo habían
-      // dejado. Está en la lista para que no vuelva a quedarse atrás sola.
-      // Su botón decía «Comenzar a Vender»; con REV1-PENDIENTES-1 dice lo
-      // mismo que el de Inicio.
-      { seccion: 'about', cta: 'Publicar una oferta', aviso: 'Iniciá sesión para publicar una oferta' },
-    ]) {
-      // Todos los CTA de publicación de la pantalla, no uno elegido a mano: si
-      // mañana aparece otro por un camino distinto, este caso lo recorre solo.
-      const cuantosCta = await (async () => {
-        const contextoContado = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-        const pagina = await contextoContado.newPage();
-        await pagina.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
-          { waitUntil: 'domcontentloaded' });
-        await pagina.getByRole('button', { name: pantalla.cta }).first()
-          .waitFor({ state: 'visible', timeout: 25_000 });
-        const cuantos = await pagina.getByRole('button', { name: pantalla.cta }).count();
-        await contextoContado.close();
-        return cuantos;
-      })();
-      assert(cuantosCta > 0, `en ${pantalla.seccion} no hay ningún CTA «${pantalla.cta}»`);
-
-      for (let indice = 0; indice < cuantosCta; indice += 1) {
-        const suContexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-        const pagina = await suContexto.newPage();
-        vigilarEscrituras(pagina);
-        await vigilarElPublicador(pagina);
-        await vigilarLosAvisos(pagina);
-        await pagina.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
-          { waitUntil: 'domcontentloaded' });
-        const ctas = pagina.getByRole('button', { name: pantalla.cta });
-        await ctas.nth(indice).waitFor({ state: 'visible', timeout: 25_000 });
-        await ctas.nth(indice).click();
-
-        // Sin sesión: el Login REAL de la aplicación, con su aviso en voseo.
-        await login(pagina).waitFor({ state: 'visible', timeout: 20_000 });
-        const avisoVisible = (await avisosVistos(pagina)).join(' | ');
-        assert(avisoVisible.includes(pantalla.aviso),
-          `el aviso del CTA ${indice + 1} de ${pantalla.seccion} no es «${pantalla.aviso}»: `
-          + JSON.stringify(avisoVisible));
-        assert(await vecesQueSeAbrio(pagina) === 0,
-          `el CTA ${indice + 1} de ${pantalla.seccion} abrió el publicador sin sesión`);
-
-        // Cancelar: vuelve a la pantalla, no abre nada y NO DICE NADA. Que no
-        // diga nada es lo que se puede ver desde afuera: quien cancela un
-        // ingreso que pidió no necesita que le expliquen su propia decisión, y
-        // cualquier aviso acá delata que algo intentó seguir sin sesión.
-        //
-        // El aviso anterior se saca de pantalla antes de poner el contador en
-        // cero: mientras siga dibujado, cada mutación del documento lo vuelve a
-        // registrar y el cero no dura. Se cierra por su propio botón —no se
-        // espera a que caduque— y se comprueba que efectivamente se fue.
-        for (const cerrarAviso of await pagina.locator('[role="status"] button').all()) {
-          await cerrarAviso.click();
-        }
-        await esperarA(async () => (await pagina.locator('[role="status"] button').count()) === 0,
-          'el aviso anterior no se fue de la pantalla', 15_000);
-        await olvidarAvisos(pagina);
-        await login(pagina).getByRole('button', { name: 'Cerrar' }).click();
-        await esperarA(async () => (await pagina.getByRole('dialog').count()) === 0,
-          `cancelar el ingreso dejó una capa abierta en ${pantalla.seccion}`, 15_000);
-        assert(await vecesQueSeAbrio(pagina) === 0,
-          `cancelar el ingreso abrió el publicador en ${pantalla.seccion}`);
-        const dichoAlCancelar = await avisosVistos(pagina);
-        assert(dichoAlCancelar.length === 0,
-          `cancelar el ingreso en ${pantalla.seccion} dijo algo: ${JSON.stringify(dichoAlCancelar)}`);
-
-        // Y la intención NO queda pegada: un ingreso genérico desde la cabecera
-        // no puede heredar una publicación que se canceló.
-        await olvidarAperturas(pagina);
-        await pagina.locator('header').getByRole('button', { name: 'Ingresar', exact: true }).click();
-        await ingresar(pagina, 'vendedor123');
-        await esperarA(async () => (await pagina.locator('header')
-          .getByRole('button', { name: 'Vender' }).count()) === 1,
-        'el ingreso genérico no llegó a abrir sesión', 25_000);
-        assert(await vecesQueSeAbrio(pagina) === 0,
-          `en ${pantalla.seccion}, un ingreso genérico posterior heredó la publicación cancelada`);
-        await suContexto.close();
-      }
-      medidos.push(`los ${cuantosCta} CTA de publicación de ${pantalla.seccion} abren el Login real `
-        + `con el aviso «${pantalla.aviso}»; cancelar no abre nada y el ingreso genérico posterior `
-        + 'no hereda la intención');
-
-      // --- Credencial fallida, y después la buena ---------------------------
-      const conFallo = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-      const paginaFallo = await conFallo.newPage();
-      vigilarEscrituras(paginaFallo);
-      await vigilarElPublicador(paginaFallo);
-      await vigilarLosAvisos(paginaFallo);
-      const carritoAlEmpezar = await (async () => {
-        await paginaFallo.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
-          { waitUntil: 'domcontentloaded' });
-        return enElCarrito(paginaFallo);
-      })();
-      await paginaFallo.getByRole('button', { name: pantalla.cta }).first().click();
-      await login(paginaFallo).waitFor({ state: 'visible', timeout: 20_000 });
-      await ingresar(paginaFallo, 'esta-clave-no-es-la-de-nadie');
-      await login(paginaFallo).getByRole('alert').waitFor({ state: 'visible', timeout: 20_000 });
-      assert(await vecesQueSeAbrio(paginaFallo) === 0,
-        `una credencial fallida abrió el publicador en ${pantalla.seccion}`);
-      const dichoAlFallar = (await avisosVistos(paginaFallo)).join(' | ');
-      assert(!/sesi[oó]n para publicar|Debes iniciar sesi/i.test(dichoAlFallar.slice(
-        dichoAlFallar.indexOf(pantalla.aviso) + pantalla.aviso.length)),
-      `tras la credencial fallida ${pantalla.seccion} volvió a pedir sesión para publicar: `
-      + JSON.stringify(dichoAlFallar));
-      assert(await login(paginaFallo).count() === 1,
-        `una credencial fallida cerró el ingreso en ${pantalla.seccion}`);
-
-      // Sin cerrar el ingreso, la credencial buena: el publicador se abre solo,
-      // sin un segundo clic en el CTA.
-      await login(paginaFallo).getByLabel(/^Contraseña/).fill('vendedor123');
-      await login(paginaFallo).getByRole('button', { name: 'Ingresar', exact: true }).click();
-      await publicador(paginaFallo).waitFor({ state: 'visible', timeout: 25_000 });
-      assert(await publicador(paginaFallo).count() === 1,
-        `el publicador se abrió ${await publicador(paginaFallo).count()} veces en ${pantalla.seccion}`);
-      // Y se abrió PORQUE entró, no desde antes: hasta el ingreso bueno, cero.
-      assert(await vecesQueSeAbrio(paginaFallo) > 0,
-        `el publicador está en pantalla pero el vigía no lo vio abrirse en ${pantalla.seccion}`);
-      assert(await login(paginaFallo).count() === 0,
-        `el ingreso quedó apilado debajo del publicador en ${pantalla.seccion}`);
-      assert(await enElCarrito(paginaFallo) === carritoAlEmpezar,
-        `ingresar cambió el carrito en ${pantalla.seccion}`);
-      await conFallo.close();
-      medidos.push(`en ${pantalla.seccion} una credencial fallida no abre el publicador y la buena `
-        + 'lo abre una sola vez, sin un segundo clic');
-
-      // --- Login ↔ Registro no pierde la intención; el alta no la ejecuta ----
-      const conSalto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-      const paginaSalto = await conSalto.newPage();
-      vigilarEscrituras(paginaSalto);
-      await vigilarElPublicador(paginaSalto);
-      await vigilarLosAvisos(paginaSalto);
-      await paginaSalto.goto(`${FRONTEND_URL}/?section=${pantalla.seccion}`,
-        { waitUntil: 'domcontentloaded' });
-      await paginaSalto.getByRole('button', { name: pantalla.cta }).first().click();
-      await login(paginaSalto).waitFor({ state: 'visible', timeout: 20_000 });
-      await paginaSalto.getByRole('button', { name: 'Registrate acá' }).click();
-      await paginaSalto.getByRole('heading', { name: 'Crear Cuenta' })
-        .waitFor({ state: 'visible', timeout: 20_000 });
-      assert(await paginaSalto.getByRole('dialog').count() === 1,
-        'el salto a Registro apiló una capa más');
-
-      // El alta de verdad: no abre sesión, así que tampoco abre el publicador.
-      const correoNuevo = `publicar.167.${Date.now()}@example.com`;
-      await paginaSalto.locator('input[name="name"]').fill('Alta Sin Sesión 167');
-      await paginaSalto.locator('input[name="email"]').fill(correoNuevo);
-      await paginaSalto.locator('input[name="phone"]').fill('+54 11 5555 1670');
-      await paginaSalto.locator('input[name="password"]').fill('Clave167Inventada');
-      await paginaSalto.locator('form input[type="password"]').nth(1).fill('Clave167Inventada');
-      await paginaSalto.getByRole('button', { name: 'Crear cuenta' }).click();
-      await esperarA(async () => (await paginaSalto.locator('[role="status"]').allInnerTexts())
-        .join(' ').includes(correoNuevo),
-      'el alta no llegó a confirmarse', 25_000);
-      assert(await vecesQueSeAbrio(paginaSalto) === 0,
-        `el alta abrió el publicador sola en ${pantalla.seccion}`);
-      assert(await paginaSalto.locator('header')
-        .getByRole('button', { name: 'Vender' }).count() === 0,
-      'el alta abrió sesión: no es lo que declara el producto');
-
-      // Y volviendo al ingreso, la intención sigue viva. El rótulo es el de la
-      // pantalla de alta hecha: «Iniciá sesión» es el del formulario, y después
-      // del alta ese formulario ya no está.
-      await paginaSalto.getByRole('button', { name: 'Ir a iniciar sesión' }).click();
-      await login(paginaSalto).waitFor({ state: 'visible', timeout: 20_000 });
-      await ingresar(paginaSalto, 'vendedor123');
-      await publicador(paginaSalto).waitFor({ state: 'visible', timeout: 25_000 });
-      medidos.push(`en ${pantalla.seccion}, ir a Registro y volver no pierde la intención, y el `
-        + 'alta no abre sesión ni el publicador por sí sola');
-      await conSalto.close();
-    }
+    // Acá se recorría cada «Publicar una oferta» sin sesión —el de Inicio y el
+    // de Quiénes somos— para ver que el formulario se retomara después de
+    // ingresar. Los dos salieron con INICIO-ECOSISTEMA-1, y con ellos esa puerta:
+    // sin sesión ya no hay botón de publicar. Quedan las herramientas de arriba,
+    // que usa la parte C.
 
     // === C. R6: la sesión se comprueba ANTES de abrir el Checkout ==========
     //
@@ -26626,8 +26462,7 @@ await runCase(167, 'Un filtro inexistente no inventa un vacío, y publicar o com
 
   return 'una categoría o una provincia inexistente en la URL se descartan solas, sin llevarse '
     + 'los filtros válidos, sin quedarse en la barra y sin afirmar un mercado vacío; el catálogo '
-    + 'auxiliar caído se dice y se reintenta; cada CTA de publicación de Inicio, Servicios y '
-    + 'Quiénes somos retoma el formulario después de un ingreso correcto y sólo después; y la '
+    + 'auxiliar caído se dice y se reintenta; y la '
     + 'sesión se comprueba ANTES de abrir el Checkout, así que la que se puede renovar no '
     + `interrumpe y la que no, ofrece ingresar en vez de un callejón; ${medidos.join('; ')}`;
 });
@@ -26883,12 +26718,12 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
     medidos.push('la salida de soporte cierra el ingreso, va a Contacto y descarta la continuidad');
 
     // --- D. El voseo, en las pantallas que esta pieza tocó ----------------
-    // D1. Quiénes somos.
+    // D1. Era Quiénes somos, que salió con INICIO-ECOSISTEMA-1. Se mira Inicio,
+    //     que es donde ahora se cuenta qué es AgroBoeda.
     await page.locator('header').first()
-      .getByRole('button', { name: 'Quiénes somos', exact: true }).first().click();
-    await esperarA(async () => (await page.getByRole('button', { name: 'Contactanos' }).count()) === 1,
-      'Quiénes somos no dice «Contactanos»', 20_000);
-    sinTuteo('Quiénes somos', await page.locator('main, body').first().innerText());
+      .getByRole('button', { name: 'Inicio', exact: true }).first().click();
+    await page.getByRole('heading', { name: /en una misma ruta/, level: 1 }).waitFor({ timeout: 20_000 });
+    sinTuteo('Inicio', await page.locator('main, body').first().innerText());
 
     // D2. El carrito vacío, y el carrito con algo adentro.
     const compradora = `voseo.${sello}@ejemplo.com`;
@@ -27081,7 +26916,7 @@ await runCase(168, 'Buscar es una acción, Contacto no promete planes, el Login 
       }
       sinTuteo(`Mi cuenta/${solapa}`, await page.locator('main, body').first().innerText());
     }
-    medidos.push('Login, Quiénes somos, carrito, confirmación, Checkout y las tres solapas '
+    medidos.push('Login, Inicio, carrito, confirmación, Checkout y las tres solapas '
       + 'vacías de Mi cuenta vosean, y ninguna conserva las formas retiradas');
 
     await contexto.close();
@@ -27457,11 +27292,11 @@ await runCase(170, 'Sin sesión, el carrito con ítems se reabre desde la cabece
           `en ${pantalla.como}, recargar sin sesión y con carrito perdió la celda «Carrito»; `
           + `la cabecera dice ${JSON.stringify(await laCabeceraDice(page))}`);
 
-        // La banda no se deforma por la celda de más: la marca sigue, las cuatro
+        // La banda no se deforma por la celda de más: la marca sigue, las tres
         // secciones siguen, y no aparece un scroll horizontal.
         assert(await cabecera(page).getByRole('button', { name: /AgroBoeda/ }).count() === 1,
           `en ${pantalla.como} la marca no está en la cabecera`);
-        for (const seccion of ['Inicio', 'Mercado', 'Quiénes somos', 'Contacto']) {
+        for (const seccion of ['Inicio', 'Mercado', 'Contacto']) {
           assert(await cabecera(page).getByRole('button', { name: seccion, exact: true })
             .count() === 1, `en ${pantalla.como} falta la sección «${seccion}» en la cabecera`);
         }
@@ -31731,7 +31566,7 @@ await runCase(183, 'La ficha de una publicación es una página con URL propia, 
         .map((i) => ({ id: i.product?.id, cantidad: i.quantity }));
     } catch { return []; }
   });
-  const tarjetaDe = (page, nombre) => page.locator('article')
+  const tarjetaDe = (page, nombre) => page.locator('article[class*="card"]')
     .filter({ has: page.getByRole('heading', { name: nombre, exact: true, level: 3 }) }).first();
   // Si la tarjeta no aparece, el rojo dice qué se ve en su lugar: un «Timeout»
   // pelado no distingue una pantalla rota de una que dibujó otra cosa.
@@ -32076,7 +31911,7 @@ await runCase(184, 'El checkout en celular no deja nada fuera de su capa, y la c
 
         await page.goto(`${FRONTEND_URL}/?section=marketplace&q=${encodeURIComponent(DEMO)}`,
           { waitUntil: 'domcontentloaded' });
-        const tarjeta = page.locator('article')
+        const tarjeta = page.locator('article[class*="card"]')
           .filter({ has: page.getByRole('heading', { name: DEMO, exact: true, level: 3 }) }).first();
         await tarjeta.waitFor({ state: 'visible', timeout: 25_000 });
         await tarjeta.getByRole('button', { name: /Agregar/ }).click();
@@ -33559,8 +33394,8 @@ await runCase(191, 'Lo que el Mercado ya no ofrece no se compra desde un carrito
 // después: si un texto vuelve a decir «agro», que el rojo lo diga primero, y
 // no que falta el texto nuevo.
 //
-// Y los textos que se alargaron se miden donde son más angostos: a 360 px, y
-// el margen vertical de la portada a 1024, el ancho más chico que lo muestra.
+// Y los textos que se alargaron se miden donde son más angostos: a 360 px. El
+// margen vertical de la portada salió con INICIO-ECOSISTEMA-1.
 // ---------------------------------------------------------------------------
 await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos más largos entran a 360 px', async () => {
   const LETRA = '[\\p{L}\\p{N}_]';
@@ -33577,9 +33412,13 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
   const hallazgos = [];
   const problemas = [];
   const medidos = [];
+  // La excepción, con su frase exacta: «Noticias del agro» es el nombre de un
+  // servicio de Inicio, aprobado tal cual por Emi y la clienta el 30/09
+  // (INICIO-ECOSISTEMA-1). Cualquier otra «agro» suelta sigue dando rojo.
+  const APROBADAS = ['Noticias del agro'];
   // Cada aparición con su contexto, y no sólo la primera de cada lugar.
   const anotar = (lugar, texto) => {
-    const cadena = String(texto);
+    const cadena = APROBADAS.reduce((resto, frase) => resto.replaceAll(frase, 'Noticias del …'), String(texto));
     for (const vista of cadena.matchAll(new RegExp(SUELTA.source, 'giu'))) {
       const contexto = cadena.slice(Math.max(0, vista.index - 40), vista.index + 44).trim();
       hallazgos.push(`${lugar}: «${contexto}»`);
@@ -33611,22 +33450,23 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
     + 'index.html y las plantillas de entorno');
 
   // --- B. la pantalla ------------------------------------------------------
-  // El texto como el navegador lo dibuja (`innerText`), con las tarjetas
-  // escondidas un instante; y los atributos que se leen o se anuncian de los
+  // El texto como el navegador lo dibuja (`innerText`), con las tarjetas de
+  // publicaciones escondidas un instante —las de los servicios de Inicio son
+  // texto de la plataforma y se leen—; y los atributos que se leen o se anuncian de los
   // elementos visibles. Nodo por nodo no sirve: React parte el texto en varios
   // nodos, y una palabra armada en pedazos no se vería.
   const leerLaPantalla = (page, raiz = 'body') => page.evaluate((selector) => {
     const coinciden = document.querySelectorAll(selector);
     if (coinciden.length !== 1) return { texto: '', tarjetas: 0, coinciden: coinciden.length };
     const [donde] = coinciden;
-    const tarjetas = document.querySelectorAll('article').length;
+    const tarjetas = document.querySelectorAll('article[class*="card"]').length;
     const sinTarjetas = document.createElement('style');
-    sinTarjetas.textContent = 'article { display: none !important; }';
+    sinTarjetas.textContent = 'article[class*="card"] { display: none !important; }';
     document.head.append(sinTarjetas);
     const renglones = donde.innerText.split(/\n+/).map((r) => r.trim()).filter(Boolean);
     sinTarjetas.remove();
     for (const el of donde.querySelectorAll('[placeholder], [aria-label], [alt], [title]')) {
-      if (el.closest('article') || !el.checkVisibility()) continue;
+      if (el.closest('article[class*="card"]') || !el.checkVisibility()) continue;
       for (const atributo of ['placeholder', 'aria-label', 'alt', 'title']) {
         if (el.getAttribute(atributo)) renglones.push(el.getAttribute(atributo));
       }
@@ -33635,17 +33475,15 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
   }, raiz);
   const PAGINAS = [
     ['Inicio', 'home', (page) => page.locator('#titulo-inicio')],
-    ['Mercado', 'marketplace', (page) => page.locator('article').first()],
-    ['Quiénes somos', 'about', (page) => page.getByRole('heading', { name: /Publicá o buscá en el Mercado/ })],
+    ['Mercado', 'marketplace', (page) => page.locator('article[class*="card"]').first()],
     ['Contacto', 'contact', (page) => page.getByRole('heading', { name: 'Contacto', level: 1 })],
   ];
   // Los textos que se alargaron, donde están.
   const ALARGADOS = [
-    ['home', 'la bajada de la portada', 'p.tg-eyebrow', 'Mercado agropecuario · Argentina'],
+    // Era el ojo de buey de la portada, «Mercado agropecuario · Argentina», que
+    // salió con INICIO-ECOSISTEMA-1; el título nuevo es el texto más largo.
+    ['home', 'el título de la portada', 'h1', 'Producción, mercado, cumplimiento y tecnología en una misma ruta.'],
     ['home', 'la bajada del pie', 'footer p', 'Mercado agropecuario: productos, servicios y logística.'],
-    // Decía «… soluciones tecnológicas para el sector agropecuario»; con
-    // REV1-PENDIENTES-1 el cierre es otro, y el sector está en su título.
-    ['about', 'el cierre de Quiénes somos', 'h2', 'Publicá o buscá en el Mercado agropecuario'],
   ];
   const CAPTURAS = process.env.SMOKE_CAPTURAS || mkdtempSync(`${tmpdir()}/topgreen-agro-`);
   mkdirSync(CAPTURAS, { recursive: true });
@@ -33740,38 +33578,6 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
         + `leídos, con ${tarjetas} tarjetas de publicaciones afuera`);
     }
 
-    // El margen vertical de la portada se ve desde 1024 px: el texto, que se
-    // alargó, tiene que caber en el alto del margen.
-    for (const ancho of [1024, 1440]) {
-      const contexto = await browser.newContext({ viewport: { width: ancho, height: 900 } });
-      const page = await contexto.newPage();
-      await page.goto(`${FRONTEND_URL}/?section=home`, { waitUntil: 'domcontentloaded' });
-      await page.locator('#titulo-inicio').waitFor({ timeout: 25_000 });
-      const margen = page.locator('[aria-hidden="true"] > span', { hasText: 'Mercado agropecuario · Argentina' });
-      if ((await margen.count()) !== 1) {
-        problemas.push(`a ${ancho} px no hay un margen vertical que diga «Mercado agropecuario · Argentina»`);
-        await contexto.close();
-        continue;
-      }
-      const cabe = await margen.evaluate((el) => {
-        const texto = el.getBoundingClientRect();
-        const caja = el.parentElement.getBoundingClientRect();
-        return {
-          visible: el.checkVisibility(), arriba: texto.top - caja.top,
-          abajo: caja.bottom - texto.bottom, alto: texto.height, disponible: caja.height,
-        };
-      });
-      if (!cabe.visible || cabe.arriba < 0 || cabe.abajo < 0) {
-        problemas.push(`a ${ancho} px el margen vertical no entra: ${cabe.alto.toFixed(0)} px de `
-          + `texto en ${cabe.disponible.toFixed(0)} de alto`);
-      }
-      const ruta = `${CAPTURAS}/margen-de-la-portada-${ancho}.png`;
-      await page.locator('#titulo-inicio').locator('xpath=ancestor::section[1]').screenshot({ path: ruta });
-      capturas.push(ruta);
-      medidos.push(`a ${ancho} px el margen vertical ocupa ${cabe.alto.toFixed(0)} de `
-        + `${cabe.disponible.toFixed(0)} px de alto`);
-      await contexto.close();
-    }
   } finally {
     await browser.close();
   }
@@ -33790,7 +33596,7 @@ await runCase(192, 'El sitio nombra el sector «agropecuario», y los textos má
 // Servicios no va como pestaña aparte. Los servicios se buscan en el Mercado,
 // con el filtro por tipo que ya existía. Se mide:
 //  A. la cabecera no ofrece Servicios, en escritorio, tablet y celular, y sus
-//     cuatro destinos entran sin desplazarse de costado;
+//     destinos entran sin desplazarse de costado;
 //  B. la URL vieja, `?section=services`, abre el Mercado con el filtro de
 //     servicios —la barra, el selector, la celda marcada y la grilla dicen lo
 //     mismo—, y muestra lo que mostraba la página: los tres servicios más
@@ -33810,7 +33616,8 @@ await runCase(193, 'Un solo Mercado: la cabecera no ofrece Servicios y los enlac
   const medidos = [];
   const sello = Date.now();
   const URL_NUEVA = '/?section=marketplace&type=servicios';
-  const DESTINOS = ['Inicio', 'Mercado', 'Quiénes somos', 'Contacto'];
+  // Quiénes somos salió con INICIO-ECOSISTEMA-1: son tres.
+  const DESTINOS = ['Inicio', 'Mercado', 'Contacto'];
   const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
   const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
   const [categoriaDeServicios] = queryRows(`
@@ -33898,7 +33705,7 @@ await runCase(193, 'Un solo Mercado: la cabecera no ofrece Servicios y los enlac
     };
     const enInicio = async (page, momento) => {
       await esperarA(async () => barra(page) === '/'
-        && (await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).count()) === 1,
+        && (await page.getByRole('heading', { name: /en una misma ruta/, level: 1 }).count()) === 1,
       `${momento}: se esperaba Inicio y la barra dice «${barra(page)}»`, 20_000);
     };
     const alPie = (page) => page.locator('footer')
@@ -33999,7 +33806,7 @@ await runCase(193, 'Un solo Mercado: la cabecera no ofrece Servicios y los enlac
     await enInicio(page, 'D3, al entrar');
     await page.evaluate(() => {
       window.history.pushState({}, '', '/?section=services');
-      window.history.pushState({}, '', '/?section=about');
+      window.history.pushState({}, '', '/?section=contact');
     });
     await page.goBack();
     await enElMercadoDeServicios(page, 'D3, Atrás hasta la entrada vieja');
@@ -34416,7 +34223,7 @@ await runCase(195, 'Filtrar por tipo y por potencia cuenta en el servidor, deja 
     await page.locator('#detalle-titulo').waitFor({ timeout: 20_000 });
     await page.goBack();
     await page.locator('header').getByRole('button', { name: 'Inicio', exact: true }).click();
-    await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
+    await page.getByRole('heading', { name: /en una misma ruta/, level: 1 }).waitFor({ timeout: 20_000 });
     await page.goBack();
     await esperarA(async () => barra().get('subtype') === 'arados'
       && (await page.locator('#catalog-subtype').inputValue().catch(() => '')) === 'arados',
@@ -35924,8 +35731,10 @@ await runCase(208, 'Inicio, el Mercado y la ficha dicen «publicaciones» y no �
     ...[...document.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label')),
     ...[...document.querySelectorAll('.tg-sr-only')].map((el) => el.textContent),
   ].join('\n'));
-  const sinOperaciones = async (page, donde) => {
-    const texto = await loQueDice(page);
+  // `aprobadas`: frases exactas en las que «operación» es lo que se concreta,
+  // que es justo donde la regla la deja.
+  const sinOperaciones = async (page, donde, aprobadas = []) => {
+    const texto = aprobadas.reduce((resto, frase) => resto.replaceAll(frase, '…'), await loQueDice(page));
     const hallazgos = [...texto.matchAll(/[^\n]{0,40}operaci[oó]n(es)?[^\n]{0,20}/gi)].map((m) => m[0].trim());
     if (hallazgos.length) problemas.push(`${donde} dice «${hallazgos.slice(0, 3).join('», «')}»`);
   };
@@ -35941,11 +35750,12 @@ await runCase(208, 'Inicio, el Mercado y la ficha dicen «publicaciones» y no �
 
       // Inicio.
       await page.goto(`${FRONTEND_URL}/?section=home`, { waitUntil: 'domcontentloaded' });
-      // Con REV1-PENDIENTES-1 Inicio ya no muestra publicaciones: queda el
-      // medidor, y el título del bloque de datos. El resto lo mira el 209.
-      await espera(page.getByText(/^Publicaci(ón|ones) disponibles? ahora$/), 'el medidor de Inicio no dice «… publicaciones disponibles ahora»');
-      await espera(page.getByRole('heading', { name: 'Lo que muestra cada publicación.', exact: true }), 'Inicio no titula «Lo que muestra cada publicación.»');
-      await sinOperaciones(page, `${ancho}, Inicio`);
+      // Desde INICIO-ECOSISTEMA-1, el número va en la tarjeta del Mercado. El
+      // resto de Inicio lo mira el 232.
+      await espera(page.getByText(/^\d+\s+publicaci(ón|ones) disponibles?$/), 'el Mercado de Inicio no dice «… publicaciones disponibles»');
+      // «Comercializar» termina en la operación, que es lo que se concreta: el
+      // texto aprobado el 30/09 la nombra en ese sentido.
+      await sinOperaciones(page, `${ancho}, Inicio`, ['Oferta, comprador, logística y operación.']);
 
       // El Mercado.
       await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
@@ -35979,25 +35789,25 @@ await runCase(208, 'Inicio, el Mercado y la ficha dicen «publicaciones» y no �
   assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
   return 'en escritorio y en celular, Inicio, el Mercado (con y sin resultados) y la ficha (también la que no está) '
     + 'dicen «publicaciones», en el texto, en los nombres accesibles y en lo que sólo lee el lector de pantalla, '
-    + 'y ninguno dice «operación»';
+    + 'y ninguno dice «operación», salvo el paso «Comercializar» de Inicio, donde es lo que se concreta';
 });
 
 // 209. REV1-PENDIENTES-1 — lo que quedó de la devolución de la clienta (20/09).
 //
 // Cada punto se mira en la pantalla, en escritorio y en celular:
-//  1. Inicio no muestra publicaciones y tiene un solo acceso al Mercado (#2).
-//  2. «Lo que muestra cada publicación.»: precio y modalidad juntos, el radio
-//     del transportista nombrado, sin «honesta» y sin instructivo (#4).
-//  3. La invitación que se repetía entre Inicio y Quiénes somos queda sólo en
-//     Quiénes somos (#6), y sin promesas (#14).
+//  1. Inicio no muestra publicaciones (#2). Desde INICIO-ECOSISTEMA-1 los
+//     caminos al Mercado son los dos «Entrar al Mercado» de la maqueta que
+//     aprobó la clienta el 30/09; antes era uno solo.
 //  4. Contacto sin preguntas frecuentes (#11a).
 //  5. Nada visible dice «comisión»: ni las páginas, ni la vinculación de
 //     Mercado Pago —sin vincular y vinculada—, ni la notificación de quien
 //     cancela. Lo que sí se dice sigue: AgroBoeda no recibe el dinero.
-//  6. Quiénes somos sin «Nuestro equipo» (#13).
+// Salieron con INICIO-ECOSISTEMA-1, porque salieron sus pantallas: el 2 («Lo
+// que muestra cada publicación.»), el 3 (la invitación de Quiénes somos) y el 6
+// (Quiénes somos sin «Nuestro equipo»). La numeración se conserva.
 // Los problemas se juntan y el caso falla al final con todos, cada uno con su
 // ancho, para que un rojo diga qué punto volvió.
-await runCase(209, 'Inicio sin publicaciones, una sola invitación, sin preguntas frecuentes, sin equipo y sin «comisión»', async () => {
+await runCase(209, 'Inicio sin publicaciones, Contacto sin preguntas frecuentes, y nada dice «comisión»', async () => {
   const problemas = [];
   const medidos = [];
   const sello = Date.now();
@@ -36103,13 +35913,14 @@ await runCase(209, 'Inicio sin publicaciones, una sola invitación, sin pregunta
       const pedidos = [];
       page.on('request', (r) => pedidos.push(r.url()));
 
-      // --- 1 y 2. Inicio ----------------------------------------------------
+      // --- 1. Inicio ---------------------------------------------------------
+      // El resto de Inicio lo mira el 232.
       await page.goto(`${FRONTEND_URL}/?section=home`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: /seguir produciendo/, level: 1 }).waitFor({ timeout: 20_000 });
-      await page.getByText(/publicaci(ón|ones) disponibles? ahora/i).first()
+      await page.getByRole('heading', { name: /en una misma ruta/, level: 1 }).waitFor({ timeout: 20_000 });
+      await page.getByText(/^\d+\s+publicaci(ón|ones) disponibles?$/).first()
         .waitFor({ state: 'visible', timeout: 20_000 })
         .catch(() => problemas.push(`${ancho}: Inicio no dice cuántas publicaciones hay`));
-      const tarjetas = await page.locator('article').count();
+      const tarjetas = await page.locator('article[class*="card"]').count();
       if (tarjetas > 0) problemas.push(`${ancho}: Inicio muestra ${tarjetas} publicación(es)`);
       if (await page.getByRole('heading', { name: 'Publicaciones disponibles', exact: true }).count() > 0) {
         problemas.push(`${ancho}: Inicio tiene el encabezado «Publicaciones disponibles»`);
@@ -36117,77 +35928,34 @@ await runCase(209, 'Inicio sin publicaciones, una sola invitación, sin pregunta
       // Los caminos al Mercado que ofrece la página, sin la cabecera ni el pie.
       const alMercado = await page.evaluate(() => [...document.querySelectorAll('button, a')]
         .filter((el) => !el.closest('header, footer') && el.checkVisibility())
-        .map((el) => (el.getAttribute('aria-label') || el.innerText).replace(/\s+/g, ' ').trim())
+        .map((el) => (el.getAttribute('aria-label') || el.innerText).replace(/→/g, '').replace(/\s+/g, ' ').trim())
         .filter((nombre) => /mercado|publicaciones|explorar/i.test(nombre)));
-      if (alMercado.length !== 1 || alMercado[0] !== 'Ir al Mercado') {
-        problemas.push(`${ancho}: Inicio lleva al Mercado por ${JSON.stringify(alMercado)} y tenía que ser sólo «Ir al Mercado»`);
+      if (JSON.stringify(alMercado) !== JSON.stringify(['Entrar al Mercado', 'Entrar al Mercado'])) {
+        problemas.push(`${ancho}: Inicio lleva al Mercado por ${JSON.stringify(alMercado)} y tenían que ser los dos «Entrar al Mercado»`);
       }
-      const datos = await loQueDice(page, 'section[aria-labelledby="titulo-datos"]');
-      if (!/Lo que muestra cada publicación\./.test(datos)) {
-        problemas.push(`${ancho}: el bloque de datos no se titula «Lo que muestra cada publicación.»`);
-      }
-      if (!/Precio y modalidad/.test(datos)) problemas.push(`${ancho}: el bloque de datos no dice «Precio y modalidad»`);
-      if (!/radio de alcance[^\n]*transportista/i.test(datos)) {
-        problemas.push(`${ancho}: el bloque de datos no nombra el radio de alcance del transportista`);
-      }
-      if (!/Quién publica y qué se puede hacer/.test(datos)) {
-        problemas.push(`${ancho}: el bloque de datos no dice «Quién publica y qué se puede hacer»`);
-      }
-      if (/Antes de avanzar/i.test(datos)) problemas.push(`${ancho}: el bloque de datos sigue diciendo «Antes de avanzar»`);
       const inicio = await loQueDice(page);
-      if (!/precio y modalidad, ubicación y quién publica/i.test(inicio)) {
-        problemas.push(`${ancho}: la bajada de Inicio no dice «precio y modalidad, ubicación y quién publica»`);
-      }
       nadaRetirado(inicio, `${ancho}: Inicio`);
       if (await page.getByRole('heading', { name: INVITACION }).count() > 0) {
         problemas.push(`${ancho}: Inicio repite la invitación «${INVITACION}»`);
       }
       await sinDesborde(page, `${ancho}: Inicio`);
       // Y el acceso lleva al Mercado.
-      const irDesdeInicio = page.getByRole('button', { name: 'Ir al Mercado', exact: true });
+      const irDesdeInicio = page.getByRole('button', { name: 'Entrar al Mercado', exact: true }).first();
       if (await irDesdeInicio.count() === 1) {
         await irDesdeInicio.click();
-        await page.locator('article').first().waitFor({ state: 'visible', timeout: 20_000 })
-          .catch(() => problemas.push(`${ancho}: «Ir al Mercado» de Inicio no llegó a las publicaciones`));
+        await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 20_000 })
+          .catch(() => problemas.push(`${ancho}: «Entrar al Mercado» de Inicio no llegó a las publicaciones`));
         if (new URL(page.url()).searchParams.get('section') !== 'marketplace') {
-          problemas.push(`${ancho}: «Ir al Mercado» de Inicio dejó la barra en ${page.url()}`);
+          problemas.push(`${ancho}: «Entrar al Mercado» de Inicio dejó la barra en ${page.url()}`);
         }
       } else {
         await page.goto(`${FRONTEND_URL}/?section=marketplace`, { waitUntil: 'domcontentloaded' });
-        await page.locator('article').first().waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+        await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
       }
       // En el Mercado sólo se mira la comisión: el resto de la lista es de las
-      // otras tres páginas, y las tarjetas traen texto de quien publica.
+      // otras páginas, y las tarjetas traen texto de quien publica.
       const mercado = await loQueDice(page);
       if (/comisi[oó]n/i.test(mercado)) problemas.push(`${ancho}: el Mercado dice «comisión»`);
-
-      // --- 3, 6 y 7. Quiénes somos --------------------------------------------
-      await page.goto(`${FRONTEND_URL}/?section=about`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: 'Misión' }).waitFor({ timeout: 20_000 });
-      const invitaciones = await page.getByRole('heading', { name: INVITACION }).count();
-      if (invitaciones !== 1) {
-        problemas.push(`${ancho}: Quiénes somos tiene ${invitaciones} invitación(es) «${INVITACION}» y tenía que tener una`);
-      } else {
-        const bloque = page.locator('section').filter({ has: page.getByRole('heading', { name: INVITACION }) });
-        const botones = (await bloque.getByRole('button').allInnerTexts()).map((t) => t.trim());
-        if (JSON.stringify(botones) !== JSON.stringify(['Publicar una oferta', 'Ir al Mercado'])) {
-          problemas.push(`${ancho}: la invitación de Quiénes somos ofrece ${JSON.stringify(botones)}`);
-        }
-      }
-      if (await page.getByRole('heading', { name: 'Nuestro equipo' }).count() > 0) {
-        problemas.push(`${ancho}: Quiénes somos tiene «Nuestro equipo»`);
-      }
-      const fotos = pedidos.filter((u) => /MercedesRaiz/i.test(u));
-      if (fotos.length) problemas.push(`${ancho}: Quiénes somos pidió la foto del equipo (${fotos[0]})`);
-      nadaRetirado(await loQueDice(page), `${ancho}: Quiénes somos`);
-      await sinDesborde(page, `${ancho}: Quiénes somos`);
-      const irDesdeQuienes = page.locator('section').filter({ has: page.getByRole('heading', { name: INVITACION }) })
-        .getByRole('button', { name: 'Ir al Mercado', exact: true });
-      if (await irDesdeQuienes.count() === 1) {
-        await irDesdeQuienes.click();
-        await page.locator('article').first().waitFor({ state: 'visible', timeout: 20_000 })
-          .catch(() => problemas.push(`${ancho}: «Ir al Mercado» de Quiénes somos no llegó a las publicaciones`));
-      }
 
       // --- 4. Contacto --------------------------------------------------------
       await page.goto(`${FRONTEND_URL}/?section=contact`, { waitUntil: 'domcontentloaded' });
@@ -36243,7 +36011,7 @@ await runCase(209, 'Inicio sin publicaciones, una sola invitación, sin pregunta
         problemas.push(`${ancho}: la notificación de quien canceló promete devolver dinero`);
       }
       await deCompra.close();
-      medidos.push(`${ancho}: Inicio, Quiénes somos, Contacto, el Mercado, Mercado Pago sin vincular y vinculado, y las notificaciones`);
+      medidos.push(`${ancho}: Inicio, Contacto, el Mercado, Mercado Pago sin vincular y vinculado, y las notificaciones`);
     }
   } finally {
     await browser.close();
@@ -36251,11 +36019,9 @@ await runCase(209, 'Inicio sin publicaciones, una sola invitación, sin pregunta
     if (publicacion?.id) await pedirCrudo(`/products/${publicacion.id}`, { method: 'DELETE', header: vendedora.token }).catch(() => {});
   }
   assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
-  return 'Inicio no muestra publicaciones, dice cuántas hay y lleva al Mercado sólo por «Ir al Mercado»; «Lo que '
-    + 'muestra cada publicación.» dice «Precio y modalidad», nombra el radio del transportista y no dice «honesta» '
-    + 'ni «próximo paso»; la invitación está sólo en Quiénes somos, sin promesas y con «Publicar una oferta» e «Ir al '
-    + 'Mercado»; Contacto no tiene preguntas frecuentes; Quiénes somos no tiene «Nuestro equipo»; nada dice '
-    + '«comisión», y Mercado Pago sigue diciendo que AgroBoeda no recibe el dinero. Mirado en '
+  return 'Inicio no muestra publicaciones, dice cuántas hay y lleva al Mercado por sus dos «Entrar al Mercado»; '
+    + 'Contacto no tiene preguntas frecuentes; nada dice «comisión», y Mercado Pago sigue diciendo que AgroBoeda '
+    + 'no recibe el dinero. Mirado en '
     + `${medidos.length} anchos (${medidos.join('; ')})`;
 });
 
@@ -38731,6 +38497,379 @@ await runCase(231, 'El link abierto de un pago devuelto o con contracargo lo apa
     if (cuentas) await desvincular(cuentas.vendedor.token).catch(() => {});
     await doble.cerrar();
     await comprador().catch(() => {});
+  }
+});
+
+// INICIO-ECOSISTEMA-1. Inicio muestra el ecosistema, no sólo el Mercado
+// (la clienta, 30/09), y «Quiénes somos» sale del sitio. Los textos son los
+// aprobados por Emi y van tal cual: si cambian en el producto, cambian acá.
+const INICIO = {
+  rotulo: 'Bienvenido a AgroBoeda',
+  titulo: 'Producción, mercado, cumplimiento y tecnología en una misma ruta.',
+  bajada: 'La plataforma parte de tu producción y su destino para determinar qué registrar, qué validar, qué '
+    + 'tecnología realmente necesitás y cómo llevar la producción al mercado.',
+  nota: 'Hoy funciona el Mercado. El resto del ecosistema se suma por etapas.',
+  banda: 'Cosecha y descarga de grano · Campo argentino',
+  ecoRotulo: 'El ecosistema AgroBoeda',
+  ecoTitulo: '¿Qué querés hacer?',
+  ecoBajada: 'Definí qué producís y dónde querés colocar la producción. AgroBoeda relaciona la ruta productiva '
+    + 'con mercado, trazabilidad, cumplimiento, certificaciones y tecnología.',
+  rutaRotulo: 'Cómo funciona',
+  rutaTitulo: 'Una misma producción puede seguir distintas rutas.',
+  rutaBajada: 'Cada paso de la ruta tiene su servicio en el ecosistema. El último, comercializar, ya funciona en '
+    + 'el Mercado.',
+  principioRotulo: 'Principio de AgroBoeda',
+  principioFrase: 'La tecnología se decide por la ruta, no al revés.',
+  principioTexto: 'Una materia prima destinada a una industria puede requerir un esquema de registros y controles '
+    + 'diferente al de una producción destinada a consumo humano directo o a un mercado de exportación exigente. '
+    + 'AgroBoeda va a adaptar la gestión a la ruta seleccionada.',
+  credito: 'Fotos de Cumplimiento y Tecnología: “soil samples”, de photofarmer, y “soil-sensors”, de Air Resources '
+    + 'Laboratory, con licencia CC BY 2.0. Recortadas.',
+};
+const SERVICIOS = [
+  ['01', 'Ruta productiva', 'Construí una ruta según producción, destino y mercado objetivo.', 'catalogo/planificacion-riego-fertirriego.webp'],
+  ['02', 'Mercado', 'Buscá productos, maquinaria, insumos, tierras y servicios o publicá una oferta.', 'catalogo/servicio-cosecha-monitor-rendimiento.webp'],
+  ['03', 'Trazabilidad', 'Generá eventos, datos y evidencias vinculados a la ruta y al lote.', 'catalogo/terneros-angus-lote-20.webp'],
+  ['04', 'Cumplimiento y certificaciones', 'Controlá requisitos, documentos y certificaciones aplicables.', 'catalogo/muestreo-suelo-recomendacion-fertilizacion.webp'],
+  ['05', 'Tecnología', 'Separá tecnología necesaria de mejoras opcionales y calculá inversión.', 'catalogo/sensores-humedad-suelo-iot.webp'],
+  ['06', 'Noticias del agro', 'Lo que pasa en el mundo agropecuario, en un solo lugar.', 'media/comercial/servicios-relevamiento-hero-960.webp'],
+  ['07', 'Charlas y capacitaciones', 'Encuentros con especialistas para producir y vender mejor.', 'catalogo/dron-pulverizador-agricola-20l.webp'],
+];
+const POR_ETAPAS = {
+  rotulo: 'Por etapas', titulo: '¿Te interesa alguno?',
+  texto: 'Cada servicio se suma por etapas, después del Mercado.', boton: 'Escribinos',
+};
+const PASOS = [
+  ['01', 'Producir', 'Qué producto, dónde, escala y etapa.', 'Ruta productiva'],
+  ['02', 'Destinar', 'Consumo, industria, exportación u otro destino.', 'Ruta productiva'],
+  ['03', 'Cumplir', 'Requisitos, documentos, controles y certificaciones.', 'Trazabilidad y cumplimiento'],
+  ['04', 'Tecnologizar', 'Lo necesario, recomendable y avanzado.', 'Tecnología'],
+  ['05', 'Comercializar', 'Oferta, comprador, logística y operación.', 'Mercado · Disponible hoy'],
+];
+const NIVELES = [['Registro esencial', 'Ruta industrial'], ['Registro ampliado', null], ['Registro exhaustivo', 'Ruta exportación']];
+const CREDITOS = [
+  ['soil samples', 'https://www.flickr.com/photos/62528187@N00/8612063738'],
+  ['photofarmer', 'https://www.flickr.com/photos/62528187@N00'],
+  ['soil-sensors', 'https://www.flickr.com/photos/87182179@N05/49238045018'],
+  ['Air Resources Laboratory', 'https://www.flickr.com/photos/87182179@N05'],
+  ['CC BY 2.0', 'https://creativecommons.org/licenses/by/2.0/'],
+];
+const ANCHOS_DE_INICIO = [['1440', { width: 1440, height: 900 }], ['390', { width: 390, height: 844 }]];
+const plano = (texto) => String(texto || '').replace(/\s+/g, ' ').trim();
+
+async function abrirInicio(browser, viewport) {
+  const contexto = await browser.newContext({ viewport });
+  const page = await contexto.newPage();
+  const errores = [];
+  page.on('pageerror', (error) => errores.push(error.message));
+  await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 20_000 });
+  return { contexto, page, errores };
+}
+
+// La sección del título principal: la portada.
+const laPortada = (page) => page.getByRole('heading', { level: 1 }).first().locator('xpath=ancestor::section[1]');
+
+// Los textos de un bloque, en el orden en que se leen.
+const textosDe = (localizador) => localizador.allInnerTexts().then((t) => t.map(plano));
+
+// 232. Inicio, de arriba abajo, en los dos anchos.
+await runCase(232, 'Inicio muestra el ecosistema: siete servicios en orden, sólo el Mercado disponible, y los textos aprobados', async () => {
+  const catalogo = await apiRequest('/catalog/products?page=1&page_size=1');
+  const total = catalogo.data.total;
+  const browser = await chromium.launch({ headless: true });
+  const problemas = [];
+  try {
+    for (const [ancho, viewport] of ANCHOS_DE_INICIO) {
+      const { contexto, page, errores } = await abrirInicio(browser, viewport);
+      const p = (texto) => problemas.push(`${ancho}: ${texto}`);
+      try {
+        // Portada.
+        const h1 = plano(await page.getByRole('heading', { level: 1 }).first().innerText());
+        if (h1 !== INICIO.titulo) p(`el título es «${h1}»`);
+        const portada = laPortada(page);
+        const dePortada = plano(await portada.innerText());
+        for (const clave of ['rotulo', 'bajada', 'nota', 'banda']) {
+          if (!dePortada.toLowerCase().includes(INICIO[clave].toLowerCase())) p(`la portada no dice «${INICIO[clave]}»`);
+        }
+        for (const boton of ['Conocé el ecosistema', 'Entrar al Mercado']) {
+          if (!(await portada.getByRole('button', { name: boton, exact: true }).count())) p(`la portada no tiene «${boton}»`);
+        }
+        const heroe = await portada.locator('img').first().getAttribute('src');
+        if (!/home-cosecha-hero-(1920|1200)\.webp$/.test(heroe || '')) p(`la foto de la portada es ${heroe}`);
+
+        // Ecosistema.
+        const eco = page.getByRole('region', { name: INICIO.ecoTitulo });
+        if (!(await eco.count())) { p(`no hay una sección «${INICIO.ecoTitulo}»`); continue; }
+        const deEco = plano(await eco.innerText()).toLowerCase();
+        for (const clave of ['ecoRotulo', 'ecoBajada']) {
+          if (!deEco.includes(INICIO[clave].toLowerCase())) p(`el ecosistema no dice «${INICIO[clave]}»`);
+        }
+        const tarjetas = eco.locator('article');
+        const nombres = (await textosDe(tarjetas.locator('h3')));
+        if (nombres.join(' | ') !== SERVICIOS.map(([, n]) => n).join(' | ')) p(`los servicios son ${JSON.stringify(nombres)}`);
+        for (let i = 0; i < SERVICIOS.length && i < (await tarjetas.count()); i += 1) {
+          const [numero, nombre, texto, foto] = SERVICIOS[i];
+          const tarjeta = tarjetas.nth(i);
+          const dice = plano(await tarjeta.innerText());
+          const estado = nombre === 'Mercado' ? 'Disponible hoy' : 'Próximamente';
+          const otro = nombre === 'Mercado' ? 'Próximamente' : 'Disponible hoy';
+          if (!dice.includes(numero) || !dice.includes(texto)) p(`${nombre}: no dice «${numero}» y «${texto}»: «${dice}»`);
+          if (!dice.toLowerCase().includes(estado.toLowerCase()) || dice.toLowerCase().includes(otro.toLowerCase())) {
+            p(`${nombre}: el estado no es «${estado}»: «${dice}»`);
+          }
+          if (nombre !== 'Mercado') {
+            const acciones = await tarjeta.locator('a, button, [role="link"], [role="button"], [tabindex]').count();
+            if (acciones) p(`${nombre}: «Próximamente» tiene ${acciones} enlace(s) o botón(es)`);
+          }
+          const img = tarjeta.locator('img');
+          if ((await img.count()) !== 1) { p(`${nombre}: tiene ${await img.count()} fotos`); continue; }
+          const [src, alt, carga, w, h] = await Promise.all(['src', 'alt', 'loading', 'width', 'height'].map((a) => img.getAttribute(a)));
+          if (!(src || '').endsWith(`/${foto}`)) p(`${nombre}: la foto es ${src} y tenía que ser ${foto}`);
+          if (alt !== '' || carga !== 'lazy' || !w || !h) p(`${nombre}: la foto va con alt «${alt}», carga ${carga}, ${w}×${h}`);
+        }
+        // El Mercado: el número del catálogo y la entrada.
+        const mercado = tarjetas.filter({ has: page.getByRole('heading', { name: 'Mercado', exact: true }) });
+        const cuenta = plano(await mercado.innerText());
+        const esperado = total === 1 ? '1 publicación disponible' : `${total} publicaciones disponibles`;
+        if (!cuenta.includes(esperado)) p(`el Mercado no dice «${esperado}»: «${cuenta}»`);
+        if (!(await mercado.getByRole('button', { name: 'Entrar al Mercado' }).count())) p('el Mercado no tiene «Entrar al Mercado»');
+        // La octava cierra el bloque.
+        const cierre = eco.locator('aside');
+        const deCierre = plano(await cierre.innerText());
+        for (const clave of ['rotulo', 'titulo', 'texto']) {
+          if (!deCierre.toLowerCase().includes(POR_ETAPAS[clave].toLowerCase())) p(`el cierre no dice «${POR_ETAPAS[clave]}»: «${deCierre}»`);
+        }
+        if (!(await cierre.getByRole('button', { name: POR_ETAPAS.boton, exact: true }).count())) p('el cierre no tiene «Escribinos»');
+        // El crédito de las dos fotos CC BY, con sus enlaces.
+        const credito = page.locator('p', { hasText: 'Fotos de Cumplimiento y Tecnología' });
+        if (!(await credito.count())) p('no está el crédito de las fotos');
+        else {
+          if (plano(await credito.first().innerText()) !== INICIO.credito) p(`el crédito dice «${plano(await credito.first().innerText())}»`);
+          for (const [nombre, url] of CREDITOS) {
+            const href = await credito.first().getByRole('link', { name: nombre, exact: true }).getAttribute('href').catch(() => null);
+            if (href !== url) p(`el crédito enlaza «${nombre}» a ${href}`);
+          }
+        }
+
+        // Cómo funciona.
+        const ruta = page.getByRole('region', { name: INICIO.rutaTitulo });
+        if (!(await ruta.count())) p(`no hay una sección «${INICIO.rutaTitulo}»`);
+        else {
+          const deRuta = plano(await ruta.innerText()).toLowerCase();
+          for (const clave of ['rutaRotulo', 'rutaBajada']) {
+            if (!deRuta.includes(INICIO[clave].toLowerCase())) p(`«Cómo funciona» no dice «${INICIO[clave]}»`);
+          }
+          const pasos = await textosDe(ruta.locator('ol > li'));
+          if (pasos.length !== PASOS.length) p(`la ruta tiene ${pasos.length} pasos`);
+          PASOS.forEach(([n, nombre, texto, servicio], i) => {
+            const paso = (pasos[i] || '').toLowerCase();
+            for (const parte of [n, nombre, texto, servicio]) {
+              if (!paso.includes(parte.toLowerCase())) p(`el paso ${n} no dice «${parte}»: «${pasos[i]}»`);
+            }
+            if (i < 4 && paso.includes('disponible')) p(`el paso ${n} se marca disponible`);
+          });
+        }
+
+        // Principio.
+        const principio = page.getByRole('region', { name: INICIO.principioRotulo });
+        if (!(await principio.count())) p(`no hay una sección «${INICIO.principioRotulo}»`);
+        else {
+          const frase = plano(await principio.locator('blockquote').innerText().catch(() => ''));
+          if (frase !== INICIO.principioFrase) p(`la frase es «${frase}»`);
+          const enCereal = plano(await principio.locator('blockquote em').innerText().catch(() => ''));
+          if (enCereal !== 'por la ruta') p(`lo destacado de la frase es «${enCereal}»`);
+          if (!plano(await principio.innerText()).includes(INICIO.principioTexto)) p('el principio no dice su texto');
+          for (const [nivel, ruta2] of NIVELES) {
+            for (const nombre of [nivel, ruta2].filter(Boolean)) {
+              const visible = await principio.getByText(nombre, { exact: true }).evaluate(
+                (el) => el.closest('[aria-hidden="true"]') === null,
+              ).catch(() => false);
+              if (!visible) p(`«${nombre}» no se lee`);
+            }
+          }
+        }
+
+        // Lo que salió de Inicio.
+        const todo = plano(await page.locator('main').innerText());
+        for (const ido of ['Publicar una oferta', 'Maquinaria y campos', 'Lo que muestra cada publicación', 'seguir produciendo']) {
+          if (todo.includes(ido)) p(`Inicio todavía dice «${ido}»`);
+        }
+
+        // La forma: en escritorio, cuatro tarjetas por fila y la ruta en una
+        // línea; en celular, filas con miniatura y la ruta hacia abajo.
+        const cajas = await tarjetas.evaluateAll((els) => els.map((el) => {
+          const c = el.getBoundingClientRect();
+          const f = el.querySelector('img')?.getBoundingClientRect();
+          const t = el.querySelector('h3')?.getBoundingClientRect();
+          return { top: Math.round(c.top), left: Math.round(c.left), imgDerecha: f && Math.round(f.right), tituloIzquierda: t && Math.round(t.left) };
+        }));
+        const pasosCajas = await ruta.locator('ol > li').evaluateAll((els) => els.map((el) => {
+          const c = el.getBoundingClientRect(); return { top: Math.round(c.top), left: Math.round(c.left) };
+        }));
+        if (viewport.width >= 1024) {
+          if (new Set(cajas.slice(0, 4).map((c) => c.top)).size !== 1) p(`las cuatro primeras tarjetas no van en una fila: ${JSON.stringify(cajas.slice(0, 4))}`);
+          if (new Set(pasosCajas.map((c) => c.top)).size !== 1) p('los pasos no van en una línea');
+        } else {
+          if (cajas.some((c) => c.imgDerecha > c.tituloIzquierda)) p(`en celular la miniatura no va al lado del título: ${JSON.stringify(cajas)}`);
+          if (pasosCajas.some((c, i) => i && (c.top <= pasosCajas[i - 1].top || c.left !== pasosCajas[0].left))) {
+            p(`en celular la ruta no va hacia abajo: ${JSON.stringify(pasosCajas)}`);
+          }
+        }
+        const [scroll, visible] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+        if (scroll > visible + 1) p(`la página desborda (${scroll} en ${visible})`);
+        if (errores.length) p(`errores de página: ${errores.join(' | ')}`);
+      } finally {
+        await contexto.close();
+      }
+    }
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return `en 1440 y 390: la portada, los siete servicios en orden con sólo el Mercado disponible y ${total} `
+      + 'publicaciones, los «Próximamente» sin enlaces, el cierre «Escribinos», el crédito de las fotos CC BY con '
+      + 'sus enlaces, los cinco pasos con el quinto disponible y el principio con sus niveles legibles; sin '
+      + '«Publicar una oferta» ni los bloques viejos';
+  } finally {
+    await browser.close();
+  }
+});
+
+// 233. Los botones de Inicio llevan adonde dicen, y el número del Mercado
+// sale del catálogo: no aparece mientras no se sabe, y en singular dice
+// «publicación».
+await runCase(233, 'Los botones de Inicio llevan adonde dicen, y el número del Mercado es el del catálogo', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const problemas = [];
+  try {
+    for (const [ancho, viewport] of ANCHOS_DE_INICIO) {
+      const { contexto, page, errores } = await abrirInicio(browser, viewport);
+      const p = (texto) => problemas.push(`${ancho}: ${texto}`);
+      try {
+        const conoce = page.getByRole('button', { name: 'Conocé el ecosistema', exact: true });
+        if (await conoce.count()) await conoce.click();
+        else p('no está «Conocé el ecosistema»');
+        const foco = await esperarA(async () => page.evaluate(() => {
+          const el = document.activeElement;
+          const c = el?.getBoundingClientRect();
+          // A la vista y no debajo de la cabecera, que en escritorio va pegada
+          // arriba.
+          const cabecera = Math.max(0, document.querySelector('header')?.getBoundingClientRect().bottom || 0);
+          return el?.tagName === 'H2' && el.textContent.trim() === '¿Qué querés hacer?'
+            && c.top >= cabecera && c.bottom <= window.innerHeight;
+        }), 'el foco no llegó', 5_000).then(() => true, () => false);
+        if (!foco) {
+          const quien = await page.evaluate(() => `${document.activeElement?.tagName} «${(document.activeElement?.textContent || '').trim().slice(0, 40)}»`);
+          p(`«Conocé el ecosistema» deja el foco en ${quien}, y no en «¿Qué querés hacer?» a la vista`);
+        }
+
+        const destinos = [
+          ['«Entrar al Mercado» de la portada', () => laPortada(page).getByRole('button', { name: 'Entrar al Mercado', exact: true }), /section=marketplace/],
+          ['«Entrar al Mercado» de la tarjeta', () => page.locator('article').filter({ has: page.getByRole('heading', { name: 'Mercado', exact: true }) }).getByRole('button', { name: 'Entrar al Mercado' }), /section=marketplace/],
+          ['«Escribinos»', () => page.locator('aside').getByRole('button', { name: 'Escribinos', exact: true }), /section=contact/],
+        ];
+        for (const [nombre, boton, barra] of destinos) {
+          await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+          await page.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 20_000 });
+          const b = boton();
+          if (!(await b.count())) { p(`no está ${nombre}`); continue; }
+          await b.first().click();
+          const llego = await esperarA(async () => barra.test(page.url()), nombre, 10_000).then(() => true, () => false);
+          if (!llego) p(`${nombre} dejó la barra en ${page.url()}`);
+        }
+        await page.getByRole('heading', { name: 'Contacto', level: 1 }).waitFor({ timeout: 10_000 })
+          .catch(() => p('«Escribinos» no mostró Contacto'));
+        if (errores.length) p(`errores de página: ${errores.join(' | ')}`);
+      } finally {
+        await contexto.close();
+      }
+    }
+
+    // El número: retenido, no se escribe; con uno, en singular.
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    let soltar;
+    const retenido = new Promise((r) => { soltar = r; });
+    await page.route(/\/api\/catalog\/products\?/, async (ruta) => {
+      await retenido;
+      const respuesta = await ruta.fetch();
+      const json = await respuesta.json();
+      await ruta.fulfill({ response: respuesta, json: { ...json, total: 1 } });
+    });
+    try {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      const mercado = page.locator('article').filter({ has: page.getByRole('heading', { name: 'Mercado', exact: true }) });
+      await mercado.first().waitFor({ timeout: 20_000 }).catch(() => {});
+      if (await mercado.count()) {
+        const antes = plano(await mercado.innerText());
+        if (/\d+\s+publicaci/i.test(antes)) problemas.push(`con el catálogo sin contestar, el Mercado ya dice un número: «${antes}»`);
+      } else problemas.push('no está la tarjeta del Mercado');
+      soltar();
+      const singular = await esperarA(async () => (await mercado.count())
+        && plano(await mercado.innerText()).includes('1 publicación disponible'), 'singular', 10_000).then(() => true, () => false);
+      if (!singular) problemas.push(`con un total de 1 el Mercado dice «${(await mercado.count()) ? plano(await mercado.innerText()) : ''}»`);
+    } finally {
+      soltar();
+      await contexto.close();
+    }
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'en 1440 y 390, «Conocé el ecosistema» deja el foco en «¿Qué querés hacer?» a la vista, los dos «Entrar al '
+      + 'Mercado» llevan al Mercado y «Escribinos» a Contacto; el número no aparece hasta que contesta el catálogo, '
+      + 'y con uno dice «1 publicación disponible»';
+  } finally {
+    await browser.close();
+  }
+});
+
+// 234. «Quiénes somos» ya no está: ni en el menú, en los dos anchos, ni en el
+// pie. Un enlace viejo lleva a Inicio con la barra reescrita, sin dejar una
+// entrada propia en el historial.
+await runCase(234, '«Quiénes somos» sale del menú y del pie, y un enlace viejo lleva a Inicio', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const problemas = [];
+  try {
+    for (const [ancho, viewport] of ANCHOS_DE_INICIO) {
+      const { contexto, page } = await abrirInicio(browser, viewport);
+      try {
+        const enLaCabecera = await page.locator('header').getByRole('button', { name: 'Quiénes somos' }).count();
+        if (enLaCabecera) problemas.push(`${ancho}: la cabecera tiene «Quiénes somos» (${enLaCabecera})`);
+        const enElPie = await page.locator('footer').getByRole('link', { name: 'Quiénes somos' }).count();
+        if (enElPie) problemas.push(`${ancho}: el pie tiene «Quiénes somos»`);
+        if (/Quiénes somos/.test(await page.locator('body').innerText())) problemas.push(`${ancho}: la página nombra «Quiénes somos»`);
+      } finally {
+        await contexto.close();
+      }
+    }
+
+    const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await contexto.newPage();
+    const enInicio = async (donde) => {
+      const ok = await esperarA(async () => new URL(page.url()).search === ''
+        && plano(await page.getByRole('heading', { level: 1 }).first().innerText().catch(() => '')) === INICIO.titulo,
+      donde, 15_000).then(() => true, () => false);
+      if (!ok) problemas.push(`${donde}: la barra dice ${page.url()} y el título «${plano(await page.getByRole('heading', { level: 1 }).first().innerText().catch(() => ''))}»`);
+    };
+    try {
+      await page.goto(`${FRONTEND_URL}/?section=contact`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Contacto', level: 1 }).waitFor({ timeout: 20_000 });
+      const largo = await page.evaluate(() => window.history.length);
+      await page.goto(`${FRONTEND_URL}/?section=about`, { waitUntil: 'domcontentloaded' });
+      await enInicio('el enlace viejo');
+      const despues = await page.evaluate(() => window.history.length);
+      if (despues !== largo + 1) problemas.push(`el enlace viejo dejó ${despues - largo} entradas en el historial`);
+      await page.goBack();
+      await page.getByRole('heading', { name: 'Contacto', level: 1 }).waitFor({ timeout: 10_000 })
+        .catch(() => problemas.push(`Atrás desde el enlace viejo dejó ${page.url()}`));
+      await page.goForward();
+      await enInicio('Adelante hasta el enlace viejo');
+    } finally {
+      await contexto.close();
+    }
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return 'en 1440 y 390, ni la cabecera ni el pie ni la página nombran «Quiénes somos»; «?section=about» termina en '
+      + 'Inicio con la barra en «/», con una sola entrada en el historial, y Atrás y Adelante no vuelven a pasar por él';
+  } finally {
+    await browser.close();
   }
 });
 

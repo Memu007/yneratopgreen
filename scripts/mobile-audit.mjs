@@ -325,11 +325,11 @@ async function exercisePublicCatalog(browser, viewport, state) {
   try {
     state.screen = '01-home';
     await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('heading', { name: /seguir produciendo/ }).waitFor();
+    await page.getByRole('heading', { name: /en una misma ruta/ }).waitFor();
     await inspect(page, state, viewport, '01-home');
 
     state.screen = '02-filters';
-    await tocar(page.getByRole('button', { name: 'Ir al Mercado', exact: true }), 'Ir al Mercado');
+    await tocar(page.getByRole('button', { name: 'Entrar al Mercado', exact: true }).first(), 'Entrar al Mercado');
     await waitForCatalog(page);
     await abrirFiltros(page);
     await elegir(page.locator('#catalog-category'), 'Categoría', { index: 1 });

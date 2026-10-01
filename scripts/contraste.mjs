@@ -383,17 +383,14 @@ for (const medida of MEDIDAS) {
     const ctx = await sesion({ viewport }, comprador);
     const page = await ctx.newPage();
 
-    const portada = page.getByRole('heading', { name: /seguir produciendo/ });
+    const portada = page.getByRole('heading', { name: /en una misma ruta/ });
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
     await revisar(page, `${medida.n} inicio`, portada);
 
     await extremosDeFoto(page, `${medida.n} inicio`, null, portada);
 
-    // Era «Nuestro equipo», que salió con REV1-PENDIENTES-1: ahora se espera
-    // el cierre de la página.
-    const cierre = page.getByRole('heading', { name: 'Publicá o buscá en el Mercado agropecuario' });
+    // «Quiénes somos» salió del sitio con INICIO-ECOSISTEMA-1: queda Contacto.
     for (const [seccion, titulo, marca] of [
-      ['Quiénes somos', 'quienes somos', cierre],
       ['Contacto', 'contacto', page.getByRole('heading', { name: 'Contacto', level: 1 })],
     ]) {
       await page.getByRole('button', { name: seccion, exact: true }).first().click();
@@ -404,7 +401,6 @@ for (const medida of MEDIDAS) {
     await page.locator('footer').getByRole('link', { name: 'Servicios', exact: true }).click();
     await revisar(page, `${medida.n} catálogo: servicios`,
       page.locator('article[class*="card"]').filter({ hasText: /Servicio|Logística/ }).first());
-    await extremosDeFoto(page, `${medida.n} quienes somos`, 'Quiénes somos', cierre);
 
     // La vista del enlace de confirmación, en su estado de rechazo: es el que
     // trae el texto de error y el formulario de reenvío. El de éxito consume
