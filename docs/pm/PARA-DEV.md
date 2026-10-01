@@ -28,7 +28,7 @@ La publicación a `main` la decide Emi. No integres ni despliegues.
 
 ## Tarea activa — SESIONES-AL-CAMBIAR-1
 
-**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM. Va antes de `VENDER-SIN-SESION-1`.
+**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM. Va antes de `FILTROS-DE-PUBLICACIONES-1`.
 
 ### Problema
 
@@ -129,7 +129,84 @@ Entregala por separado.
 
 ---
 
-## Después — VENDER-SIN-SESION-1 (empezala apenas entregues SESIONES-AL-CAMBIAR-1)
+## Siguiente — FILTROS-DE-PUBLICACIONES-1 (apenas entregues SESIONES-AL-CAMBIAR-1)
+
+**Decisión de Emi (01/10), por pedido de la clienta.** Revierte la decisión
+del 25/09 («el filtro de marca muestra las 44»). Va antes de
+`VENDER-SIN-SESION-1`. Entregala por separado.
+
+### Problema
+
+La clienta eligió Maquinaria agrícola, después Tractores, y el filtro le
+ofreció todas las marcas, aunque nadie haya publicado un tractor de la
+mayoría. Ella quiere que los filtros salgan de las publicaciones:
+
+- sólo se ofrece lo que alguien publicó;
+- una marca nueva que alguien escriba aparece sola.
+
+Su prototipo está en `originales/BUSCADOR-AGROMARKET-CLIENTA-2026-10-01.html`.
+
+### Qué entra
+
+1. **Cada filtro del Mercado ofrece sólo opciones con publicaciones** dentro
+   de la búsqueda de ese momento, con su cantidad. Vale para la marca, el
+   tipo, los rangos de potencia, el origen y la condición.
+   - Con Tractores elegido, sólo las marcas que tienen tractores publicados.
+   - Una opción ya elegida se sigue mostrando aunque quede en cero, para
+     poder sacarla.
+   - Sin categoría que use marca, sigue la regla del caso 175.
+2. **«Otra marca» al publicar y en «Editar»,** en las categorías con
+   `usa_marca`.
+   - Se escribe el nombre: de 2 a 40 caracteres, sin espacios de más.
+   - Si coincide con una marca que ya existe, sin importar mayúsculas,
+     acentos ni espacios, se usa esa y no se crea otra.
+   - Si es nueva, aparece sola en el filtro con su cantidad, y en la ficha
+     con el nombre como se escribió.
+   - La lista del alta la ofrece desde ahí para las publicaciones
+     siguientes.
+   - Cómo se guarda lo elegís vos. Si necesita migración, aditiva y probada
+     en modo producción, con un caso sobre una base sin siembra.
+3. **«Tecnologizar» pasa a «Tecnificar»** en «Cómo funciona» de Inicio (la
+   clienta, 01/10). Actualizá los casos que lo lean.
+
+### Fuera de alcance
+
+- Unir o corregir marcas desde el panel: es otra pieza.
+- Las categorías («Bienes y Ganado», agrícola o pecuario, la hacienda) y
+  «Origen y Destino»: esperan una reunión de Emi con la clienta.
+- Integración y despliegue.
+
+### Aceptación verificable
+
+1. **Caso nuevo, en el Mercado, en escritorio y celular:**
+   - con Tractores elegido, la marca ofrece exactamente las marcas de los
+     tractores publicados, con su cantidad, y ninguna en cero;
+   - lo mismo con el tipo y la potencia;
+   - una marca elegida que queda en cero sigue a la vista.
+2. **Caso nuevo de «Otra marca»:**
+   - publicar un tractor con «Otra marca: Agromec» hace que «Agromec»
+     aparezca en el filtro, con 1, y en la ficha;
+   - otro con «AGROMEC » usa la misma marca, y el filtro dice 2;
+   - «Otra marca: john deere» usa John Deere;
+   - la API rechaza una de 1 o de 41 caracteres, con su motivo.
+3. **Negativos:**
+   - el filtro con opciones en cero da rojo;
+   - una marca nueva que no aparece en el filtro da rojo;
+   - «AGROMEC» creada como una segunda marca da rojo.
+4. **Las dos guías** se actualizan si nombran el filtro de marca o la lista
+   cerrada.
+5. Suite completa desde base nueva, a11y, contraste, móvil y las puertas de
+   siempre.
+
+### Frená y consultá
+
+- Si quitar las opciones en cero rompe la regla del caso 175, o algún filtro
+  que dependa de otro.
+- Si «Otra marca» obliga a cambiar cómo se guardan las marcas que ya existen.
+
+---
+
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues FILTROS-DE-PUBLICACIONES-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.
