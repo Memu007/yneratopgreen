@@ -11,7 +11,9 @@ import {
 import {
   ANIO_MINIMO,
   anioMaximo,
+  MARCA_MAXIMO,
   ORIGENES,
+  OTRA_MARCA,
   ROTULO_DEL_ORIGEN,
   type OrigenDeclarado,
 } from '../../utils/catalogService';
@@ -171,6 +173,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   // viaja: la lista no puede tener todas las marcas que existen, y obligar
   // a elegir una haría que el vendedor conteste cualquiera para publicar.
   const [brand, setBrand] = useState('');
+  // «Otra marca»: la que no está en la lista, escrita. La API la busca entre
+  // las que hay sin importar mayúsculas, acentos ni espacios, y si no está la
+  // agrega a la lista.
+  const [otraMarca, setOtraMarca] = useState('');
 
   // El tipo —el tercer nivel— y la potencia. Cuelgan del SUBRUBRO: se
   // ofrecen si el subrubro elegido los tiene, se sueltan al cambiarlo y son
@@ -219,6 +225,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     // Todo lo declarado se suelta: la marca se quedaba, y el alta siguiente
     // se abría con la marca de la publicación anterior ya elegida.
     setBrand('');
+    setOtraMarca('');
     setTipo('');
     setPotencia('');
     setModelo('');
@@ -534,6 +541,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
       }
     }
 
+    // «Otra marca» elegida y sin escribir no se manda como «sin declarar»:
+    // quien la eligió quiso declarar una.
+    if (selectedCategory?.usaMarca && brand === OTRA_MARCA && !otraMarca.trim()) {
+      showToast('Escribí el nombre de la marca, o elegí una de la lista.', 'warning');
+      return;
+    }
+
     // El año, si se declara, va de 1950 al año próximo. La API valida lo
     // mismo; acá se dice antes de mandar.
     if (selectedCategory?.usaMarca && anio
@@ -602,7 +616,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         publication_type: publicationType,
         operation_kind: operationKind,
         condition: operationKind === 'activo' && condition ? condition : undefined,
-        brand: selectedCategory?.usaMarca && brand ? brand : undefined,
+        brand: selectedCategory?.usaMarca && brand && brand !== OTRA_MARCA ? brand : undefined,
+        otra_marca: selectedCategory?.usaMarca && brand === OTRA_MARCA ? otraMarca.trim() : undefined,
         subcategory_type: tiposDelSubrubro.length > 0 && tipo ? tipo : undefined,
         power_hp: subrubroElegido?.usa_potencia && potencia ? Number(potencia) : undefined,
         model: selectedCategory?.usaMarca && modelo.trim() ? modelo.trim() : undefined,
@@ -863,11 +878,27 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   {formOptions.brand.map(opcion => (
                     <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
                   ))}
+                  <option value={OTRA_MARCA}>Otra marca</option>
                 </select>
                 <p className={styles.helpText}>
                   Elegila de la lista para que quien busque por marca te encuentre.
-                  Si la tuya no está, dejala sin declarar: escribirla en el título
-                  no la vuelve buscable.
+                  Si la tuya no está, elegí «Otra marca» y escribila.
+                </p>
+              </div>
+            )}
+            {selectedCategory?.usaMarca && brand === OTRA_MARCA && (
+              <div className={styles.formGroup}>
+                <label htmlFor="otra-marca">Nombre de la marca</label>
+                <input
+                  id="otra-marca"
+                  name="otra_marca"
+                  type="text"
+                  maxLength={MARCA_MAXIMO}
+                  value={otraMarca}
+                  onChange={(e) => setOtraMarca(e.target.value)}
+                />
+                <p className={styles.helpText}>
+                  De 2 a 40 caracteres. Si ya está en la lista, se usa esa.
                 </p>
               </div>
             )}

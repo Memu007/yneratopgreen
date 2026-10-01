@@ -184,9 +184,9 @@ function textoDeUnError(item: unknown): string | null {
   if (type === 'missing' && nombre) {
     return `${nombre} es obligatorio.`;
   }
-  // La regla de la contraseña nueva (`ClaveNueva` en la API) ya trae el
-  // mensaje entero, con el nombre del campo adentro.
-  if (type === 'clave_nueva') {
+  // La regla de la contraseña nueva (`ClaveNueva` en la API) y la de «Otra
+  // marca» ya traen el mensaje entero, con el nombre del campo adentro.
+  if (type === 'clave_nueva' || type === 'otra_marca') {
     return msg;
   }
 

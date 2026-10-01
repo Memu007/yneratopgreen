@@ -86,6 +86,11 @@ export const ORIGENES: { valor: OrigenDeclarado; rotulo: string }[] = [
   { valor: 'dueno_directo', rotulo: 'Dueño directo' },
 ];
 export const ROTULO_DEL_ORIGEN = 'declarado por quien vende';
+
+/** «Otra marca» en los selectores del alta y de «Editar»: no es una marca de
+    la lista, es pedir escribir una. La API acepta de 2 a 40 caracteres. */
+export const OTRA_MARCA = '__otra_marca__';
+export const MARCA_MAXIMO = 40;
 export const rotuloDeOrigen = (valor?: string | null): string | undefined =>
   ORIGENES.find((origen) => origen.valor === valor)?.rotulo;
 
@@ -197,6 +202,9 @@ export interface ProductDetailFromBackend extends ProductFromBackend {
   seller: SellerInfo;
   images: ProductImage[];
   published_at?: string;
+  /** El nombre de la marca como está en la lista; el de «Otra marca», como
+      se escribió. */
+  brand_label?: string | null;
 }
 
 /**
@@ -212,6 +220,26 @@ export interface MarcaDelMercado {
   count: number;
 }
 
+/**
+ * Una opción de otro filtro del Mercado —tipo, potencia, origen o
+ * condición— con cuántas publicaciones tiene HOY. El rótulo no viaja: es el
+ * de la lista de acá, que ya lo tiene.
+ */
+export interface OpcionDelMercado {
+  value: string;
+  count: number;
+}
+
+/** Lo que el conjunto filtrado tiene en cada filtro, además de la marca. */
+export interface FacetasDelMercado {
+  tipos: OpcionDelMercado[];
+  potencias: OpcionDelMercado[];
+  origenes: OpcionDelMercado[];
+  condiciones: OpcionDelMercado[];
+}
+
+export const SIN_FACETAS: FacetasDelMercado = { tipos: [], potencias: [], origenes: [], condiciones: [] };
+
 export interface ProductListResponse {
   items: ProductFromBackend[];
   total: number;
@@ -224,6 +252,12 @@ export interface ProductListResponse {
       tiene cada una. Viene en la misma respuesta que el listado: pedirla
       aparte podría contestar sobre un conjunto distinto del dibujado. */
   brands: MarcaDelMercado[];
+  /** Lo mismo para el tipo y la potencia —sólo con un subrubro elegido—, el
+      origen y la condición. */
+  subcategory_types?: OpcionDelMercado[];
+  power_ranges?: OpcionDelMercado[];
+  origins?: OpcionDelMercado[];
+  conditions?: OpcionDelMercado[];
 }
 
 /**

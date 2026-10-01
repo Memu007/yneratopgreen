@@ -25,6 +25,7 @@ import {
   getLocalities,
   getProvinces,
   convertBackendProductToFrontend,
+  SIN_FACETAS,
 } from './utils/catalogService';
 import { asegurarSesion, tokenStorage } from './utils/api';
 import { ContextoDeNavegacion, useNavegacion } from './navegacion/navegacion';
@@ -32,6 +33,7 @@ import type { Seccion } from './navegacion/politica';
 import type { NewProductData, Product, CotizacionPedida } from './types';
 import type {
   CategoryResponse,
+  FacetasDelMercado,
   LocalityResponse,
   MarcaDelMercado,
   ProvinceResponse,
@@ -115,6 +117,8 @@ function App() {
    * cambiaría de opciones al pasar de página.
    */
   const [marcasDelMercado, setMarcasDelMercado] = useState<MarcaDelMercado[]>([]);
+  // Y lo mismo para el tipo, la potencia, el origen y la condición.
+  const [facetasDelMercado, setFacetasDelMercado] = useState<FacetasDelMercado>(SIN_FACETAS);
   // Qué decir cuando el mercado no carga. Sin esto, una falla de red terminaba
   // en la lista vacía y el cartel «No hay operaciones con estos filtros», que
   // es mentira: no es que no haya, es que no pudimos preguntar.
@@ -565,6 +569,12 @@ function App() {
         // La faceta viene calculada SIN la marca puesta, así que elegir una
         // no vacía la lista: las demás siguen ahí, con sus conteos.
         setMarcasDelMercado(response.brands ?? []);
+        setFacetasDelMercado({
+          tipos: response.subcategory_types ?? [],
+          potencias: response.power_ranges ?? [],
+          origenes: response.origins ?? [],
+          condiciones: response.conditions ?? [],
+        });
       })
       .catch((error) => {
         if (cancelled) return;
@@ -572,6 +582,7 @@ function App() {
         setProducts([]);
         setTotalDeCatalogo(null);
         setMarcasDelMercado([]);
+        setFacetasDelMercado(SIN_FACETAS);
         // Dos fallas distintas, y conviene no confundirlas: quedarse sin red es
         // algo que la persona puede resolver, y que se lo cuenten es lo que le
         // permite hacerlo. Que el servidor falle no es asunto suyo. El resto de
@@ -802,6 +813,7 @@ function App() {
                 condicion={condicion}
                 marca={marca}
                 marcasDisponibles={marcasDelMercado}
+                facetas={facetasDelMercado}
                 tipo={tipo}
                 potencia={potencia}
                 anioDesde={anioDesde}

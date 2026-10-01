@@ -72,7 +72,7 @@ const PASOS: { numero: string; nombre: string; texto: string; servicio: string; 
   { numero: '01', nombre: 'Producir', texto: 'Qué producto, dónde, escala y etapa.', servicio: 'Ruta productiva' },
   { numero: '02', nombre: 'Destinar', texto: 'Consumo, industria, exportación u otro destino.', servicio: 'Ruta productiva' },
   { numero: '03', nombre: 'Cumplir', texto: 'Requisitos, documentos, controles y certificaciones.', servicio: 'Trazabilidad y cumplimiento' },
-  { numero: '04', nombre: 'Tecnologizar', texto: 'Lo necesario, recomendable y avanzado.', servicio: 'Tecnología' },
+  { numero: '04', nombre: 'Tecnificar', texto: 'Lo necesario, recomendable y avanzado.', servicio: 'Tecnología' },
   { numero: '05', nombre: 'Comercializar', texto: 'Oferta, comprador, logística y operación.', servicio: 'Mercado · Disponible hoy', disponible: true },
 ];
 

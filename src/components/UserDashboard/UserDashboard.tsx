@@ -22,8 +22,10 @@ import {
   getLocalities,
   getProvinces,
   LocalityResponse,
+  MARCA_MAXIMO,
   opcionDeLocalidad,
   ORIGENES,
+  OTRA_MARCA,
   ProvinceResponse,
 } from '../../utils/catalogService';
 import {
@@ -360,6 +362,8 @@ interface EditFormData {
   origen: string;
   /** La marca, por el `value` de la lista. Vacía es «sin declarar». */
   marca: string;
+  /** «Otra marca», escrita, cuando `marca` es `OTRA_MARCA`. */
+  otraMarca: string;
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -1738,6 +1742,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
       anio: product.year != null ? String(product.year) : '',
       origen: product.origin || '',
       marca: product.brand || '',
+      otraMarca: '',
       // Campos de servicio
       pricing_type: product.pricing_type || 'por_hora',
       availability: product.availability || 'inmediata',
@@ -1780,6 +1785,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
     if (potenciaEscrita && !(/^\d+$/.test(potenciaEscrita)
       && Number(potenciaEscrita) >= 1 && Number(potenciaEscrita) <= 1000)) {
       showToast('La potencia va en HP: un número entero entre 1 y 1000.', 'warning');
+      return;
+    }
+    // «Otra marca» elegida y sin escribir no se manda: quien la eligió quiso
+    // declarar una.
+    if (editingProduct.marca === OTRA_MARCA && !editingProduct.otraMarca.trim()) {
+      showToast('Escribí el nombre de la marca, o elegí una de la lista.', 'warning');
       return;
     }
     const anioEscrito = editingProduct.anio.trim();
@@ -1839,7 +1850,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
         // marca que la administración ya sacó de la lista la API la rechaza,
         // y reenviarla sin tocarla impediría guardar el resto.
         const marcaGuardada = backendProducts.find(p => p.id === editingProduct.id)?.brand || '';
-        if (editingProduct.marca !== marcaGuardada) {
+        if (editingProduct.marca === OTRA_MARCA) {
+          payload.otra_marca = editingProduct.otraMarca.trim();
+        } else if (editingProduct.marca !== marcaGuardada) {
           payload.brand = editingProduct.marca || null;
         }
       }
@@ -3999,11 +4012,25 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                       ))}
                       {/* La que tiene y ya no está en la lista se sigue viendo:
                           si no, el selector diría «Sin declarar» sin serlo. */}
-                      {editingProduct.marca && !marcas.some(opcion => opcion.value === editingProduct.marca) && (
+                      {editingProduct.marca && editingProduct.marca !== OTRA_MARCA
+                        && !marcas.some(opcion => opcion.value === editingProduct.marca) && (
                         <option value={editingProduct.marca}>{editingProduct.marca}</option>
                       )}
+                      <option value={OTRA_MARCA}>Otra marca</option>
                     </select>
                   </div>
+                  {editingProduct.marca === OTRA_MARCA && (
+                    <div className={styles.editFormGroup}>
+                      <label htmlFor="edit-otra-marca">Nombre de la marca</label>
+                      <input
+                        id="edit-otra-marca"
+                        type="text"
+                        maxLength={MARCA_MAXIMO}
+                        value={editingProduct.otraMarca}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, otraMarca: e.target.value })}
+                      />
+                    </div>
+                  )}
                   <div className={styles.editFormGroup}>
                     <label htmlFor="edit-modelo">Modelo</label>
                     <input

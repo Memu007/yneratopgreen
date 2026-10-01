@@ -23,7 +23,7 @@ from app.schemas.products import ProductCreateRequest, ProductUpdateRequest, Pro
 from app.core.config import settings
 from app.services.storage import get_storage
 from app.models.form_option import FormOption
-from app.services import anatomia, atributos, candado, tipos
+from app.services import anatomia, atributos, candado, marcas, tipos
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -78,7 +78,9 @@ def slugify(text: str) -> str:
     return text.strip('-')
 
 
-def marca_declarada(db: Session, category: Category, pedida: Optional[str]) -> Optional[str]:
+def marca_declarada(
+    db: Session, category: Category, pedida: Optional[str], otra: Optional[str] = None,
+) -> Optional[str]:
     """La marca que se guarda, o nada.
 
     Dos condiciones, y las dos importan:
@@ -91,12 +93,23 @@ def marca_declarada(db: Session, category: Category, pedida: Optional[str]) -> O
        el día que esto sea un filtro no habría nada que contar. Una marca que
        no está cargada se rechaza; no se guarda a medias.
 
+    La que no está en la lista se escribe aparte, como «Otra marca» (`otra`),
+    y entra a la lista como una más: una que coincide con una existente sin
+    importar mayúsculas, acentos ni espacios usa esa (`marcas.marca_escrita`).
+
     Donde la categoría no ofrece marca, lo que venga se descarta en silencio,
     igual que la condición: guardar un dato que ninguna pantalla muestra es
     dejarlo listo para que una edición futura lo resucite.
     """
     if not getattr(category, "usa_marca", False):
         return None
+    if pedida and otra:
+        raise HTTPException(
+            status_code=400,
+            detail="Elegí una marca de la lista o escribí otra, no las dos.",
+        )
+    if otra:
+        return marcas.marca_escrita(db, otra)
     if not pedida:
         return None
 
@@ -311,7 +324,7 @@ async def create_product(
     # tienen marca: decidirlo por anatomía pondría una lista de marcas de
     # tractor sobre los dos. Donde la categoría no la ofrece, se descarta si
     # viene, igual que la condición.
-    brand = marca_declarada(db, category, product_data.brand)
+    brand = marca_declarada(db, category, product_data.brand, product_data.otra_marca)
 
     # El tipo y la potencia los decide el SUBRUBRO, que es donde vive la lista.
     subrubro = subrubro_de(db, product_data.subcategory_id)
@@ -655,10 +668,12 @@ async def update_product(
     categoria_final = db.query(Category).filter(
         Category.id == update_data.get("category_id", product.category_id)
     ).first()
+    # «Otra marca» no es una columna: se resuelve en la marca y se saca.
+    otra_marca = update_data.pop("otra_marca", None)
     if categoria_final is not None:
-        if "brand" in update_data:
+        if "brand" in update_data or otra_marca:
             update_data["brand"] = marca_declarada(
-                db, categoria_final, update_data["brand"])
+                db, categoria_final, update_data.get("brand"), otra_marca)
         elif not getattr(categoria_final, "usa_marca", False):
             update_data["brand"] = None
 

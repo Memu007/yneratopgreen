@@ -170,6 +170,9 @@ class ProductDetailResponse(ProductBase):
     operation_kind: str = "insumo"
     condition: Optional[str] = None
     brand: Optional[str] = None
+    # El nombre de la marca, como está en la lista: el de una escrita como
+    # «Otra marca» es el que se escribió.
+    brand_label: Optional[str] = None
     subcategory_type: Optional[TipoDeSubrubro] = None
     power_hp: Optional[int] = None
     model: Optional[str] = None
@@ -197,12 +200,21 @@ class BrandFacetItem(BaseModel):
     """Una marca ofrecible, con cuántas publicaciones tiene HOY.
 
     `count` se cuenta sobre el conjunto que se está mirando —con los demás
-    filtros puestos— y no sobre el catálogo entero. Con una categoría que usa
-    marca elegida llegan todas las marcas activas, también las que están en
-    cero; si no, sólo las que el conjunto tiene.
+    filtros puestos— y no sobre el catálogo entero. Llegan sólo las marcas
+    que el conjunto tiene, y la elegida aunque quede en cero.
     """
     value: str
     label: str
+    count: int
+
+class FacetaItem(BaseModel):
+    """Una opción de un filtro, con cuántas publicaciones tiene HOY.
+
+    Como la marca: con los demás filtros puestos, sólo lo que el conjunto
+    tiene, y la elegida aunque quede en cero. El rótulo no viaja: es el de la
+    lista del Mercado, que ya lo tiene.
+    """
+    value: str
     count: int
 
 class ProductListResponse(BaseModel):
@@ -219,6 +231,12 @@ class ProductListResponse(BaseModel):
     # que el listado a propósito: una llamada aparte podría contestar sobre
     # un conjunto distinto del que se está dibujando.
     brands: List[BrandFacetItem] = []
+    # Y las del tipo, la potencia, el origen y la condición, con la misma
+    # regla. El tipo y la potencia llegan sólo con un subrubro elegido.
+    subcategory_types: List[FacetaItem] = []
+    power_ranges: List[FacetaItem] = []
+    origins: List[FacetaItem] = []
+    conditions: List[FacetaItem] = []
 
 
 # ============= Filter & Search Schemas =============

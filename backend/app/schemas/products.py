@@ -1,11 +1,27 @@
 """
 Schemas para gestión de productos y servicios (crear, editar)
 """
-from typing import Optional, List, Literal
-from pydantic import BaseModel, Field, field_validator
+from typing import Annotated, Optional, List, Literal
+from pydantic import AfterValidator, BaseModel, Field, field_validator
+from pydantic_core import PydanticCustomError
 from uuid import UUID
 
-from app.services import atributos
+from app.services import atributos, marcas
+
+
+def _otra_marca(valor: str) -> str:
+    """«Otra marca»: el nombre escrito, de 2 a 40 caracteres sin espacios de más."""
+    limpio = marcas.limpiar_marca(valor)
+    if len(limpio) < marcas.MARCA_MINIMO:
+        raise PydanticCustomError("otra_marca", "La marca tiene que tener al menos 2 caracteres.")
+    if len(limpio) > marcas.MARCA_MAXIMO:
+        raise PydanticCustomError("otra_marca", "La marca puede tener hasta 40 caracteres.")
+    if not marcas.clave_de_marca(limpio):
+        raise PydanticCustomError("otra_marca", "La marca tiene que tener letras o números.")
+    return limpio
+
+
+OtraMarca = Annotated[str, AfterValidator(_otra_marca)]
 
 
 class ProductCreateRequest(BaseModel):
@@ -32,6 +48,10 @@ class ProductCreateRequest(BaseModel):
     # se rechaza en vez de guardarse como texto libre, que es lo que vuelve
     # incontable un filtro.
     brand: Optional[str] = Field(None, max_length=60)
+    # «Otra marca»: la que no está en la lista, escrita. Va en lugar de
+    # `brand`, no junto: si coincide con una que existe se usa esa, y si no,
+    # entra a la lista (ver `marcas.marca_escrita`).
+    otra_marca: Optional[OtraMarca] = None
     # El tipo: el slug de uno de la lista del SUBRUBRO elegido. Opcional; si
     # viene y no es de esa lista, el alta se rechaza.
     subcategory_type: Optional[str] = Field(None, max_length=80)
@@ -71,6 +91,8 @@ class ProductUpdateRequest(BaseModel):
     operation_kind: Optional[Literal["activo", "insumo", "servicio", "logistica"]] = None
     condition: Optional[Literal["nuevo", "usado"]] = None
     brand: Optional[str] = Field(None, max_length=60)
+    # «Otra marca», como en el alta.
+    otra_marca: Optional[OtraMarca] = None
     # `null` explícito quita el tipo o la potencia; no mandarlos los deja.
     subcategory_type: Optional[str] = Field(None, max_length=80)
     power_hp: Optional[int] = Field(None, ge=1, le=1000)

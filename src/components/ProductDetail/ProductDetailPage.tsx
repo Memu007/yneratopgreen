@@ -100,10 +100,13 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     getProductDetail(id)
       .then(async (respuesta) => {
         const product = convertBackendProductToFrontend(respuesta);
-        // La marca se muestra por su nombre. Si la lista no llega, por su
-        // valor: la ficha no se queda sin mostrarse por eso.
+        // La marca se muestra por su nombre, que trae el detalle: una escrita
+        // como «Otra marca» recién creada no está en la lista que el
+        // navegador guardó al abrir el sitio. Si no llega, por la lista, y si
+        // la lista tampoco, por su valor: la ficha no se queda sin mostrarse.
         if (product.brand) {
-          product.brandName = await nombreDeMarca(product.brand).catch(() => product.brand);
+          product.brandName = respuesta.brand_label
+            || await nombreDeMarca(product.brand).catch(() => product.brand);
         }
         if (vigente) setCarga({ estado: 'lista', product });
       })

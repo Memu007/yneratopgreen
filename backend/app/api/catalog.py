@@ -17,7 +17,7 @@ from app.models.product_image import ProductImage
 from app.models.locality import Locality
 from app.models.user import User
 from app.models.documentacion import DocumentacionDeVendedor, EstadoDeDocumentacion
-from app.services import padron, stock, tipos
+from app.services import marcas as marcas_de_la_lista, padron, stock, tipos
 from app.schemas.catalog import (
     CategoryResponse,
     SubcategoryBase,
@@ -28,6 +28,7 @@ from app.schemas.catalog import (
     SellerBasicInfo,
     UbicacionDePublicacion,
     BrandFacetItem,
+    FacetaItem,
     TipoDeSubrubro,
 )
 
@@ -175,11 +176,19 @@ def get_form_options(
     if option_type:
         query = query.filter(FormOption.option_type == option_type)
         options = query.order_by(FormOption.display_order, FormOption.label).all()
+        if option_type == "brand":
+            # Las marcas se ordenan acá y no en la base: ver `orden_de_marca`.
+            options.sort(key=marcas_de_la_lista.orden_de_marca)
         return [{"value": opt.value, "label": opt.label} for opt in options]
     
     # Devolver todas agrupadas por tipo
     all_options = query.order_by(FormOption.option_type, FormOption.display_order, FormOption.label).all()
     
+    # Las marcas se ordenan acá y no en la base: ver `orden_de_marca`.
+    all_options.sort(key=lambda opt: (
+        opt.option_type,
+        marcas_de_la_lista.orden_de_marca(opt) if opt.option_type == "brand" else 0,
+    ))
     grouped = {}
     for opt in all_options:
         if opt.option_type not in grouped:
@@ -373,43 +382,52 @@ def get_products(
         Product.status == ProductStatus.ACTIVE
     )
     
-    # Aplicar filtros
+    # === Los filtros ======================================================
+    #
+    # Cada filtro va a esta lista con su nombre, y se escribe UNA vez. El
+    # listado los aplica todos, y cada faceta todos menos el suyo
+    # (`con_filtros`). Una copia de los filtros para las facetas se
+    # desincroniza al primer filtro nuevo que alguien agregue de un solo
+    # lado, y el síntoma sería una faceta que promete resultados que el
+    # listado no tiene.
+    filtros = []
+
     if search:
         search_filter = f"%{search}%"
-        query = query.filter(
+        filtros.append(("search", lambda q: q.filter(
             or_(
                 Product.name.ilike(search_filter),
                 Product.description.ilike(search_filter),
                 # El modelo no tiene filtro propio: se encuentra buscándolo.
                 Product.model.ilike(search_filter),
             )
-        )
+        )))
     
     if category:
-        query = query.filter(Product.category_id == category)
+        filtros.append(("category", lambda q: q.filter(Product.category_id == category)))
 
     # Subcategoría: viaja a la consulta como la categoría, y por el mismo
     # motivo. Filtrarla en el navegador significa filtrar la página que bajó:
     # el total deja de describir el conjunto y las publicaciones que la
     # cumplen pero cayeron en otra página no existen para quien mira.
     if subcategory:
-        query = query.filter(Product.subcategory_id == subcategory)
+        filtros.append(("subcategory", lambda q: q.filter(Product.subcategory_id == subcategory)))
     
     if min_price is not None:
-        query = query.filter(Product.price >= min_price)
+        filtros.append(("min_price", lambda q: q.filter(Product.price >= min_price)))
     
     if max_price is not None:
-        query = query.filter(Product.price <= max_price)
+        filtros.append(("max_price", lambda q: q.filter(Product.price <= max_price)))
     
     if in_stock:
         # Disponible, no existente: una unidad reservada por una compra que
         # está esperando el pago no es una unidad que se pueda vender hoy.
-        query = query.filter(
+        filtros.append(("in_stock", lambda q: q.filter(
             func.coalesce(Product.stock, 0) - Product.stock_reservado > 0
-        )
+        )))
     
     if seller_id:
-        query = query.filter(Product.seller_id == seller_id)
+        filtros.append(("seller_id", lambda q: q.filter(Product.seller_id == seller_id)))
 
     # Producto o servicio, decidido en la base y no en el navegador.
     #
@@ -423,31 +441,32 @@ def get_products(
     # alta y la edicion rechazan las tres combinaciones cruzadas-, asi que
     # filtrar por uno u otro devuelve exactamente lo mismo.
     if publication_type:
-        query = query.filter(Product.publication_type == publication_type)
+        filtros.append(("publication_type", lambda q: q.filter(Product.publication_type == publication_type)))
     
     # Filtro por provincia — subconsulta sobre localities, match exacto
     if province:
-        query = query.filter(
+        filtros.append(("province", lambda q: q.filter(
             Product.locality_id.in_(
                 db.query(Locality.id).filter(
                     Locality.province_name == province
                 )
             )
-        )
+        )))
     
     # Filtro por localidad: la localidad y las entidades anidadas que el
     # selector no ofrece por separado. Lo guardado sobre una de ellas aparece
     # al filtrar por su localidad.
     if locality_id:
-        query = query.filter(Product.locality_id.in_(padron.ids_del_filtro(db, locality_id)))
+        localidades = padron.ids_del_filtro(db, locality_id)
+        filtros.append(("locality_id", lambda q: q.filter(Product.locality_id.in_(localidades))))
 
     # Calificación mínima del vendedor. Sin calificar es cero y no "todavía
     # no se sabe": pedir 4 o más deja afuera a quien no tiene ninguna, que es
     # lo que el control promete.
     if min_rating is not None and min_rating > 0:
-        query = query.filter(
+        filtros.append(("min_rating", lambda q: q.filter(
             func.coalesce(User.rating_average, 0) >= min_rating
-        )
+        )))
     
     # La condicion la tienen solo los activos, y ahi es opcional a proposito:
     # en «Bienes y Ganado» y «Tierras y parcelas» un ternero o un campo no son
@@ -459,7 +478,7 @@ def get_products(
     # Se aplica ANTES del conteo, como todos los demas: si se aplicara despues,
     # el total describiria el catalogo y no lo que se esta mirando.
     if condition:
-        query = query.filter(Product.condition == condition)
+        filtros.append(("condicion", lambda q: q.filter(Product.condition == condition)))
 
     # El tipo y la potencia, con la misma regla que la condición: ACOTAN y no
     # completan. Pedir «Arados» devuelve los declarados arados y no los que no
@@ -469,22 +488,24 @@ def get_products(
     #
     # El slug del tipo se repite entre subrubros —hay «otros» en muchos—, así
     # que con subrubro se busca el de ESE subrubro.
-    #
-    # Y van acá, antes de la faceta y del conteo, como todos los demás.
     if subcategory_type:
         tipos_pedidos = db.query(SubcategoryType.id).filter(
             SubcategoryType.slug == subcategory_type
         )
         if subcategory:
             tipos_pedidos = tipos_pedidos.filter(SubcategoryType.subcategory_id == subcategory)
-        query = query.filter(Product.subcategory_type_id.in_(tipos_pedidos))
+        filtros.append(("tipo", lambda q: q.filter(Product.subcategory_type_id.in_(tipos_pedidos))))
+
+    def en_el_rango(q, valor):
+        desde, hasta = tipos.rango(valor)
+        if desde is not None:
+            q = q.filter(Product.power_hp >= desde)
+        if hasta is not None:
+            q = q.filter(Product.power_hp <= hasta)
+        return q
 
     if power_range:
-        desde, hasta = tipos.rango(power_range)
-        if desde is not None:
-            query = query.filter(Product.power_hp >= desde)
-        if hasta is not None:
-            query = query.filter(Product.power_hp <= hasta)
+        filtros.append(("potencia", lambda q: en_el_rango(q, power_range)))
 
     # El año es un rango y cualquiera de los dos extremos puede ir solo. Con
     # «desde» mayor que «hasta» no hay año que cumpla los dos, y el resultado
@@ -492,47 +513,90 @@ def get_products(
     # nulo no entra, y el origen tampoco: pedir «Dueño directo» no trae a los
     # que no lo declararon.
     if year_from is not None:
-        query = query.filter(Product.year >= year_from)
+        filtros.append(("year_from", lambda q: q.filter(Product.year >= year_from)))
     if year_to is not None:
-        query = query.filter(Product.year <= year_to)
+        filtros.append(("year_to", lambda q: q.filter(Product.year <= year_to)))
     if origin:
-        query = query.filter(Product.origin == origin)
+        filtros.append(("origen", lambda q: q.filter(Product.origin == origin)))
 
-    # === La faceta de marcas ===============================================
-    #
-    # Se calcula ACA, y el lugar es la mitad de la pieza: con todos los
-    # filtros vigentes ya aplicados y `brand` TODAVIA NO. Por eso elegir una
-    # marca no borra a las demas de la lista -que es lo que pasaria contando
-    # despues- y por eso los numeros describen el conjunto que se esta
-    # mirando y no el catalogo entero.
-    #
-    # Y no hay una segunda consulta con los filtros copiados: se reusa ESTA,
-    # cambiandole unicamente lo que selecciona. Una copia se desincroniza al
-    # primer filtro nuevo que alguien agregue de un solo lado, y el sintoma
-    # seria una faceta que promete resultados que el listado no tiene.
-    #
-    # Se cuenta antes de ordenar y de paginar: una faceta calculada sobre la
-    # pagina contaria 24 publicaciones y llamaria a eso "el mercado".
-    marcas_contadas = dict(
-        # `distinct` porque lo que se cuenta son publicaciones, no filas: la
-        # consulta trae varios `outerjoin` y ninguno tiene que poder inflar
-        # un numero que despues se le muestra a alguien como "hay 30".
-        query.with_entities(Product.brand, func.count(func.distinct(Product.id)))
-        .filter(Product.brand.isnot(None))
-        .group_by(Product.brand)
-        .all()
-    )
+    # La marca, como los demás: va a la lista y el listado la aplica antes de
+    # contar y de paginar.
+    if brand:
+        filtros.append(("marca", lambda q: q.filter(Product.brand == brand)))
 
-    # Con una categoria que usa marca elegida, se ofrece la lista COMPLETA:
-    # todas las marcas activas, cada una con su cantidad, tambien las que
-    # estan en cero (decision de Emi, 25/09). Es mas facil de revisar y se ve
-    # igual desde el primer dia. Elegir una en cero da el vacio de siempre.
-    # Sin categoria, o con una que no usa marca, sigue la regla de antes: se
-    # ofrecen solo las marcas que el conjunto tiene.
-    lista_completa = False
-    if category:
-        categoria_elegida = db.query(Category.usa_marca).filter(Category.id == category).first()
-        lista_completa = bool(categoria_elegida and categoria_elegida.usa_marca)
+    def con_filtros(consulta, sin=None):
+        """La consulta con todos los filtros vigentes, menos el llamado `sin`."""
+        for nombre, aplicar in filtros:
+            if nombre != sin:
+                consulta = aplicar(consulta)
+        return consulta
+
+    # === Las facetas =======================================================
+    #
+    # Cada filtro ofrece sólo lo que el conjunto tiene, con cuántas
+    # publicaciones (decisión de Emi, 01/10, por pedido de la clienta: el
+    # buscador es un resumen de lo que se publicó, y un filtro lleno de
+    # opciones vacías no ayuda a encontrar).
+    #
+    # Cada una se cuenta con todos los filtros vigentes MENOS el suyo. Por eso
+    # elegir una marca no borra a las demás de la lista -que es lo que pasaría
+    # contando con la marca puesta- y los números describen el conjunto que se
+    # está mirando y no el catálogo entero. Y se cuentan antes de ordenar y de
+    # paginar: una faceta calculada sobre la página contaría 24 publicaciones
+    # y llamaría a eso «el mercado».
+    def contar(sin, columna):
+        return dict(
+            # `distinct` porque lo que se cuenta son publicaciones, no filas:
+            # la consulta trae varios `outerjoin` y ninguno tiene que poder
+            # inflar un número que después se le muestra a alguien como «hay
+            # 30».
+            con_filtros(query, sin)
+            .with_entities(columna, func.count(func.distinct(Product.id)))
+            .filter(columna.isnot(None))
+            .group_by(columna)
+            .all()
+        )
+
+    # La opción ELEGIDA no se cae de la lista aunque otro filtro la deje en
+    # cero. Si se cayera, el control no tendría cómo decir que está puesta ni
+    # cómo sacarla: quedaría un mercado vacío y un filtro invisible
+    # sosteniéndolo. Es la única que puede aparecer con cero; las demás no.
+    def faceta(contados, elegida):
+        items = [
+            FacetaItem(value=valor, count=cantidad)
+            for valor, cantidad in sorted(contados.items())
+            if cantidad > 0
+        ]
+        if elegida and not contados.get(elegida):
+            items.append(FacetaItem(value=elegida, count=0))
+        return items
+
+    # El tipo y la potencia cuelgan del subrubro: sin uno elegido, el
+    # Mercado no los ofrece y no hay nada que contar.
+    tipos_ofrecidos = []
+    potencias_ofrecidas = []
+    if subcategory:
+        tipos_ofrecidos = faceta(contar("tipo", SubcategoryType.slug), subcategory_type)
+        # Cada publicación declara una potencia, así que sumar los conteos de
+        # cada potencia dentro de un rango da las publicaciones del rango.
+        por_potencia = contar("potencia", Product.power_hp)
+        por_rango = {}
+        for valor in tipos.VALORES_DE_RANGO:
+            desde, hasta = tipos.rango(valor)
+            por_rango[valor] = sum(
+                cantidad for hp, cantidad in por_potencia.items()
+                if (desde is None or hp >= desde) and (hasta is None or hp <= hasta)
+            )
+        potencias_ofrecidas = faceta(por_rango, power_range)
+    origenes_ofrecidos = faceta(contar("origen", Product.origin), origin)
+    condiciones_ofrecidas = faceta(contar("condicion", Product.condition), condition)
+
+    # --- La marca ----------------------------------------------------------
+    #
+    # La regla es la del caso 175 en todas partes, también con una categoría
+    # que usa marca elegida. El 25/09 Emi había decidido ofrecer ahí la lista
+    # completa, con las que estaban en cero; el 01/10 lo revirtió.
+    marcas_contadas = contar("marca", Product.brand)
 
     # La etiqueta y el estado salen de la misma tabla que valida el alta, no
     # de una lista escrita acá: una marca dada de baja deja de ofrecerse sin
@@ -540,7 +604,7 @@ def get_products(
     # Y si el conjunto no tiene ninguna marca -que es el caso de la mayoría
     # de los listados- no se lee nada: no hay etiquetas que buscar.
     opciones_de_marca = {}
-    if marcas_contadas or brand or lista_completa:
+    if marcas_contadas or brand:
         opciones_de_marca = {
             opcion.value: opcion
             for opcion in db.query(FormOption).filter(
@@ -558,35 +622,21 @@ def get_products(
             continue
         facetas_de_marca.append((opcion, cantidad))
 
-    # La marca ELEGIDA no se cae de la lista aunque otro filtro la deje en
-    # cero. Si se cayera, el control no tendria como decir que esta puesta ni
-    # como sacarla: quedaria un mercado vacio y un filtro invisible
-    # sosteniendolo. Es la unica que puede aparecer con cero; las demas no.
+    # La elegida no se cae aunque quede en cero, como en las demás facetas.
     if brand and brand not in marcas_contadas:
         elegida = opciones_de_marca.get(brand)
         if elegida is not None and elegida.is_active:
             facetas_de_marca.append((elegida, 0))
 
-    # Con la lista completa, las marcas activas que el conjunto no tiene
-    # entran tambien, en cero.
-    if lista_completa:
-        ofrecidas = {opcion.value for opcion, _ in facetas_de_marca}
-        facetas_de_marca += [
-            (opcion, 0) for opcion in opciones_de_marca.values()
-            if opcion.is_active and opcion.value not in ofrecidas
-        ]
-
     # En el mismo orden en que las ofrece el alta.
-    facetas_de_marca.sort(key=lambda par: (par[0].display_order or 0, par[0].label))
+    facetas_de_marca.sort(key=lambda par: marcas_de_la_lista.orden_de_marca(par[0]))
     marcas = [
         BrandFacetItem(value=opcion.value, label=opcion.label, count=cantidad)
         for opcion, cantidad in facetas_de_marca
     ]
 
-    # Y RECIEN AHORA la marca entra al listado, antes de contar y paginar,
-    # como todos los demas filtros.
-    if brand:
-        query = query.filter(Product.brand == brand)
+    # Y el listado, con todos los filtros.
+    query = con_filtros(query)
 
     # Contar total antes de paginar
     total = query.count()
@@ -716,6 +766,10 @@ def get_products(
         has_next=page < pages,
         has_prev=page > 1,
         brands=marcas,
+        subcategory_types=tipos_ofrecidos,
+        power_ranges=potencias_ofrecidas,
+        origins=origenes_ofrecidos,
+        conditions=condiciones_ofrecidas,
     )
 
 
@@ -794,6 +848,14 @@ def get_product_detail(
         "operation_kind": product.operation_kind,
         "condition": product.condition,
         "brand": product.brand,
+        # `first` y no `scalar`: la tabla no impide dos opciones con el mismo
+        # valor, y la ficha no puede caerse por eso.
+        "brand_label": (
+            (db.query(FormOption.label).filter(
+                FormOption.option_type == "brand", FormOption.value == product.brand,
+            ).first() or (None,))[0]
+            if product.brand else None
+        ),
         "subcategory_type": (
             TipoDeSubrubro(value=product.subcategory_type.slug, label=product.subcategory_type.name)
             if product.subcategory_type else None

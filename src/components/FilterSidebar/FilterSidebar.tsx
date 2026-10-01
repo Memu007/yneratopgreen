@@ -2,8 +2,10 @@ import React, { useMemo, useRef, useState } from 'react';
 import styles from './FilterSidebar.module.css';
 import type {
   CategoryResponse,
+  FacetasDelMercado,
   LocalityResponse,
   MarcaDelMercado,
+  OpcionDelMercado,
   ProvinceResponse,
   RangoDePotencia,
 } from '../../utils/catalogService';
@@ -40,6 +42,9 @@ interface FilterSidebarProps {
       acá no hay nada que elegir, y entonces el control no se dibuja: un
       selector con una sola opción que no filtra nada es ruido. */
   marcasDisponibles: MarcaDelMercado[];
+  /** Lo mismo para el tipo, la potencia, el origen y la condición: qué
+      tiene el conjunto filtrado y cuántas publicaciones de cada uno. */
+  facetas: FacetasDelMercado;
   /** El tipo del subrubro elegido, por slug. Vacío es «todos». */
   tipo: string;
   /** El rango de potencia de Tractores. Vacío es «cualquiera». */
@@ -89,6 +94,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   condicion,
   marca,
   marcasDisponibles,
+  facetas,
   tipo,
   potencia,
   anioDesde,
@@ -135,6 +141,21 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     [currentSubcategories, selectedSubcategory],
   );
   const tiposDelSubrubro = subrubroElegido?.tipos ?? [];
+
+  // Cada lista del Mercado, reducida a lo que el conjunto tiene: cada opción
+  // con su cantidad, en el orden de la lista, y la elegida aunque quede en
+  // cero, para que se vea puesta y se pueda sacar (decisión de Emi, 01/10).
+  const ofrecidas = <T,>(lista: T[], valorDe: (opcion: T) => string, opciones: OpcionDelMercado[], elegida: string) => {
+    const cuantas = new Map(opciones.map(({ value, count }) => [value, count]));
+    return lista
+      .filter((opcion) => (cuantas.get(valorDe(opcion)) ?? 0) > 0 || valorDe(opcion) === elegida)
+      .map((opcion) => ({ opcion, cantidad: cuantas.get(valorDe(opcion)) ?? 0 }));
+  };
+  const tiposOfrecidos = ofrecidas(tiposDelSubrubro, (t) => t.value, facetas.tipos, tipo);
+  const potenciasOfrecidas = ofrecidas(RANGOS_DE_POTENCIA, (r) => r.valor, facetas.potencias, potencia);
+  const origenesOfrecidos = ofrecidas(ORIGENES, (o) => o.valor, facetas.origenes, origen);
+  const condicionesOfrecidas = ofrecidas(
+    CONDICIONES.filter(({ valor }) => valor !== ''), (c) => c.valor, facetas.condiciones, condicion);
 
   // Lo que describe una MÁQUINA o un PRODUCTO no aplica a un servicio: un
   // asesoramiento no es nuevo ni usado, no tiene año ni concesionaria. Esos
@@ -257,8 +278,9 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
           )}
 
           {/* Tipo: el tercer nivel. Aparece con un subrubro elegido que tiene
-              lista, y ofrece sólo esa lista. Acota y no completa: las
-              publicaciones que no declararon tipo no entran. */}
+              lista, y ofrece de esa lista sólo los tipos con publicaciones.
+              Acota y no completa: las publicaciones que no declararon tipo no
+              entran. */}
           {tiposDelSubrubro.length > 0 && (
             <div className={styles.filterSection}>
               <label className={styles.filterLabel} htmlFor="catalog-subtype">Tipo</label>
@@ -269,8 +291,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 onChange={(e) => onTipoChange(e.target.value)}
               >
                 <option value="">Todos</option>
-                {tiposDelSubrubro.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
+                {tiposOfrecidos.map(({ opcion: { value, label }, cantidad }) => (
+                  <option key={value} value={value}>{`${label} (${cantidad})`}</option>
                 ))}
               </select>
             </div>
@@ -288,8 +310,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 onChange={(e) => onPotenciaChange(e.target.value as RangoDePotencia | '')}
               >
                 <option value="">Cualquiera</option>
-                {RANGOS_DE_POTENCIA.map(({ valor, rotulo }) => (
-                  <option key={valor} value={valor}>{rotulo}</option>
+                {potenciasOfrecidas.map(({ opcion: { valor, rotulo }, cantidad }) => (
+                  <option key={valor} value={valor}>{`${rotulo} (${cantidad})`}</option>
                 ))}
               </select>
             </div>
@@ -299,15 +321,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
               La lista la trae la respuesta junto con el listado, y cada
               opción dice cuántas publicaciones tiene con los demás filtros
-              puestos.
-
-              Con una categoría que usa marca elegida llegan TODAS las marcas
-              activas, también las que están en cero (decisión de Emi, 25/09):
-              se revisa más fácil y se ve igual desde el primer día. Elegir
-              una en cero da el vacío de siempre.
-
-              Sin esa categoría llegan sólo las marcas que el conjunto tiene, y
-              si no tiene ninguna el control no se dibuja. */}
+              puestos. Llegan sólo las marcas que el conjunto tiene, y la
+              elegida aunque quede en cero (decisión de Emi, 01/10: revierte
+              la lista completa del 25/09). Si no hay ninguna, el control no
+              se dibuja. */}
           {marcasDisponibles.length > 0 && (
             <div className={styles.filterSection}>
               <label className={styles.filterLabel} htmlFor="catalog-brand">
@@ -379,8 +396,9 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               value={condicion}
               onChange={(e) => onCondicionChange(e.target.value as CondicionDelMercado)}
             >
-              {CONDICIONES.map(({ valor, rotulo }) => (
-                <option key={valor || 'cualquiera'} value={valor}>{rotulo}</option>
+              <option value="">Cualquiera</option>
+              {condicionesOfrecidas.map(({ opcion: { valor, rotulo }, cantidad }) => (
+                <option key={valor} value={valor}>{`${rotulo} (${cantidad})`}</option>
               ))}
             </select>
           </div>
@@ -401,8 +419,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 onChange={(e) => onOrigenChange(e.target.value as OrigenDeclarado | '')}
               >
                 <option value="">Cualquiera</option>
-                {ORIGENES.map(({ valor, rotulo }) => (
-                  <option key={valor} value={valor}>{rotulo}</option>
+                {origenesOfrecidos.map(({ opcion: { valor, rotulo }, cantidad }) => (
+                  <option key={valor} value={valor}>{`${rotulo} (${cantidad})`}</option>
                 ))}
               </select>
             </div>
