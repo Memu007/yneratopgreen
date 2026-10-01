@@ -13,7 +13,6 @@ import { CheckoutModal } from './components/Checkout/CheckoutModal';
 import { AddProductModal } from './components/AddProduct/AddProductModal';
 import { AdminPanel } from './components/AdminPanel/AdminPanel';
 import { HomePage } from './components/Pages/HomePage';
-import { AboutPage } from './components/Pages/AboutPage';
 import { ContactPage } from './components/Pages/ContactPage';
 import { ProductDetailPage } from './components/ProductDetail/ProductDetailPage';
 import { PaymentResultPage } from './components/Pages/PaymentResultPage';
@@ -270,37 +269,6 @@ function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-
-  /**
-   * Publicar.
-   *
-   * Es la misma puerta que ya usan la tarjeta y el detalle: sin sesión se
-   * abre el Login de verdad y, si la persona entra, se abre el formulario
-   * que había pedido. Antes el aviso y el Login eran todo el trámite: al
-   * volver había que encontrar otra vez el botón, así que la intención se
-   * perdía justo donde la persona ya había dicho qué quería hacer.
-   *
-   * La sesión se lee DESPUÉS de que el ingreso se cerró, y del `ref` y no de
-   * la variable capturada: el modal cierra en el mismo paso en que la sesión
-   * se guarda, así que leerla dentro del callback dice siempre «no entró».
-   * Es el mismo desfasaje que ya resolvió Mi cuenta y usa su misma lectura.
-   *
-   * Cancelar, equivocar la contraseña o darse de alta dejan esto en nada: el
-   * alta no abre sesión, así que no hay nada que retomar. Y lo único que se
-   * retoma es abrir la pantalla: ingresar no publica, no crea una orden, no
-   * reserva stock y no toca el carrito.
-   */
-  const pedirPublicar = () => {
-    if (situacion.current.autenticado) {
-      setIsAddProductOpen(true);
-      return;
-    }
-    abrirLoginYVolver(() => {
-      setTimeout(() => {
-        if (situacion.current.autenticado) setIsAddProductOpen(true);
-      }, 0);
-    });
-  };
 
   const selectedProvinceId =
     provinces.find((province) => province.name === selectedProvince)?.id || '';
@@ -794,7 +762,7 @@ function App() {
       case 'home':
         return <HomePage 
           onNavigateToMarketplace={() => handleNavigate('marketplace')} 
-          onSolicitarPublicar={pedirPublicar}
+          onNavigateToContact={() => handleNavigate('contact')}
           vistaPrevia={vistaPreviaDeInicio}
         />;
       case 'verificar-correo':
@@ -892,14 +860,6 @@ function App() {
             onRequiereIngreso={abrirLogin}
           />
         ) : null;
-      case 'about':
-        return (
-          <AboutPage 
-            onNavigateToMarketplace={() => handleNavigate('marketplace')}
-            onNavigateToContact={() => handleNavigate('contact')}
-            onSolicitarPublicar={pedirPublicar}
-            />
-        );
       case 'account':
         // Mi cuenta es una página del sitio, no una capa sobre él.
         // Quien entra sin sesión no ve nada: el efecto de más abajo
@@ -955,7 +915,7 @@ function App() {
       default:
         return <HomePage 
           onNavigateToMarketplace={() => handleNavigate('marketplace')}
-          onSolicitarPublicar={pedirPublicar}
+          onNavigateToContact={() => handleNavigate('contact')}
           vistaPrevia={vistaPreviaDeInicio}
         />;
     }

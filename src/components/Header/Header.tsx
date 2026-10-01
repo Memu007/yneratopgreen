@@ -32,11 +32,11 @@ interface HeaderProps {
 // celda, la marca hace lo que hace en cualquier sitio: vuelve a Inicio.
 //
 // Servicios ya no es una celda: queda un solo Mercado, y los servicios se
-// encuentran ahí con el filtro por tipo.
+// encuentran ahí con el filtro por tipo. «Quiénes somos» tampoco: salió del
+// sitio a pedido de la clienta (30/09), e Inicio cuenta qué es AgroBoeda.
 const SECCIONES: [PageSection, string][] = [
   ['home', 'Inicio'],
   ['marketplace', 'Mercado'],
-  ['about', 'Quiénes somos'],
   ['contact', 'Contacto'],
 ];
 

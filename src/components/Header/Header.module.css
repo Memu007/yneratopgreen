@@ -280,7 +280,7 @@
     order: 3;
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     border-top: 1px solid var(--celda-filete);
   }
 
@@ -351,12 +351,11 @@
     display: inline;
   }
 
-  /* Las cuatro secciones no entran en una línea de 358 px útiles: van en dos
-     y dos, que es leerlas, y no en un scroll horizontal ni en un
-     `display: none`, que es esconderlas. Eran cinco, en tres y dos: la
-     cabecera conserva sus dos renglones. */
+  /* Las tres secciones entran en una línea de 358 px útiles, como en la
+     maqueta de Inicio. Eran cuatro, en dos y dos, hasta que salió «Quiénes
+     somos»; la cabecera conserva sus dos renglones. */
   .navInterior {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .navLink {
@@ -364,14 +363,6 @@
     font-size: 13px;
     text-align: center;
     white-space: normal;
-  }
-
-  .navLink:nth-child(2n) {
-    border-right: 0;
-  }
-
-  .navLink:nth-child(n + 3) {
-    border-top: 1px solid var(--celda-filete);
   }
 
   .bandaDeBusqueda {

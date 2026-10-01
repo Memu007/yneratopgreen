@@ -1,196 +1,167 @@
-/* Inicio comercial — dirección «B, Mercado nacional».
-   La página abre con copy y fotografía en columnas separadas, sin overlay;
-   sigue con el libro mayor de las cuatro familias y muestra publicaciones
-   reales. El medidor es un dato de la operación, no un monumento: la cifra
-   sale de `response.total`. */
+/* Inicio — el ecosistema AgroBoeda (INICIO-ECOSISTEMA-1, maqueta v2 del 30/09).
+   La forma la da la maqueta; los valores, `tokens.css`. Los blancos
+   translúcidos sobre el verde son los dos que ya usa el pie: 0,78 para el
+   texto secundario (6,85:1) y 0,25 para los filetes. */
 
 .pagina {
   min-height: 100vh;
   background-color: var(--tg-color-canvas);
 }
 
-/* --- Hero: dos columnas, cero overlay ------------------------------------ */
-.hero {
-  position: relative;
-  min-height: 560px;
+/* Sobre el verde, el ojo de buey va en blanco: el cereal profundo no se lee
+   ahí. La marca cereal de la izquierda sigue igual. */
+.portada :global(.tg-eyebrow),
+.porEtapas :global(.tg-eyebrow),
+.principio :global(.tg-eyebrow) {
+  color: var(--tg-color-text-inverse);
+}
+
+.portada :global(.tg-eyebrow)::after,
+.porEtapas :global(.tg-eyebrow)::after,
+.principio :global(.tg-eyebrow)::after {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+/* --- Portada: el texto sobre la banda verde y la foto al lado ------------- */
+.portada {
   display: grid;
-  grid-template-columns: 47% 53%;
-  background-color: var(--tg-color-canvas);
+  grid-template-columns: minmax(0, 47fr) minmax(0, 53fr);
+  min-height: 600px;
+  background-color: var(--tg-color-brand);
+  color: var(--tg-color-text-inverse);
 }
 
-/* El margen del libro. Es la regla del borde con el rótulo de la sección
-   girado; no informa nada nuevo y por eso está fuera del árbol accesible. */
-.margen {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-right: 1px solid var(--tg-color-border);
-}
-
-.margen span {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  color: var(--tg-color-text-secondary);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.heroCopy {
+.portadaTexto {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   justify-content: center;
-  gap: var(--tg-space-4);
-  /* El copy arranca donde arranca el contenedor del resto de la página: el
-     texto del hero y el de las secciones comparten margen izquierdo. */
-  padding: 44px 44px 32px
-    max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)));
-  /* Los dos filetes del pautado: la columna de copy es una hoja reglada, no un
-     bloque suelto. Son fondo y no elementos, así que no entran en el orden de
-     lectura ni en la tabulación. */
-  background-image:
-    linear-gradient(var(--tg-color-border), var(--tg-color-border)),
-    linear-gradient(var(--tg-color-border), var(--tg-color-border));
-  background-size: 1px 100%, 1px 100%;
-  background-position: 30% 0, 70% 0;
-  background-repeat: no-repeat;
+  align-items: flex-start;
+  /* El texto arranca donde arranca `tg-container` en el resto de la página:
+     el ancho máximo con sus dos márgenes, centrado, más un margen. */
+  padding: var(--tg-space-20) var(--tg-space-12) var(--tg-space-16)
+    max(var(--tg-gutter-desktop),
+      calc((100vw - var(--tg-container-max) - 2 * var(--tg-gutter-desktop)) / 2 + var(--tg-gutter-desktop)));
 }
 
-/* El ojo de buey del hero llega de punta a punta de la columna: su regla es
-   parte del pautado.
-
-   Y lleva fondo propio: los dos filetes verticales le pasaban por detrás, y el
-   cereal profundo a 12 px sobre el gris del filete mide 3,69:1 —por debajo del
-   mínimo—. Con el fondo opaco el filete se interrumpe en ese renglón, que es
-   justo donde la propia regla del ojo de buey ya lo cruza. */
-.heroCopy :global(.tg-eyebrow) {
+.portada :global(.tg-eyebrow) {
   width: 100%;
-  background-color: var(--tg-color-canvas);
+  max-width: 260px;
 }
 
-.heroTitulo {
-  margin-top: var(--tg-space-2);
-  font-size: clamp(40px, 3.9vw, 54px);
-  line-height: 1;
-  letter-spacing: -0.025em;
+.portadaTitulo {
+  max-width: 620px;
+  margin: var(--tg-space-8) 0 var(--tg-space-6);
+  color: var(--tg-color-text-inverse);
+  font-size: clamp(40px, 3.8vw, 54px);
+  font-weight: 800;
+  line-height: 1.03;
+  letter-spacing: -0.024em;
+  text-wrap: balance;
+}
+
+.portadaBajada {
+  max-width: 540px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 18px;
+  line-height: 1.58;
 }
 
 .acciones {
   display: flex;
   flex-wrap: wrap;
   gap: var(--tg-space-3);
-  margin-top: var(--tg-space-2);
+  margin-top: var(--tg-space-10);
 }
 
-/* La acción principal de las páginas públicas lleva el canto cereal: es la
-   firma del sistema y no se reparte por todos los botones verdes. */
-.acciones :global(.tg-button--primary) {
-  min-height: 54px;
-  padding-inline: 28px;
+/* Las dos acciones de la portada. La principal, blanca con el canto cereal:
+   es la firma del sistema. La otra, de línea. */
+.botonClaro,
+.botonLinea {
+  min-height: 52px;
+  padding-inline: 26px;
+  font-size: 16px;
+}
+
+.botonClaro {
+  color: var(--tg-color-brand);
+  background-color: var(--tg-color-surface);
   border-left: 4px solid var(--tg-color-signal);
-  font-size: 15.5px;
 }
 
-.acciones :global(.tg-button--secondary) {
-  min-height: 54px;
-  padding-inline: 28px;
-  border-width: 1.5px;
-  border-color: var(--tg-color-text);
-  font-size: 15.5px;
+.botonClaro:hover {
+  color: var(--tg-color-brand);
+  background-color: var(--tg-color-surface-subtle);
 }
 
-.acciones :global(.tg-button--secondary):hover {
-  color: var(--tg-color-canvas);
-  background-color: var(--tg-color-text);
-  border-color: var(--tg-color-text);
+.botonLinea {
+  color: var(--tg-color-text-inverse);
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.78);
 }
 
-/* El medidor: cuántas operaciones hay de verdad. Aparece sólo cuando la API
-   contestó, y trata 0, 1 y N con el mismo dato real. */
-.medidor {
+.botonLinea:hover {
+  color: var(--tg-color-text-inverse);
+  background-color: var(--tg-color-action-hover);
+}
+
+.nota {
   display: flex;
   align-items: center;
-  gap: var(--tg-space-4);
-  width: 100%;
-  margin: var(--tg-space-3) 0 0;
+  gap: 10px;
+  margin-top: var(--tg-space-8);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
 }
 
-.medidorNumero {
-  font-family: var(--tg-font-display);
-  font-size: 44px;
-  line-height: 1;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+.nota::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background-color: var(--tg-color-signal);
 }
 
-.medidorTexto {
-  max-width: 17ch;
-  color: var(--tg-color-text-secondary);
-  font-size: 12px;
-  line-height: 1.3;
-  font-weight: 650;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
-.medidorRegla {
-  flex: 1;
-  max-width: 170px;
-  height: 13px;
-  border-top: 2px solid var(--tg-color-text);
-  background: repeating-linear-gradient(90deg, var(--tg-color-text) 0 1px, transparent 1px 10px)
-    top left / 100% 7px no-repeat;
-}
-
-.heroFoto {
-  position: relative;
-  min-height: 320px;
+.portadaFoto {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
   margin: 0;
-  overflow: hidden;
 }
 
-.heroFoto picture,
-.heroFoto img {
+.portadaFoto picture {
+  position: relative;
   display: block;
+  flex: 1;
+  min-height: 0;
+}
+
+.portadaFoto img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: 50% 60%;
 }
 
-.heroFoto img {
-  object-position: center 70%;
-}
-
-/* La banda de registro va debajo de la foto y no encima del sujeto: dice qué
-   se está mirando sin taparlo ni teñirlo. */
+/* La banda de registro va debajo de la foto, no encima: dice qué se está
+   mirando sin taparlo. */
 .fotoBanda {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 36px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: var(--tg-space-5);
-  padding-inline: 22px;
-  background-color: var(--tg-color-brand);
+  align-items: center;
+  gap: var(--tg-space-4);
+  padding: 15px 22px;
+  background-color: var(--tg-color-action-hover);
   color: var(--tg-color-text-inverse);
 }
 
 .fotoBanda span {
   overflow: hidden;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -198,232 +169,647 @@
 
 .fotoBanda i {
   flex: none;
-  width: 130px;
-  height: 8px;
-  background: repeating-linear-gradient(90deg, var(--tg-color-signal) 0 2px, transparent 2px 12px)
-    right top / 100% 8px no-repeat;
+  width: 120px;
+  height: 10px;
+  background: repeating-linear-gradient(90deg, var(--tg-color-signal) 0 2px, transparent 2px 10px);
 }
 
-/* --- Libro mayor: contenido, no controles -------------------------------- */
-.taxonomia {
-  background-color: var(--tg-color-surface);
-  border-block: 1px solid var(--tg-color-border);
-}
-
-.taxonomiaGrilla {
+/* --- Encabezado de sección, común al ecosistema y a la ruta -------------- */
+.cabeza {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: var(--tg-space-16);
+  margin-bottom: var(--tg-space-10);
 }
 
-.taxonomiaItem {
-  min-height: 96px;
-  padding: 18px 26px;
+.cabeza :global(.tg-eyebrow) {
+  width: 100%;
+  max-width: 300px;
+}
+
+.titulo {
+  margin-top: var(--tg-space-5);
+  font-size: clamp(34px, 3.4vw, 48px);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.024em;
+  text-wrap: balance;
+}
+
+/* «Conocé el ecosistema» deja el foco acá. El margen es para que, al traerlo
+   a la vista, no quede debajo de la cabecera pegada arriba. */
+.ecosistema .titulo {
+  scroll-margin-top: var(--tg-space-20);
+}
+
+.intro {
+  max-width: 560px;
+  color: var(--tg-color-text-secondary);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.numero {
+  color: var(--tg-color-accent);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.2em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Ecosistema ----------------------------------------------------------- */
+.ecosistema {
+  padding: var(--tg-space-20) 0;
+}
+
+.grilla {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tg-grid-gap-desktop);
+}
+
+.servicio {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: var(--tg-space-1);
-  border-left: 1px solid var(--tg-color-border);
+  overflow: hidden;
+  background-color: var(--tg-color-surface);
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-md);
 }
 
-.taxonomiaItem:first-child {
-  border-left: 0;
-  padding-left: max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)));
+.servicio.disponible {
+  border: 2px solid var(--tg-color-brand);
 }
 
-.taxonomiaItem:last-child {
-  padding-right: max(var(--tg-gutter-desktop), calc((100vw - var(--tg-container-max)) / 2 + var(--tg-gutter-desktop)));
+.foto {
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background-color: var(--tg-color-surface-subtle);
 }
 
-.taxonomiaNumero {
-  font-family: var(--tg-font-display);
-  color: var(--tg-color-accent);
-  font-size: 11px;
-  line-height: 1;
+.foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cuerpo {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 22px 22px;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+/* El estado es un rótulo, no un control. «Próximamente» va en acero sobre el
+   gris (4,92:1); «Disponible hoy», en el verde de éxito (5,63:1). */
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  color: var(--tg-color-steel);
+  background-color: var(--tg-color-surface-muted);
+  border-radius: var(--tg-radius-sm);
+  box-shadow: inset 0 0 0 1px var(--tg-color-border);
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  line-height: 1;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.taxonomiaItem strong {
-  font-size: 16.5px;
-  font-weight: 650;
+.estadoHoy {
+  color: var(--tg-color-success);
+  background-color: var(--tg-color-success-bg);
+  box-shadow: none;
+}
+
+.estadoHoy::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--tg-color-success);
+}
+
+.servicio h3 {
+  margin-top: var(--tg-space-1);
+  font-size: 22px;
   line-height: 1.15;
+  letter-spacing: -0.012em;
 }
 
-.taxonomiaDescriptor {
+.cuerpo > p {
+  margin: 0 0 var(--tg-space-1);
   color: var(--tg-color-text-secondary);
-  font-size: 12.5px;
-  line-height: 1.4;
+  font-size: 14.5px;
+  line-height: 1.55;
 }
 
-/* --- Lo que muestra cada publicación ------------------------------------ */
-.decision {
-  padding-block: var(--tg-space-12);
+.cuerpo > p.cuenta {
+  margin: auto 0 0;
+  font-size: 13.5px;
+}
+
+.cuenta b {
+  margin-right: 2px;
+  color: var(--tg-color-text);
+  font-family: var(--tg-font-display);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.entrar {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--tg-control-min);
+  margin-top: auto;
+  padding: 13px 0 0;
+  color: var(--tg-color-brand);
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--tg-color-border);
+  font-size: 15px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cuenta + .entrar {
+  margin-top: 0;
+}
+
+.entrar:hover span:first-child {
+  text-decoration: underline;
+}
+
+/* La octava: la invitación a escribir por los servicios que vienen. */
+.porEtapas {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 30px 28px;
+  background-color: var(--tg-color-brand);
+  border-radius: var(--tg-radius-md);
+  color: var(--tg-color-text-inverse);
+}
+
+.porEtapas h3 {
+  margin-top: 22px;
+  color: var(--tg-color-text-inverse);
+  font-size: 30px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.porEtapas p:not(:global(.tg-eyebrow)) {
+  margin-top: var(--tg-space-3);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* «Escribinos» va blanco y liso: el canto cereal es de la acción principal
+   de la portada. */
+.botonBlanco {
+  align-self: flex-start;
+  min-height: 48px;
+  padding-inline: 26px;
+  color: var(--tg-color-brand);
+  background-color: var(--tg-color-surface);
+  font-size: 16px;
+}
+
+.botonBlanco:hover {
+  color: var(--tg-color-brand);
+  background-color: var(--tg-color-surface-subtle);
+}
+
+.credito {
+  margin-top: var(--tg-space-6);
+  color: var(--tg-color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.credito a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* --- Cómo funciona -------------------------------------------------------- */
+.ruta {
+  padding: var(--tg-space-20) 0;
   background-color: var(--tg-color-surface);
   border-block: 1px solid var(--tg-color-border);
 }
 
-.decisionGrilla {
+.pasos {
   display: grid;
-  grid-template-columns: 1.1fr repeat(3, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.decisionIntro {
-  padding-right: var(--tg-space-10);
+.paso {
+  position: relative;
+  padding: 46px var(--tg-space-8) 0 0;
 }
 
-.decisionIntro h2 {
-  margin-top: var(--tg-space-2);
+/* La línea de la ruta une un nodo con el siguiente. */
+.paso::before {
+  content: "";
+  position: absolute;
+  top: 15px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--tg-color-border-control) 0 7px, transparent 7px 14px);
 }
 
-.decisionItem {
-  padding: var(--tg-space-1) var(--tg-space-6);
-  border-left: 1px solid var(--tg-color-border);
+.paso:last-child::before {
+  display: none;
 }
 
-.decisionItem strong {
-  display: block;
-  margin-bottom: var(--tg-space-2);
-  font-size: 15px;
-  font-weight: 650;
+.nodo {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  background-color: var(--tg-color-surface);
+  border: 2px solid var(--tg-color-border-control);
+  border-radius: 50%;
 }
 
-.decisionItem p {
+.pasoHoy .nodo {
+  background-color: var(--tg-color-brand);
+  border-color: var(--tg-color-brand);
+  box-shadow: 0 0 0 5px var(--tg-color-success-bg);
+}
+
+.paso h3 {
+  margin: var(--tg-space-3) 0 10px;
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+
+.paso p {
+  max-width: 220px;
   margin: 0;
   color: var(--tg-color-text-secondary);
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.55;
 }
 
+.de {
+  display: inline-block;
+  margin-top: 18px;
+  color: var(--tg-color-steel);
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pasoHoy .de {
+  color: var(--tg-color-success);
+}
+
+/* --- Principio ------------------------------------------------------------ */
+.principioMarco {
+  padding: var(--tg-space-20) 0;
+}
+
+.principio {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--tg-space-16);
+  padding: var(--tg-space-16);
+  background-color: var(--tg-color-brand);
+  border-radius: var(--tg-radius-md);
+  color: var(--tg-color-text-inverse);
+}
+
+.principio :global(.tg-eyebrow) {
+  width: 100%;
+  max-width: 300px;
+}
+
+.frase {
+  margin: var(--tg-space-6) 0 0;
+  font-family: var(--tg-font-display);
+  font-size: clamp(33px, 3.3vw, 46px);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.024em;
+  text-wrap: balance;
+}
+
+/* «por la ruta» en cereal: 3,86:1 sobre el verde, que alcanza para texto de
+   este tamaño. */
+.frase em {
+  color: var(--tg-color-signal);
+  font-style: normal;
+}
+
+.principioTexto {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 17px;
+  line-height: 1.62;
+}
+
+.niveles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tg-space-4);
+  margin: var(--tg-space-8) 0 0;
+  padding: var(--tg-space-6) 0 0;
+  list-style: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.barras {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.barras i {
+  height: 9px;
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.barras i.barraLlena {
+  background-color: var(--tg-color-signal);
+}
+
+.nivel b {
+  display: block;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.nivel span:not(.barras) {
+  display: block;
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* --- Tableta: dos columnas y la ruta hacia abajo -------------------------- */
 @media (max-width: 1023px) {
-  /* La foto pasa arriba y el copy debajo, y el orden del DOM acompaña: no se
-     usa `order` para contradecir la tabulación. */
-  .hero {
-    display: flex;
-    flex-direction: column-reverse;
+  /* `minmax(0, 1fr)` y no `1fr`: la banda de la foto no corta línea, y con
+     `1fr` la columna crecía hasta su ancho y desbordaba en celular. */
+  .portada {
+    grid-template-columns: minmax(0, 1fr);
     min-height: 0;
   }
 
-  .margen {
-    display: none;
+  .portadaTexto {
+    padding: var(--tg-space-12) var(--tg-gutter-tablet);
   }
 
-  .heroCopy {
-    padding: var(--tg-space-8) var(--tg-gutter-tablet);
+  .portadaFoto picture {
+    flex: none;
+    aspect-ratio: 16 / 9;
   }
 
-  .heroFoto {
-    height: 300px;
-    min-height: 300px;
+  .cabeza {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--tg-space-4);
   }
 
-  .taxonomiaGrilla {
-    grid-template-columns: repeat(2, 1fr);
+  .grilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--tg-grid-gap-tablet);
   }
 
-  .taxonomiaItem {
-    min-height: 88px;
-    border-bottom: 1px solid var(--tg-color-border);
+  .pasos {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .taxonomiaItem:nth-child(odd) {
-    border-left: 0;
+  /* La ruta va hacia abajo: la línea une los nodos en vertical. */
+  .paso {
+    padding: 0 0 30px 38px;
   }
 
-  .taxonomiaItem:first-child,
-  .taxonomiaItem:nth-child(3) {
-    padding-left: var(--tg-gutter-tablet);
+  .paso::before {
+    top: 18px;
+    bottom: -8px;
+    left: 7px;
+    right: auto;
+    width: 2px;
+    height: auto;
+    background: repeating-linear-gradient(180deg, var(--tg-color-border-control) 0 7px, transparent 7px 14px);
   }
 
-  .taxonomiaItem:nth-child(2),
-  .taxonomiaItem:last-child {
-    padding-right: var(--tg-gutter-tablet);
+  .paso:last-child {
+    padding-bottom: 0;
   }
 
-  .decisionGrilla {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--tg-space-6) 0;
+  .nodo {
+    top: 2px;
   }
 
-  .decisionIntro {
-    padding-right: var(--tg-space-6);
+  .paso p {
+    max-width: none;
+  }
+
+  .principio {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--tg-space-6);
+    padding: var(--tg-space-10) var(--tg-space-8);
   }
 }
 
+/* --- Celular: los servicios son filas con miniatura ----------------------- */
 @media (max-width: 599px) {
-  /* En celular el copy va primero: es lo que responde qué es esto. */
-  .hero {
-    flex-direction: column;
+  .portadaTexto {
+    padding: var(--tg-space-10) var(--tg-gutter-mobile) var(--tg-space-8);
   }
 
-  .heroCopy {
-    padding: 18px var(--tg-gutter-mobile) 22px;
-    gap: var(--tg-space-3);
-    background-image: none;
+  .portadaTitulo {
+    margin: 22px 0 18px;
+    font-size: 34px;
+    line-height: 1.05;
   }
 
-  .heroTitulo {
-    font-size: 33px;
+  .portadaBajada {
+    font-size: 16.5px;
   }
 
   .acciones {
     flex-direction: column;
     align-self: stretch;
+    margin-top: 30px;
   }
 
-  .acciones :global(.tg-button) {
+  .botonClaro,
+  .botonLinea,
+  .botonBlanco {
     width: 100%;
-    min-height: 52px;
+    min-height: 50px;
   }
 
-  /* De canto a pie: en una columna angosta el canto izquierdo se pierde
-     contra el borde de la pantalla. */
-  .acciones :global(.tg-button--primary) {
-    border-left-width: 0;
-    border-bottom: 4px solid var(--tg-color-signal);
+  .nota {
+    align-items: flex-start;
+    margin-top: var(--tg-space-6);
+    font-size: 13.5px;
   }
 
-  .medidorNumero {
-    font-size: 38px;
+  .nota::before {
+    margin-top: 5px;
   }
 
-  .heroFoto {
-    height: 240px;
-    min-height: 240px;
-    border-top: 2px solid var(--tg-color-text);
+  .portadaFoto picture {
+    aspect-ratio: 4 / 3;
   }
 
   .fotoBanda {
-    height: 30px;
-    padding-inline: 14px;
+    padding: 12px var(--tg-gutter-mobile);
+  }
+
+  .fotoBanda span {
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
   }
 
   .fotoBanda i {
-    width: 80px;
+    width: 60px;
   }
 
-  .taxonomiaItem {
-    min-height: 84px;
-    padding: 14px var(--tg-gutter-mobile);
+  .ecosistema,
+  .ruta {
+    padding: var(--tg-space-12) 0 var(--tg-space-16);
   }
 
-  .taxonomiaItem:nth-child(-n + 2) {
-    border-top: 0;
+  .titulo {
+    margin-top: 18px;
+    font-size: 34px;
   }
 
-  .decision {
-    padding-block: var(--tg-space-8);
+  .intro {
+    font-size: 16px;
   }
 
-  .decisionGrilla {
-    display: block;
+  .cabeza {
+    margin-bottom: 28px;
   }
 
-  .decisionIntro {
-    padding: 0 0 var(--tg-space-5);
+  .grilla {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--tg-space-3);
   }
 
-  .decisionItem {
-    padding: var(--tg-space-4) 0;
-    border-left: 0;
-    border-top: 1px solid var(--tg-color-border);
+  .servicio {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+
+  .foto {
+    aspect-ratio: auto;
+    height: 100%;
+  }
+
+  .cuerpo {
+    gap: 7px;
+    padding: 14px var(--tg-space-4) var(--tg-space-4);
+  }
+
+  .servicio h3 {
+    margin-top: 2px;
+    font-size: 19px;
+  }
+
+  .cuerpo > p {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .estado {
+    padding: 5px 7px;
+    font-size: 9.5px;
+  }
+
+  .numero {
+    font-size: 11px;
+  }
+
+  .entrar {
+    padding-top: 10px;
+  }
+
+  .porEtapas {
+    gap: 22px;
+    padding: 26px var(--tg-space-5);
+  }
+
+  .porEtapas h3 {
+    margin-top: 18px;
+    font-size: 26px;
+  }
+
+  .paso h3 {
+    margin: var(--tg-space-2) 0 6px;
+    font-size: 21px;
+  }
+
+  .de {
+    margin-top: 10px;
+  }
+
+  .principioMarco {
+    padding: 0 0 var(--tg-space-12);
+  }
+
+  .principio {
+    padding: var(--tg-space-10) var(--tg-space-5);
+  }
+
+  .frase {
+    margin-top: 18px;
+  }
+
+  .principioTexto {
+    font-size: 16px;
+  }
+
+  .niveles {
+    gap: 10px;
+  }
+
+  .nivel b {
+    font-size: 13px;
+  }
+
+  .nivel span:not(.barras) {
+    font-size: 10px;
+    letter-spacing: 0.06em;
   }
 }

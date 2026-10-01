@@ -11,7 +11,6 @@
 export type Seccion =
   | 'home'
   | 'marketplace'
-  | 'about'
   | 'contact'
   | 'account'
   | 'product'
@@ -33,7 +32,6 @@ export type Seccion =
  */
 const NOMBRE_EN_LA_BARRA: Partial<Record<Seccion, string>> = {
   marketplace: 'marketplace',
-  about: 'about',
   contact: 'contact',
   account: 'account',
   product: 'product',
@@ -41,7 +39,6 @@ const NOMBRE_EN_LA_BARRA: Partial<Record<Seccion, string>> = {
 
 const SECCION_DEL_NOMBRE: Record<string, Seccion> = {
   marketplace: 'marketplace',
-  about: 'about',
   contact: 'contact',
   account: 'account',
   product: 'product',
@@ -117,9 +114,13 @@ export function publicacionDeLaBarra(busqueda: string): string | null {
  * que terminar en Inicio ni en una pantalla vacía: lleva al Mercado con ese
  * filtro puesto. La barra se reescribe —no se agrega una entrada—, así que
  * Atrás no vuelve a pasar por el nombre viejo.
+ *
+ * «Quiénes somos» salió del sitio a pedido de la clienta (30/09): su enlace
+ * viejo lleva a Inicio, que es donde ahora se cuenta qué es AgroBoeda.
  */
 const NOMBRES_RETIRADOS: Record<string, () => string> = {
   services: () => urlDe('marketplace', new URLSearchParams({ type: 'servicios' })),
+  about: () => urlDe('home'),
 };
 
 /**

@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './Footer.module.css';
 
-type Seccion = 'home' | 'marketplace' | 'about' | 'contact';
+type Seccion = 'home' | 'marketplace' | 'contact';
 
 interface FooterProps {
   onNavigate?: (section: Seccion) => void;
@@ -68,7 +68,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onVerServicios }) =>
           <div className={styles.titulo}>AgroBoeda</div>
           <ul className={styles.lista}>
             <li><a href="#" onClick={handleNavigate('home')}>Inicio</a></li>
-            <li><a href="#" onClick={handleNavigate('about')}>Quiénes somos</a></li>
             <li><a href="#" onClick={handleNavigate('contact')}>Contacto</a></li>
           </ul>
         </div>

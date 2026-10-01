@@ -88,7 +88,7 @@ En la cabecera:
 
 - «AgroBoeda» e «Inicio» llevan a la página principal.
 - «Mercado» abre las publicaciones.
-- «Quiénes somos» y «Contacto» son las páginas de la empresa.
+- «Contacto» es la página de la empresa.
 - «Vender» abre el formulario para publicar (parte 2).
 - «Carrito» abre tu carrito.
 - Tu nombre, o «Cuenta» en el celular, abre «Mi cuenta».
@@ -536,7 +536,7 @@ mirarlas.
 Además, el programa no mira:
 
 - el pie de página, que tiene el contacto de la empresa;
-- el contenido de «Notificaciones», «Quiénes somos» y «Contacto»;
+- el contenido de «Notificaciones» y «Contacto»;
 - las publicaciones de servicios paso a paso: las recorre sólo en el Mercado;
 - los planes y suscripciones, que todavía no existen, ni qué datos de contacto
   ve cada persona, que está en definición.
