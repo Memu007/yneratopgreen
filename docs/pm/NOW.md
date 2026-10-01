@@ -1,19 +1,17 @@
 # Estado actual
 
-Actualizado: 2026-09-30.
+Actualizado: 2026-10-01.
 
 `NOW.md` contiene sólo estado vigente, restricciones vivas, bloqueos y próxima acción. La historia anterior permanece en Git; la instantánea previa a esta poda está en `ab4165fc`.
 
 ## Resumen ejecutivo
 
-- **Traspaso de PM (01/10):** Emi sigue con PM en otra cuenta. Todo lo de esta sesión está en la rama y en `main`. Nada espera revisión: la Dev trabaja `INICIO-ECOSISTEMA-1`, con el texto aprobado entero en `PARA-DEV.md` y la maqueta en `maquetas/`. Quedó fuera del repositorio:
-  - el documento «Inicio de AgroBoeda: propuesta de texto», que es de la cuenta anterior. Su texto final está en la tarea;
-  - los scripts de los negativos de PM, que corrieron desde fuera del repositorio. Cada `REPRODUCCION-*.md` dice qué rompían y qué rojo dieron.
+- **PM vuelve a esta sesión (01/10, Emi):** la PM de la otra cuenta deja de escribir en el repositorio. Un solo PM escribe `PARA-DEV.md`.
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `77d3d2c`, publicado el 01/10 con autorización de Emi («Dale»), por fast-forward desde `2ab0a36`. Suma `LINK-ABIERTO-DEVUELTO-1` y documentos de PM. Sin migraciones. La verificación previa fue sobre el mismo código (`cac729d`, que difiere sólo en `docs/pm`): el 231 rojo con la base y verde con la entrega, suite 230/231 (131 de entorno), 5 negativos (3 de PM) y puertas verdes. No cambia nada visible: sólo actúa con Mercado Pago habilitado.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`77d3d2c`) tiene todo lo aceptado. La Dev trabaja `INICIO-ECOSISTEMA-1`.
-- **Última decisión PM:** `LINK-ABIERTO-DEVUELTO-1` **ACEPTADA EN RAMA** (01/10, `cac729d`, producto en `4b02fec`). El link abierto de un pago devuelto o con contracargo entra en el criterio de cobros en curso: desvincular frena y el reconciliador lo apaga sin cambiar el pago, la orden ni el stock. Los terminadores de las dos piezas anteriores, restaurados. Caso 231: rojo con la base y verde con la entrega; suite 230/231 (131 de entorno); 5 negativos en rojo, 3 de PM. Sin migraciones. **Publicada en `77d3d2c` el 01/10.** Evidencia en `REPRODUCCION-LINK-ABIERTO-DEVUELTO-1-2026-09-30.md`. Antes: `DESVINCULAR-CON-COBROS-1`, publicada en `2ab0a36` el 30/09.
-- **Tarea activa:** `INICIO-ECOSISTEMA-1` (Emi, 30/09): Inicio con el ecosistema, según la maqueta v2, y sin «Quiénes somos». Asignada a la Dev el 01/10, al aceptar `LINK-ABIERTO-DEVUELTO-1`.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `INICIO-ECOSISTEMA-1` está aceptada en rama (`69068d9`) y **espera la autorización de Emi para publicarse**. `CAMBIAR-CONTRASENA-1` está asignada.
+- **Última decisión PM:** `INICIO-ECOSISTEMA-1` **ACEPTADA EN RAMA** (01/10, `69068d9`, producto en `b5daa24` y `7d7d808`). Inicio con el ecosistema según la maqueta v2, y sin «Quiénes somos». Casos 232 a 234; nueve negativos en rojo, tres de PM; suite 233/234 (169 de entorno); puertas verdes. **Escalado a Emi:** sin sesión no queda ningún botón para publicar. Evidencia en `REPRODUCCION-INICIO-ECOSISTEMA-1-2026-10-01.md`.
+- **Tarea activa:** `CAMBIAR-CONTRASENA-1`: «Cambiar contraseña» en «Mi cuenta», las reglas del registro en la API y ningún 500 con más de 72 bytes. Le permite a Emi cambiar desde el sitio las dos contraseñas que quedaron en chats.
 - **Mercado Pago:** `LINK-ABIERTO-DEVUELTO-1`, que iba antes de la prueba, está publicada (01/10). **Mercado Pago (Emi, 30/09): se prueba en el sitio publicado, con cuentas de prueba.** Los pasos están en `PASOS-MERCADO-PAGO-2026-09-30.md`: etapa 1, preparar (Emi, en Railway y en el panel de Mercado Pago); etapa 2, probar, guiada por PM. Los valores secretos van directo a Railway, nunca al chat. **Hipótesis por confirmar en la prueba:** vincular una cuenta de Mercado Pago necesita una cookie del Backend, y con el sitio y el Backend en dos direcciones de `up.railway.app`, Safari, Brave y Firefox no la mandan. Si se confirma, el lanzamiento real necesita un dominio propio. Emi aprobó el costo del Reconciliador el 29/09.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
@@ -55,6 +53,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `INICIO-ECOSISTEMA-1` | aceptada en rama (`69068d9`), sin publicar | `REPRODUCCION-INICIO-ECOSISTEMA-1-2026-10-01.md` |
 | `PAGO-ORDEN-CERRADA-1` | publicada en `65457cc` | `REPRODUCCION-PAGO-ORDEN-CERRADA-1-2026-09-28.md` |
 | `COBRO-CONCURRENTE-1` | publicada en `58bb62b` | `REPRODUCCION-COBRO-CONCURRENTE-1-2026-09-28.md` |
 | `AVISOS-DE-PAGO-1` | publicada en `a7e2237` | `REPRODUCCION-AVISOS-DE-PAGO-1-2026-09-27.md` |
