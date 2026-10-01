@@ -10,6 +10,23 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-01 — Los filtros salen de las publicaciones, y se puede escribir otra marca
+
+**Revierte la del 25/09** («el filtro de marca muestra siempre la lista completa»). La
+clienta, al ver Tractores, pidió que los filtros ofrezcan sólo lo publicado, y que una marca
+nueva aparezca sola. Emi eligió hacerlo sin esperar la reunión. Pasa a la Dev como
+`FILTROS-DE-PUBLICACIONES-1`:
+
+- cada filtro ofrece sólo opciones con publicaciones en la búsqueda del momento;
+- al publicar se puede escribir «Otra marca». Si coincide con una que ya existe, sin
+  importar mayúsculas, acentos ni espacios, se usa esa;
+- «Tecnologizar» pasa a «Tecnificar».
+
+Unir o corregir marcas desde el panel es otra pieza. Las categorías esperan la reunión.
+
+Motivo: la clienta quiere un buscador que sea un resumen de lo que se publicó. Un filtro
+lleno de opciones vacías no ayuda a encontrar.
+
 ## 2026-10-01 — Inicio cuenta el concepto: «Por qué AgroBoeda» (maqueta v3)
 
 La clienta le pidió a Emi que Inicio haga entender mejor el concepto, y le pasó su documento
