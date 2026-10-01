@@ -175,7 +175,52 @@ hubiera entrado.
 
 ---
 
-## Después — VENDER-SIN-SESION-1 (empezala apenas entregues SESIONES-AL-CAMBIAR-1)
+## Después — HERO-COMPACTO-1 (apenas entregues SESIONES-AL-CAMBIAR-1)
+
+**Decisión de Emi (01/10), opción A.** Emi miró el Inicio publicado en su
+notebook: la portada ocupa toda la pantalla, y los servicios del ecosistema,
+que son lo principal de la versión 2, quedan abajo. En 1440 el título se parte
+en cuatro renglones, con «cumplimiento» solo en uno, y la foto acompaña esa
+altura. Es fiel a la maqueta: lo que cambia es la proporción, no el error.
+Entregala por separado.
+
+### Qué entra
+
+1. **El título de la portada en tres renglones o menos** en 1440, con los
+   tokens de tipografía que ya existen.
+2. **La portada más baja.** En 1440×900 y en 1366×768, sin bajar, se ven:
+   - el rótulo «El ecosistema AgroBoeda»;
+   - «¿Qué querés hacer?»;
+   - el borde de arriba de la primera fila de tarjetas.
+3. **La foto acompaña la altura nueva**, sin deformarse y sin cortar el tractor
+   ni la tolva.
+4. **En 390 no empeora:** la portada no crece. Decí en el informe cuánto mide
+   antes y después.
+
+### Fuera de alcance
+
+- Cambiar los textos aprobados, los botones o la foto elegida.
+- Tocar las otras secciones de Inicio.
+
+### Aceptación verificable
+
+1. **Caso nuevo** que mida, en 1440×900 y 1366×768:
+   - los renglones del título;
+   - que «¿Qué querés hacer?» y el borde de la primera tarjeta queden dentro
+     de la pantalla al abrir Inicio.
+2. **Negativo:** la portada con la altura de hoy da rojo.
+3. **Capturas antes y después** en 1440×900, 1366×768 y 390.
+4. El 232 y el 233 siguen verdes.
+5. Suite completa, a11y, contraste, móvil y las puertas de siempre.
+
+### Frená y consultá
+
+- Si para llegar hace falta un tamaño de letra o una medida que
+  `tokens.css` no tiene.
+
+---
+
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues HERO-COMPACTO-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.

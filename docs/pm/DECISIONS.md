@@ -10,6 +10,17 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-01 — La portada de Inicio se achica
+
+Emi miró el Inicio publicado (`30f9791`) en su notebook: la portada ocupa toda la pantalla, el
+título va en cuatro renglones y los servicios del ecosistema no se ven sin bajar. Eligió la
+opción A: el título en tres renglones o menos, y la portada más baja, para que en 1440×900 y
+1366×768 se vea el comienzo de los servicios. Los textos y la foto no cambian. Pasa a la Dev
+como `HERO-COMPACTO-1`, antes de `VENDER-SIN-SESION-1`.
+
+Motivo: la versión 2 pone el ecosistema primero, y con la portada a pantalla completa quedaba
+escondido.
+
 ## 2026-10-01 — Una sola regla de contraseña, y el cambio cierra las sesiones viejas
 
 PM, sobre el freno de `CAMBIAR-CONTRASENA-1` (`3f9f2e5`).

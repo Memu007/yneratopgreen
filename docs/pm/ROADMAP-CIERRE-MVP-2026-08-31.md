@@ -208,6 +208,7 @@ o un rediseño nuevo.
 | 51 | **INICIO-ECOSISTEMA-1 — publicada en `30f9791`** | Emi, 30/09: aprobó la maqueta v2 y pidió programarla | Base `5412555`; producto `b5daa24` y `7d7d808`; casos 232 a 234; informe `69068d9`. PM: nueve negativos en rojo (tres de PM), suite 233/234, puertas verdes. Evidencia en `REPRODUCCION-INICIO-ECOSISTEMA-1-2026-10-01.md`. |
 | 52 | **CAMBIAR-CONTRASENA-1 — asignada** | Nadie cambia su propia contraseña desde el sitio | «Cambiar contraseña» en «Mi cuenta», reglas en la API y ningún 500 con más de 72 bytes. Tarea activa en `PARA-DEV.md`. |
 | 53a | **SESIONES-AL-CAMBIAR-1 — en cola** | Cambiar la contraseña no cierra las sesiones abiertas; una renovada no vence nunca | Cambiar o restablecer invalida las sesiones anteriores de la cuenta. Va después de `CAMBIAR-CONTRASENA-1` y antes de `VENDER-SIN-SESION-1`. |
+| 53b | **HERO-COMPACTO-1 — en cola** | La portada de Inicio tapa el ecosistema en una notebook (Emi, 01/10: opción A) | Título en tres renglones o menos y portada más baja: en 1440×900 y 1366×768 se ve el comienzo de los servicios. Va después de `SESIONES-AL-CAMBIAR-1` y antes de `VENDER-SIN-SESION-1`. |
 | 53 | **VENDER-SIN-SESION-1 — en cola** | Sin sesión no queda ningún botón para publicar (Emi, 01/10: opción B) | «Vender» siempre en la cabecera; sin sesión pide ingresar y abre el formulario. Va después de `CAMBIAR-CONTRASENA-1`. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
