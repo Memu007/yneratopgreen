@@ -10,6 +10,16 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-01 — «Vender» se ve siempre, también sin sesión
+
+Al aceptar `INICIO-ECOSISTEMA-1` quedó un hueco: sin sesión no hay ningún botón para publicar.
+«Publicar una oferta» salió de Inicio con la maqueta v2, y el otro botón estaba en «Quiénes
+somos», que salió del sitio. Emi eligió la opción B: «Vender» se ve siempre en la cabecera, y
+sin sesión pide ingresar y después abre el formulario. Pasa a la Dev como
+`VENDER-SIN-SESION-1`, después de `CAMBIAR-CONTRASENA-1`.
+
+Motivo: quien quiere vender tiene que ver por dónde empezar sin tener cuenta todavía.
+
 ## 2026-09-30 — Inicio v2 se programa sin esperar las respuestas de la clienta
 
 Emi aprobó la maqueta de Inicio versión 2 y pidió programarla sin esperar las cuatro respuestas

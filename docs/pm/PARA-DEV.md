@@ -20,8 +20,8 @@ Sobre `69068d9` (producto en `b5daa24` y `7d7d808`). Evidencia en
 - **Suite completa desde base nueva:** 233/234. Sólo cae el 169, de entorno.
 - **Auditorías y las dos guías:** verdes.
 - **La banda en 390 y los casos retirados:** aceptados.
-- **El camino para publicar sin sesión:** lo decide Emi. No lo toques hasta
-  que esté en una tarea.
+- **El camino para publicar sin sesión:** Emi eligió que «Vender» se vea
+  siempre. Es `VENDER-SIN-SESION-1`, abajo, después de esta tarea.
 
 Buen cierre de una pieza empezada por otra cuenta. Rehacer la evidencia era
 lo correcto.
@@ -106,6 +106,56 @@ vez de «contraseña incorrecta», porque bcrypt no acepta más.
 
 ---
 
+## Siguiente — VENDER-SIN-SESION-1 (empezala apenas entregues CAMBIAR-CONTRASENA-1)
+
+**Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
+Entregala por separado.
+
+### Problema
+
+Desde `INICIO-ECOSISTEMA-1`, sin sesión no hay ningún botón para publicar:
+
+- «Publicar una oferta» salió de Inicio;
+- la página «Quiénes somos», que tenía el otro botón, salió del sitio;
+- «Vender» aparece sólo después de ingresar.
+
+### Qué entra
+
+1. **«Vender» en la cabecera para todos**, en escritorio y en celular.
+2. **Sin sesión:** abre el ingreso, y al entrar abre el formulario de
+   publicar. Es el mismo recorrido que hacía `pedirPublicar` antes de
+   `b5daa24`:
+   - cancelar o equivocar la contraseña no abre nada;
+   - darse de alta no abre sesión, así que no hay nada que retomar.
+3. **Con sesión:** como hoy.
+
+### Fuera de alcance
+
+- Volver a poner «Publicar una oferta» en Inicio: la maqueta aprobada no lo
+  tiene.
+- Cambiar el texto de la tarjeta del Mercado.
+
+### Aceptación verificable
+
+1. **Caso nuevo, en 1440 y 390, sin sesión:**
+   - «Vender» se ve;
+   - ingresar lleva al formulario;
+   - cancelar el ingreso no abre nada.
+2. **Con sesión:** «Vender» abre el formulario como hoy.
+3. **Negativos:**
+   - «Vender» oculto sin sesión da rojo;
+   - ingresar sin que se abra el formulario da rojo.
+4. **La cabecera en 390** no desborda ni tapa controles: la auditoría móvil
+   y las capturas lo muestran.
+5. Suite completa desde base nueva, a11y, contraste, móvil, las dos guías y
+   las puertas de siempre.
+
+### Frená y consultá
+
+- Si en 390 «Vender» no entra en la cabecera sin cambiar su forma.
+
+---
+
 ## Después (no empezar todavía)
 
 Lo decide la PM. Lo que depende de Emi puede reordenar la cola:
@@ -119,8 +169,6 @@ Lo decide la PM. Lo que depende de Emi puede reordenar la cola:
   - los cuatro de `PAGO-ORDEN-CERRADA-1` y los de
     `RECONCILIADOR-PROGRAMADO-1` y `DESVINCULAR-CON-COBROS-1`, en sus
     reproducciones;
-  - ingresar con una contraseña de más de 72 bytes da 500 (bcrypt);
-  - cambiar la propia contraseña desde la pantalla: la API tiene `/auth/change-password` y ninguna pantalla lo usa;
 - **antes del 01/12/2026:** sacar de `railway.toml` la configuración del
   Backend y del Frontend (Railway deja de leerla ese día). Pieza propia;
 - una devolución o un contracargo que llega con la cuenta desvinculada no
