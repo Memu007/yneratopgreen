@@ -13970,10 +13970,16 @@ await runCase(130, 'El token sigue siendo el mismo JWT despues de cambiar la bib
     const desvio = Math.abs((carga.exp - ahora) - segundosEsperados);
     assert(desvio <= 120,
       `el token de ${nombre} vence en ${carga.exp - ahora} s y la configuracion dice ${segundosEsperados} s`);
-    // 3. Nada de mas: el token no lleva la cuenta adentro.
+    // 3. Nada de mas: el token no lleva la cuenta adentro. `sv` es la version
+    //    de sesiones de la cuenta (SESIONES-AL-CAMBIAR-1): un numero que sube
+    //    al cerrar sus sesiones, no un dato de la cuenta. Un token sin el
+    //    sigue sirviendo, asi que su llegada no tira ninguna sesion abierta:
+    //    lo mide el caso 236.
     const claves = Object.keys(carga).sort().join(',');
-    assert(claves === 'exp,sub,type',
-      `el token de ${nombre} lleva reclamaciones de mas: ${claves}`);
+    assert(claves === 'exp,sub,sv,type',
+      `el token de ${nombre} lleva reclamaciones de mas o de menos: ${claves}`);
+    assert(Number.isInteger(carga.sv) && carga.sv >= 0,
+      `la version de sesiones del token de ${nombre} es ${JSON.stringify(carga.sv)}`);
 
     // 4. Y la firma es HMAC-SHA256 del secreto, recalculada acá sin PyJWT.
     assert(firma === firmar(cuerpo),
