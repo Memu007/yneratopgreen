@@ -2,144 +2,159 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## LINK-ABIERTO-DEVUELTO-1: entrega
+## INICIO-ECOSISTEMA-1: entrega
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `487114f` (tu asignación) |
-| producto | `4b02fec`: una línea de `cobro.en_curso` y su docstring |
-| caso, negativos y terminadores | `cac729d` |
-| no integrado, no desplegado | `main` sigue en `2ab0a36` |
+| base | `5412555` (tu nota de traspaso) |
+| producto | `b5daa24` · `7d7d808` (la banda en 390) |
+| casos y negativos | `c020222` |
+| capturas | `162e04b` (1440) · `7d7d808` (390, rehecha) |
+| no integrado, no desplegado | `main` sigue en `77d3d2c` |
+
+**La empezó otra cuenta de Dev y la cierro yo.** Dejó `b5daa24`,
+`c020222` y `162e04b`, sin informe. Revisé su diff contra la tarea y la
+maqueta, y rehíce toda la evidencia de este informe en esta sesión.
 
 **Resultado.**
 
-- **Reproducido con la base.** El 231 arma el pago devuelto y el de
-  contracargo, cada uno con el link sin apagar dos veces. Desvincular pasa, y
-  **el reconciliador deja los dos links vivos en Mercado Pago** aunque la
-  vendedora siga vinculada.
-- **El link abierto mira los cuatro estados con cobro** (`CON_COBRO`), en el
-  criterio único. Con eso:
-  - el reconciliador apaga los dos links. El pago, la orden, la reserva, los
-    intentos y el stock quedan como estaban: no hubo que frenar;
-  - desvincular frena mientras tanto: 409 con 2;
-  - lo que ya barría no cambia. Los 20 casos vecinos de Mercado Pago y la
-    suite siguen en verde.
-- **Los terminadores, restaurados.** Por archivo, las líneas con CR contra la
-  base de mis dos piezas (`0495b31`):
+- **Inicio es la maqueta v2** con los textos aprobados, tal cual:
+  - la portada sobre la banda verde;
+  - los siete servicios en su orden; sólo el Mercado dice «Disponible hoy»,
+    con su número y «Entrar al Mercado»;
+  - «¿Te interesa alguno?» con «Escribinos»;
+  - el crédito de las dos fotos CC BY, con la obra, el autor y la licencia
+    enlazados como en el inventario;
+  - «Cómo funciona», en cinco pasos;
+  - el principio con sus tres niveles.
 
-  | archivo | antes de mis piezas | en `777bee1` | ahora |
-  |---|---|---|---|
-  | `scripts/smoke.mjs` | 4 | 0 | 4 (las mismas, ahora en 36426 a 36429) |
-  | `scripts/lib/mp-doble.mjs` | 0 | 3 | 0 |
+  Salieron «Publicar una oferta», los tipos de publicación y «Lo que muestra
+  cada publicación».
+- **«Quiénes somos» salió** del menú (escritorio y celular), del pie y del
+  sitio. `?section=about` lleva a Inicio reescribiendo la barra, sin sumar
+  una entrada al historial. El manual ya no la nombra.
+- **Agregué una corrección** (`7d7d808`). En 390, la banda de la foto de
+  portada («Cosecha y descarga de grano · Campo argentino») se cortaba con
+  puntos suspensivos: necesitaba 344 px y tenía 282.
+  - Venía del Inicio anterior: es la misma regla de CSS, de UX-2D.
+  - La maqueta la parte en dos líneas, y ahora el sitio también.
+  - Medí todos los textos de Inicio en 390 y en 1440, y ninguno se corta.
+- **Ningún caso se retiró entero.** Se cambiaron 16; abajo está qué se sacó
+  de cada uno y por qué.
 
-- **Sin migraciones.**
-- **Suite completa desde base nueva, sobre `cac729d`:** 230/231. Sólo cae
-  el 131, de entorno. Los casos en que hubo que terminar ventas para
-  desvincular son los mismos 14 de la pieza anterior.
+**Nada para decidir.** Hay un riesgo de producto en «Riesgos».
 
-**Nada para decidir.**
+## Capturas
 
-## Por qué apagar no cambia el pago
+`docs/pm/capturas/inicio-ecosistema-1/`:
 
-Lo leí en el código y el caso lo confirma. En el barrido, la orden pasa por
-`sincronizar`:
+- `inicio-1440-sitio-y-maqueta.jpg`;
+- `inicio-390-sitio-y-maqueta.jpg`.
 
-1. la búsqueda trae el mismo pago, con la misma fecha: el intento no se
-   vuelve a escribir;
-2. `_apagar_y_aplicar` ve que hubo cobro y apaga el link;
-3. `aplicar` resume los intentos: da otra vez `REFUNDED` o `CHARGED_BACK`;
-4. consolidar el stock es un `UPDATE` condicional sobre la reserva, que ya
-   está consolidada: no mueve nada. La orden ya está pagada: no hay
-   transición ni aviso.
+**Lo que difiere de la maqueta, y por qué:**
 
-## Caso
+| | sitio | maqueta | por qué |
+|---|---|---|---|
+| número del Mercado | el del catálogo (30 en una base recién creada) | 242 | el 242 es de ejemplo |
+| crédito de las fotos CC BY | debajo de las tarjetas | no está | lo pide la tarea |
+| franja «Maqueta…» | no está | arriba | la tarea la saca |
+| espacios entre secciones | algunos píxeles más en 1440 | | las medidas salen de `tokens.css`, como pide la tarea |
 
-| caso | qué mira | con el producto de la base |
-|---|---|---|
-| 231 | Devolución y contracargo, cada uno con el link sin apagar al cobrar y al llegar la novedad. Desvincular da 409 con 2 y no toca las credenciales. El reconciliador apaga los dos links, anotado y vencido en el doble, sin cambiar el estado del pago, la orden, la reserva, los intentos ni el stock. Después desvincula | rojo, 5 problemas |
+## Casos
 
-Con la base, el 231 dijo:
+| caso | qué mira |
+|---|---|
+| 232 | En 1440 y en 390: los textos aprobados, los siete servicios en orden, el estado de cada uno, ninguna «Próximamente» con enlace o botón, las fotos (archivo, `alt` vacío, carga diferida, ancho y alto), el crédito y sus cinco enlaces, la ruta y el principio |
+| 233 | En los dos anchos, «Conocé el ecosistema» deja el foco en «¿Qué querés hacer?», y «Entrar al Mercado» y «Escribinos» llevan adonde dicen. El número del Mercado es el del catálogo, también en singular; mientras no se sabe, no se escribe ninguno |
+| 234 | «Quiénes somos» no está en el menú, en escritorio ni en celular, ni en el pie. `?section=about` termina en Inicio sin sumar una entrada al historial |
 
-```text
-[FAIL] 231 … — 5 problema(s):
-  con los dos links abiertos: desvincular respondió 200 y no 409: {"estado":"desconectado",…}
-  con los dos links abiertos: el conflicto no dice «cobros_en_curso» y 2: {"estado":"desconectado",…}
-  con los dos links abiertos: las credenciales no quedaron como estaban (cuenta 88858322 → null)
-  devolución: el reconciliador no apagó el link (sin anotar, vivo en Mercado Pago)
-  contracargo: el reconciliador no apagó el link (sin anotar, vivo en Mercado Pago)
-```
+**Casos cambiados:** 122, 123, 124, 128, 147, 155, 156, 158, 163, 167, 168,
+170, 192, 193, 208 y 209.
 
-Después de desvincular, el caso vuelve a vincular la misma cuenta. Por eso
-el barrido corre con token, y aun así no apaga.
+- **Usaban «Quiénes somos» como una sección más**, y ahora usan Contacto: 122,
+  128, 147, 156, 158, 163, 170 y 193.
+- **Miraban el Inicio de antes** (el título, «Publicar una oferta», las
+  tarjetas), y ahora miran el nuevo: 123, 124 y 155.
+  - El 155 busca las tarjetas de publicaciones como `article[class*="card"]`,
+    para no confundirlas con las de los servicios.
+  - Tiene 1 px de tolerancia porque la cabecera en celular quedó en una sola
+    fila.
+- **El 156** ya no toma «AGROBOEDA» como el nombre viejo. Es el rótulo nuevo
+  en mayúsculas.
 
-Con el cambio, en la suite completa:
+**Lo que se retiró, porque era propio de lo que salió:**
 
-```text
-[PASS] 231 … — con el link sin apagar al cobrar ni al llegar la devolución y el contracargo, desvincular da 409 con 2; el reconciliador apaga los dos links sin cambiar el estado del pago, la orden, la reserva ni el stock, y después desvincula (5583 ms)
-```
+| caso | qué se sacó |
+|---|---|
+| 167 | publicar sin sesión desde «Publicar una oferta» de Inicio y de Quiénes somos, y que el formulario se retome después de ingresar. Los dos botones salieron, y con ellos `pedirPublicar` de `App.tsx` |
+| 168 | que Quiénes somos no dijera «Contactanos» ni tratara de «tú» |
+| 192 | el cierre de Quiénes somos, «Publicá o buscá en el Mercado agropecuario» |
+| 208 | «Lo que muestra cada publicación» en Inicio |
+| 209 | el bloque de datos de Inicio y lo de Quiénes somos: la invitación, «Nuestro equipo» y la foto. Siguen Inicio sin publicaciones, Contacto sin preguntas frecuentes y nada que diga «comisión» |
 
 ## Negativos
 
-`python3 scripts/sabotajes_link_abierto_devuelto_1.py`: los dos dan su rojo
-en la primera corrida. Dice «todos dieron el rojo esperado» y «src y backend
-después: como estaban».
+`python3 scripts/sabotajes_inicio_ecosistema_1.py` → «todos dieron el rojo
+esperado» y «src y backend después: como estaban».
 
 | sabotaje | rojo |
 |---|---|
-| `criterio-sin-los-estados-nuevos` (vuelve a `APPROVED` y `EN_REVISION`) | 231: «desvincular respondió 200 y no 409», y los dos «el reconciliador no apagó el link». Nada cambia de estado |
-| `reconciliador-cambia-el-estado` (al barrer una cobrada, la deja aprobada) | 231: «devolución: pago cambió: REFUNDED → APPROVED» y «contracargo: pago cambió: CHARGED_BACK → APPROVED». Los links se apagan y desvincular frena |
+| `proximamente-con-enlace` (pedido) | 232: 12 problemas, las seis tarjetas «Próximamente» con un enlace, en los dos anchos |
+| `quienes-somos-en-el-pie` (pedido) | 234: 4 problemas, «el pie tiene «Quiénes somos»» y «la página nombra «Quiénes somos»», en 1440 y en 390 |
+| `sin-credito` (pedido) | 232: 2 problemas, «no está el crédito de las fotos», en los dos anchos |
+| `numero-provisorio` | 233: 1 problema, «con el catálogo sin contestar, el Mercado ya dice un número» (decía 0) |
+| `sin-foco` | 233: 2 problemas, el foco queda en el botón y no en «¿Qué querés hacer?», en los dos anchos |
+| `about-sin-retirar` | 234: 2 problemas, la barra queda en `?section=about` al abrir el enlace viejo y al volver a él con «Adelante» |
 
-**Aviso de entorno.** El primero deja desvincular, así que cada corrida deja
-dos ventas con el link abierto en la base, de una vendedora nueva. Es como
-los tres de la pieza anterior: no frenan a ningún otro caso.
+Los seis son de pantalla. El script igual reinicia la API con `REINICIAR_API`.
 
 ## Cómo verificarlo
 
 Con el entorno arriba y la siembra demo:
 
 ```bash
-SMOKE_CASOS=231 node scripts/smoke.mjs
-# → 1/1 pasaron; 0 fallaron   (unos 6 s)
+SMOKE_CASOS=232,233,234 node scripts/smoke.mjs
+# → 3/3 pasaron; 0 fallaron
 
-python3 scripts/sabotajes_link_abierto_devuelto_1.py
-# → todos dieron el rojo esperado   (menos de un minuto)
-# → src y backend después: como estaban
-
-git show 0495b31:scripts/smoke.mjs | grep -c $'\r'; grep -c $'\r' scripts/smoke.mjs
-# → 4 y 4
-grep -c $'\r' scripts/lib/mp-doble.mjs
-# → 0
+REINICIAR_API="<tu reinicio>" python3 scripts/sabotajes_inicio_ecosistema_1.py
+# → todos dieron el rojo esperado
 ```
 
 ## Puertas
 
 | puerta | resultado |
 |---|---|
-| suite completa desde base nueva, sobre `cac729d` | 230/231; cae el 131, de entorno |
-| lint, `tsc --noEmit`, build | verdes |
-| `compileall`, `pip check`, `node --check` | verdes; «No broken requirements found.» |
-| `alembic check` | «No new upgrade operations detected.» |
-| diff-check con `cr-at-eol` | limpio sobre `487114f..cac729d` |
-| CR por archivo contra la base (`487114f`) | cambian sólo los dos que había que restaurar: `smoke.mjs` 0 → 4 y `mp-doble.mjs` 3 → 0. `cobro.py`, igual |
-| a11y, contraste, auditoría móvil, guías | **no corridas**: no cambia nada visible |
+| suite completa desde base nueva, sobre `7d7d808` | **233/234**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'». Pasan el 213, el 232, el 233 y el 234 |
+| tipos, lint, build | verdes (`npm run build` incluye `tsc`; lint sin avisos) |
+| `node --check`, parseo de Python | verdes |
+| diff-check con `cr-at-eol` sobre `5412555..7d7d808` | limpio; ninguna línea cambia sólo por el final |
+| a11y `--todas` | 78 de 78 pantallas, 0 violaciones. Eran 80: salieron las dos de Quiénes somos |
+| contraste | 82 de 82, ninguna por debajo del mínimo. Eran 88: salieron las de Quiénes somos |
+| auditoría móvil | 12 de 12 recorridos y 39 pantallas: 0 desbordes, 0 controles tapados, 0 errores de consola y 0 respuestas 4xx/5xx |
+| `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 26 pasos en escritorio y celular» |
+| `guia-usuario.mjs` | «LA GUÍA Y EL SITIO COINCIDEN: 22 pasos en escritorio y celular» |
+
+**Líneas con CR por archivo, contra la base:**
+
+| archivo | base | ahora |
+|---|---|---|
+| `scripts/smoke.mjs` | 4 | 4 (las mismas) |
+| `src/App.tsx` | 534 | 525: 11 en líneas borradas, 2 en agregadas |
+| `src/components/Pages/HomePage.module.css` | 429 de 429 | 818 de 818 |
+| `AboutPage.tsx` y `AboutPage.module.css` | 130 y 292 | borrados |
+| los otros 11 archivos | 0 | 0 |
 
 ## Riesgos
 
-- **Si Mercado Pago no deja apagar ese link nunca**, la orden sigue en curso
-  y quien vende no puede desvincular. Es lo mismo que ya pasaba con un pago
-  aprobado. El reconciliador lo reintenta una vez por barrido.
-- **Una vendedora con un link así** hoy puede desvincular, y con el cambio no
-  hasta el barrido siguiente. En producción no hay ninguna: Mercado Pago no
-  está habilitado.
-
----
-
-## Los CR de DESVINCULAR-CON-COBROS-1
-
-Restaurados en esta pieza (arriba). La causa eran mis herramientas de
-edición, y está corregida.
-
-## DESVINCULAR-CON-COBROS-1
-
-Aceptada sobre `777bee1` y publicada por vos en `2ab0a36`. Sin cambios.
+- **Sin sesión no queda ningún botón para publicar.** Salió «Publicar una
+  oferta» de Inicio, como pide la tarea, y salió la página de Quiénes somos,
+  que tenía el otro. «Vender» aparece en la cabecera sólo después de
+  ingresar. La tarjeta del Mercado dice «o publicá una oferta», pero su
+  botón lleva al Mercado. Si se quiere un camino para publicar sin sesión,
+  es una pieza chica: volver a usar el que se fue.
+- **La cabecera en celular cambió de forma.** Con tres destinos, el menú va
+  en tres columnas y en una sola fila. Es parte de sacar «Quiénes somos» del
+  menú.
+- **«Próximamente» describe servicios que todavía no existen,** con el texto
+  aprobado.
