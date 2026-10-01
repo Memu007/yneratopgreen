@@ -38873,6 +38873,178 @@ await runCase(234, '«Quiénes somos» sale del menú y del pie, y un enlace vie
   }
 });
 
+// 235. CAMBIAR-CONTRASENA-1 — cambiar la propia contraseña, y la regla única.
+//
+// Nadie podía cambiar su contraseña desde el sitio: la API tenía
+// `/auth/change-password` y ninguna pantalla lo usaba. Y las reglas de la
+// contraseña nueva estaban en cuatro lugares distintos, con más de 72 bytes
+// dando un 500 en todos (bcrypt no guarda más).
+//
+// A. Por la API, llamada directo: la regla de 6 caracteres a 72 bytes en el
+//    registro, el cambio, el alta y el restablecer del panel; 73 bytes en el
+//    ingreso es «incorrecta». Ningún 500, y ningún 422 devuelve la
+//    contraseña escrita.
+// B. En la pantalla, en 1440 y 390, con una cuenta nueva por ancho: las dos
+//    nuevas distintas no mandan nada; la actual mal no cambia nada ni borra lo
+//    escrito; el cambio bueno, y después salir, la vieja no entra y la nueva sí.
+await runCase(235, 'Cambiar la contraseña desde Mi cuenta: la nueva entra, la vieja no, y más de 72 bytes nunca da 500', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  const L73 = 'a'.repeat(73);
+  const N37 = 'ñ'.repeat(37); // 37 caracteres, 74 bytes
+  const L72 = 'a'.repeat(72);
+
+  // --- A. La regla, en los cuatro caminos que guardan una contraseña --------
+  const titular = { email: `clave.api.${sello}@example.com`, password: 'Primera1', full_name: `Clave Api ${sello}` };
+  await registrarYVerificar({ ...titular, role: 'user' });
+  const cuenta = await ingresarVendedor(titular.email, titular.password);
+  const admin = await ingresarVendedor('admin@topgreen.com', 'admin123');
+  const tipoDe = (r) => (Array.isArray(r.datos?.detail) ? r.datos.detail.map((d) => d.type).join(',') : '');
+  const mensajeDe = (r) => (Array.isArray(r.datos?.detail) ? r.datos.detail.map((d) => d.msg).join(' ') : String(r.datos?.detail ?? ''));
+  const pruebas = [
+    ['registro con 73 bytes', 422, /hasta 72 caracteres/, () => pedirCrudo('/auth/register', {
+      method: 'POST', body: { email: `clave.l73.${sello}@example.com`, password: L73, full_name: 'Clave Larga', role: 'user' } })],
+    ['registro con 37 eñes (74 bytes)', 422, /hasta 72 caracteres/, () => pedirCrudo('/auth/register', {
+      method: 'POST', body: { email: `clave.n37.${sello}@example.com`, password: N37, full_name: 'Clave Larga', role: 'user' } })],
+    ['registro con 5 caracteres', 422, /al menos 6 caracteres/, () => pedirCrudo('/auth/register', {
+      method: 'POST', body: { email: `clave.c5.${sello}@example.com`, password: 'abcde', full_name: 'Clave Corta', role: 'user' } })],
+    ['registro con 72 bytes justos', 201, null, () => pedirCrudo('/auth/register', {
+      method: 'POST', body: { email: `clave.l72.${sello}@example.com`, password: L72, full_name: 'Clave Justa', role: 'user' } })],
+    ['ingreso con 73 bytes', 401, /Email o contraseña incorrectos/, () => pedirCrudo('/auth/login', {
+      method: 'POST', body: { email: titular.email, password: L73 } })],
+    ['cambio a una de 73 bytes', 422, /hasta 72 caracteres/, () => pedirCrudo('/auth/change-password', {
+      method: 'POST', header: cuenta.token, body: { current_password: titular.password, new_password: L73 } })],
+    ['cambio a una de 3 caracteres', 422, /al menos 6 caracteres/, () => pedirCrudo('/auth/change-password', {
+      method: 'POST', header: cuenta.token, body: { current_password: titular.password, new_password: 'abc' } })],
+    ['cambio con la actual de 73 bytes', 400, /Contraseña actual incorrecta/, () => pedirCrudo('/auth/change-password', {
+      method: 'POST', header: cuenta.token, body: { current_password: L73, new_password: 'Segunda2' } })],
+    ['alta desde el panel con 73 bytes', 422, /hasta 72 caracteres/, () => pedirCrudo('/admin/users', {
+      method: 'POST', header: admin.token, body: { email: `clave.alta.${sello}@example.com`, password: L73, full_name: 'Alta Larga' } })],
+    ['restablecer desde el panel con 73 bytes', 422, /hasta 72 caracteres/, () => pedirCrudo(`/admin/users/${cuenta.id}/reset-password`, {
+      method: 'POST', header: admin.token, body: { password: L73 } })],
+    ['restablecer desde el panel con 3 caracteres', 422, /al menos 6 caracteres/, () => pedirCrudo(`/admin/users/${cuenta.id}/reset-password`, {
+      method: 'POST', header: admin.token, body: { password: 'abc' } })],
+  ];
+  for (const [que, codigo, motivo, pedido] of pruebas) {
+    const r = await pedido();
+    if (r.status !== codigo) problemas.push(`API, ${que}: HTTP ${r.status} y tenía que ser ${codigo} (${JSON.stringify(r.datos).slice(0, 160)})`);
+    if (codigo === 422 && tipoDe(r) !== 'clave_nueva') problemas.push(`API, ${que}: el error es «${tipoDe(r)}» y no la regla de la contraseña`);
+    if (motivo && !motivo.test(mensajeDe(r))) problemas.push(`API, ${que}: el motivo es «${mensajeDe(r)}»`);
+    if (/a{73}|ñ{37}|abcde"|"abc"/.test(JSON.stringify(r.datos ?? ''))) problemas.push(`API, ${que}: la respuesta devuelve la contraseña escrita`);
+  }
+  // Nada de eso cambió la contraseña de la cuenta.
+  if ((await pedirCrudo('/auth/login', { method: 'POST', body: titular })).status !== 200) {
+    problemas.push('API: después de los rechazos, la contraseña de la cuenta ya no es la misma');
+  }
+  medidos.push(`${pruebas.length} pedidos a la API, ninguno con 500`);
+
+  // --- B. En la pantalla ---------------------------------------------------
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [ancho, viewport] of [['escritorio', { width: 1440, height: 900 }], ['celular', { width: 390, height: 844 }]]) {
+      const quien = { email: `clave.${ancho}.${sello}@example.com`, password: 'Primera1', full_name: `Clave ${ancho} ${sello}` };
+      const NUEVA = 'Segunda22';
+      await registrarYVerificar({ ...quien, role: 'user' });
+      const contexto = await browser.newContext({ viewport, hasTouch: viewport.width < 800 });
+      await entrarConSesion(contexto, quien);
+      const page = await contexto.newPage();
+      const pedidos = [];
+      page.on('request', (r) => { if (r.url().includes('/auth/change-password')) pedidos.push(r.method()); });
+      const p = (texto) => problemas.push(`${ancho}: ${texto}`);
+      const entra = async (clave) => (await pedirCrudo('/auth/login', { method: 'POST', body: { email: quien.email, password: clave } })).status;
+      try {
+        await abrirPestanaDeCuenta(page, 'Mi Perfil', 'Mi Perfil');
+        const seccion = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Cambiar contraseña', exact: true }) });
+        if (!(await seccion.count())) { p('Mi Perfil no tiene «Cambiar contraseña»'); continue; }
+        await seccion.scrollIntoViewIfNeeded();
+        const campo = (nombre) => seccion.getByLabel(nombre, { exact: true });
+        for (const nombre of ['Contraseña actual', 'Contraseña nueva', 'Repetí la contraseña nueva']) {
+          if (!(await campo(nombre).count())) p(`la sección no pide «${nombre}»`);
+          else if ((await campo(nombre).getAttribute('type')) !== 'password') p(`«${nombre}» se ve escrita`);
+        }
+        const cambiar = () => seccion.getByRole('button', { name: 'Cambiar contraseña', exact: true }).click();
+        const dice = async (texto) => seccion.getByRole('alert').filter({ hasText: texto }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 }).then(() => true, () => false);
+        const llenar = async (actual, nueva, repetida) => {
+          if (await campo('Contraseña actual').count()) await campo('Contraseña actual').fill(actual);
+          await campo('Contraseña nueva').fill(nueva);
+          await campo('Repetí la contraseña nueva').fill(repetida);
+        };
+
+        // 1. Las dos nuevas distintas: no se manda nada.
+        await llenar(quien.password, NUEVA, `${NUEVA}x`);
+        await cambiar();
+        if (!(await dice('La contraseña nueva y su repetición no coinciden.'))) p('con las nuevas distintas no dice que no coinciden');
+        if (pedidos.length) p(`con las nuevas distintas se mandó ${pedidos.length} pedido(s)`);
+
+        // 2. La actual mal: no cambia nada y no borra lo escrito.
+        await llenar('equivocada1', NUEVA, NUEVA);
+        await cambiar();
+        if (!(await dice('Contraseña actual incorrecta'))) p('con la actual mal no dice «Contraseña actual incorrecta»');
+        if ((await campo('Contraseña nueva').inputValue()) !== NUEVA || (await campo('Repetí la contraseña nueva').inputValue()) !== NUEVA) {
+          p('el error de la actual borró la contraseña nueva');
+        }
+        if ((await campo('Contraseña actual').count()) && (await campo('Contraseña actual').inputValue()) !== 'equivocada1') {
+          p('el error de la actual borró lo que se había escrito en ella');
+        }
+        if (await entra(quien.password) !== 200) p('con la actual mal la contraseña cambió igual');
+
+        // 3. El cambio bueno.
+        await llenar(quien.password, NUEVA, NUEVA);
+        await cambiar();
+        await page.getByText('Cambiaste tu contraseña.').first().waitFor({ state: 'visible', timeout: 10_000 })
+          .catch(() => p('el cambio no dice «Cambiaste tu contraseña.»'));
+        const vacios = await Promise.all(['Contraseña nueva', 'Repetí la contraseña nueva'].map(async (n) => (await campo(n).inputValue()) === ''));
+        if (!vacios.every(Boolean)) p('después de cambiarla, la contraseña nueva sigue escrita en la pantalla');
+        const [scroll, visible] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+        if (scroll > visible + 1) p(`Mi Perfil desborda (${scroll} en ${visible})`);
+
+        // 4. Salir, y entrar por la pantalla: la vieja no, la nueva sí.
+        await page.getByRole('button', { name: 'Salir' }).first().click();
+        await page.getByRole('button', { name: 'Ingresar', exact: true }).first().waitFor({ timeout: 15_000 });
+        const ingresar = async (clave) => {
+          await page.getByRole('button', { name: 'Ingresar', exact: true }).first().click();
+          const login = page.getByRole('dialog', { name: 'Ingresar' });
+          await login.waitFor({ timeout: 15_000 });
+          await login.getByLabel(/^Email/).fill(quien.email);
+          await login.getByLabel(/^Contraseña/).fill(clave);
+          await login.getByRole('button', { name: 'Ingresar', exact: true }).click();
+          return login;
+        };
+        const conLaVieja = await ingresar(quien.password);
+        const salir = page.getByRole('button', { name: 'Salir' });
+        await esperarA(async () => (await conLaVieja.getByRole('alert').count()) > 0 || (await salir.count()) > 0,
+          'el ingreso con la contraseña vieja no respondió', 15_000).catch((e) => p(e.message));
+        if (await salir.count()) {
+          // Entró: se anota y se sale, para que el resto del ancho siga midiendo.
+          p('con la contraseña vieja entró');
+          await salir.first().click();
+          await page.getByRole('button', { name: 'Ingresar', exact: true }).first().waitFor({ timeout: 15_000 });
+        } else {
+          await conLaVieja.getByRole('button', { name: 'Cerrar' }).click();
+        }
+        await ingresar(NUEVA);
+        await page.getByRole('button', { name: 'Salir' }).first().waitFor({ timeout: 15_000 })
+          .catch(() => p('con la contraseña nueva no entró'));
+        if (await entra(quien.password) !== 401) p('por la API, la contraseña vieja todavía entra');
+        if (await entra(NUEVA) !== 200) p('por la API, la contraseña nueva no entra');
+        if (pedidos.length !== 2) p(`se mandaron ${pedidos.length} pedidos de cambio y tenían que ser 2: la actual mal y el bueno`);
+        medidos.push(ancho);
+      } finally {
+        await contexto.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'la regla de 6 caracteres a 72 bytes rechaza con su motivo en el registro, el cambio, el alta y el restablecer '
+    + 'del panel; 73 bytes en el ingreso es «incorrecta»; ningún 500 y ningún 422 devuelve la contraseña. En la '
+    + 'pantalla, las nuevas distintas no mandan nada, la actual mal no cambia nada ni borra lo escrito, y después del '
+    + `cambio la vieja no entra y la nueva sí. Medido: ${medidos.join('; ')}`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

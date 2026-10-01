@@ -485,6 +485,30 @@ del flete se acuerdan directamente.
 
 ---
 
+## 13. Tu contraseña
+
+### Paso 23. Cambiar tu contraseña
+<!-- recorrido: cambiar-contrasena -->
+
+En «Mi cuenta», «Mi Perfil», está «Cambiar contraseña».
+
+1. Escribí tu «Contraseña actual».
+2. Escribí la «Contraseña nueva», y otra vez en «Repetí la contraseña nueva».
+   Tiene que tener al menos 6 caracteres y hasta 72; las letras con acento y
+   la ñ cuentan doble.
+3. Tocá «Cambiar contraseña». Dice «Cambiaste tu contraseña.», y desde ahí
+   entrás con la nueva: la anterior deja de funcionar.
+
+Si algo no está bien, la sección lo dice y no cambia nada. Lo que escribiste
+queda, para que corrijas sólo lo que hace falta:
+
+- «Contraseña actual incorrecta»;
+- «La contraseña nueva y su repetición no coinciden.»: en ese caso no se
+  manda;
+- «La contraseña tiene que tener al menos 6 caracteres.»
+
+---
+
 ## Cómo se comprueba esta guía
 
 El programa es `scripts/guia-usuario.mjs`. Necesita el sitio corriendo en

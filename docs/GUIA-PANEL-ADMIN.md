@@ -136,6 +136,8 @@ Si falta algo, el formulario lo dice y no crea nada:
 
 - «Completá el email, la contraseña y el nombre: son obligatorios.»
 - «La contraseña necesita al menos 6 caracteres.»
+- Si la contraseña es demasiado larga: «La contraseña puede tener hasta 72
+  caracteres. Las letras con acento y la ñ cuentan doble.»
 - Si el correo ya tiene cuenta: «El email ya está registrado».
 
 ![El formulario de alta](guia-panel-admin/usuarios-crear-escritorio.png)

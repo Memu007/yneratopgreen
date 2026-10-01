@@ -538,6 +538,11 @@ const RECORRIDOS = {
       await crear();
       await esperarTexto(page, 'La contraseña necesita al menos 6 caracteres.');
       await v.mirar(page);
+      // Una de 73 bytes: la rechaza la API, con su motivo y sin un 500.
+      await panel.getByPlaceholder('Contraseña *').fill('a'.repeat(73));
+      await crear();
+      await esperarTexto(page, 'La contraseña puede tener hasta 72 caracteres. Las letras con acento y la ñ cuentan doble.');
+      await v.mirar(page);
       // Un correo que ya tiene cuenta.
       await panel.getByPlaceholder('Email *').fill(c.vendedora.user.email);
       await panel.getByPlaceholder('Contraseña *').fill(c.nueva.clave);

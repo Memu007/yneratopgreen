@@ -1348,7 +1348,8 @@ const RECORRIDOS = {
     await v.mirar(page);
     await perfil.getByRole('button', { name: 'Editar', exact: true }).click();
     await perfil.getByLabel('Alias bancario').waitFor();
-    await v.inventario('«Mi Perfil» al editar', perfil, null, { fuera: ['Mercado Pago — dónde cobrás', 'Documentación fiscal'] });
+    await v.inventario('«Mi Perfil» al editar', perfil, null, {
+      fuera: ['Mercado Pago — dónde cobrás', 'Documentación fiscal', 'Cambiar contraseña'] });
     await v.afirma('El «Email» no se cambia.', async () => {
       exigir(await perfil.getByLabel('Email', { exact: true }).count() === 0 && await perfil.locator('input[type="email"]').count() === 0,
         'al editar, el correo se puede cambiar');
@@ -1841,7 +1842,7 @@ const RECORRIDOS = {
     await perfil.getByRole('button', { name: 'Editar', exact: true }).click();
     await perfil.getByLabel('Radio de cobertura (km)').waitFor();
     await v.inventario('«Datos de transportista» al editar', perfil, null, {
-      desde: '[class*="_carrierHeading_"]', fuera: ['Mercado Pago — dónde cobrás', 'Documentación fiscal'] });
+      desde: '[class*="_carrierHeading_"]', fuera: ['Mercado Pago — dónde cobrás', 'Documentación fiscal', 'Cambiar contraseña'] });
     await v.afirma('Con «Editar» cambiás cualquiera de esos datos, igual que en el alta, y «Guardar» los guarda.', async () => {
       await perfil.getByLabel('Radio de cobertura (km)').fill('280');
       await perfil.getByRole('button', { name: 'Guardar', exact: true }).click();
@@ -1911,6 +1912,61 @@ const RECORRIDOS = {
     });
     await v.mirar(page);
     await v.inventario('«Mis Operaciones»', page.locator('main [class*="_section_"]').first());
+  },
+
+  // --- Parte 4. La cuenta --------------------------------------------------------
+
+  async 'cambiar-contrasena'(c, v) {
+    const { page } = c.compra;
+    const { email } = c.nuevaCompradora;
+    const NUEVA = `${CLAVE}b`;
+    const entra = async (clave) => (await pedir('/auth/login', { method: 'POST', body: { email, password: clave } })).status;
+    await abrirCuenta(page, 'Mi Perfil');
+    const seccion = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Cambiar contraseña', exact: true }) });
+    await seccion.scrollIntoViewIfNeeded();
+    await v.inventario('«Cambiar contraseña»', seccion);
+    const campo = (nombre) => seccion.getByLabel(nombre, { exact: true });
+    const cambiar = () => seccion.getByRole('button', { name: 'Cambiar contraseña', exact: true }).click();
+    const aviso = (texto) => seccion.getByRole('alert').filter({ hasText: texto }).waitFor({ timeout: 10_000 })
+      .catch(() => { throw new Falla(`la sección no dice «${texto}»`); });
+    const pedidos = [];
+    page.on('request', (r) => { if (r.url().includes('/auth/change-password')) pedidos.push(r.url()); });
+
+    await v.afirma('«La contraseña nueva y su repetición no coinciden.»: en ese caso no se manda', async () => {
+      await campo('Contraseña actual').fill(CLAVE);
+      await campo('Contraseña nueva').fill(NUEVA);
+      await campo('Repetí la contraseña nueva').fill(`${NUEVA}x`);
+      await cambiar();
+      await aviso('La contraseña nueva y su repetición no coinciden.');
+      exigir(pedidos.length === 0, `se mandaron ${pedidos.length} pedidos con las dos nuevas distintas`);
+    });
+    await v.mirar(page);
+    await v.afirma('Si algo no está bien, la sección lo dice y no cambia nada. Lo que escribiste queda, para que corrijas sólo lo que hace falta', async () => {
+      await campo('Contraseña actual').fill('equivocada1');
+      await campo('Repetí la contraseña nueva').fill(NUEVA);
+      await cambiar();
+      await aviso('Contraseña actual incorrecta');
+      exigir(await entra(CLAVE) === 200, 'con la actual equivocada la contraseña cambió igual');
+      exigir(await campo('Contraseña nueva').inputValue() === NUEVA
+        && await campo('Repetí la contraseña nueva').inputValue() === NUEVA, 'el error borró la contraseña nueva');
+    });
+    await v.mirar(page);
+    await campo('Contraseña nueva').fill('abc');
+    await campo('Repetí la contraseña nueva').fill('abc');
+    await campo('Contraseña actual').fill(CLAVE);
+    await cambiar();
+    await aviso('La contraseña tiene que tener al menos 6 caracteres.');
+    await v.mirar(page);
+    await v.afirma('desde ahí entrás con la nueva: la anterior deja de funcionar', async () => {
+      await campo('Contraseña nueva').fill(NUEVA);
+      await campo('Repetí la contraseña nueva').fill(NUEVA);
+      await cambiar();
+      await page.getByText('Cambiaste tu contraseña.').first().waitFor({ timeout: 10_000 })
+        .catch(() => { throw new Falla('no dice «Cambiaste tu contraseña.»'); });
+      await v.mirar(page);
+      exigir(await entra(NUEVA) === 200, 'con la nueva no entra');
+      exigir(await entra(CLAVE) === 401, 'con la anterior todavía entra');
+    });
   },
 };
 
