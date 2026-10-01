@@ -1721,7 +1721,10 @@
 
 /* Documentación fiscal del vendedor. Verde y no azul: es otra cosa que
    Mercado Pago y conviene que no se confundan de un vistazo. */
-.docSection {
+/* «Cambiar contraseña» va con la misma forma, y una clase propia: las pruebas
+   ubican la documentación por la suya. */
+.docSection,
+.claveSection {
   margin-top: 24px;
   background: var(--tg-color-surface-subtle);
   border-radius: var(--tg-radius-sm);
@@ -1729,12 +1732,14 @@
   overflow: hidden;
 }
 
-.docSection .sectionHeader {
+.docSection .sectionHeader,
+.claveSection .sectionHeader {
   background: var(--tg-color-brand);
   padding: 16px 24px;
 }
 
-.docSection .sectionHeader h2 {
+.docSection .sectionHeader h2,
+.claveSection .sectionHeader h2 {
   color: white;
   font-size: 18px;
   margin: 0;

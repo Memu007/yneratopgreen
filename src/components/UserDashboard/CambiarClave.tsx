@@ -45,7 +45,7 @@ export const CambiarClave: React.FC = () => {
   };
 
   return (
-    <section className={styles.docSection} aria-labelledby="titulo-cambiar-clave">
+    <section className={styles.claveSection} aria-labelledby="titulo-cambiar-clave">
       <div className={styles.sectionHeader}>
         <h2 id="titulo-cambiar-clave">Cambiar contraseña</h2>
       </div>
