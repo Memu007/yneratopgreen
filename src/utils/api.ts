@@ -176,6 +176,11 @@ function textoDeUnError(item: unknown): string | null {
   if (type === 'missing' && nombre) {
     return `${nombre} es obligatorio.`;
   }
+  // La regla de la contraseña nueva (`ClaveNueva` en la API) ya trae el
+  // mensaje entero, con el nombre del campo adentro.
+  if (type === 'clave_nueva') {
+    return msg;
+  }
 
   return nombre ? `${nombre}: ${msg}` : msg;
 }

@@ -2,6 +2,8 @@
 Aplicación principal FastAPI - AgroBoeda Marketplace Backend
 """
 from fastapi import FastAPI
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings, REVISION
@@ -43,6 +45,21 @@ app = Aplicacion(
     redoc_url=f"{settings.API_PREFIX}/redoc",
     openapi_url=f"{settings.API_PREFIX}/openapi.json"
 )
+
+
+# Un 422 devuelve, por cada error, lo que se escribió (`input`). Para una
+# contraseña eso es devolver el secreto en la respuesta, donde puede quedar en
+# un registro o en un reporte de error. Se saca de esos campos y del resto no:
+# el formato sigue siendo el de FastAPI.
+@app.exception_handler(RequestValidationError)
+async def _validacion_sin_contrasenas(request, exc: RequestValidationError):
+    errores = [
+        {clave: valor for clave, valor in error.items() if clave != "input"}
+        if any("password" in str(parte) for parte in error.get("loc", ()))
+        else error
+        for error in exc.errors()
+    ]
+    return await request_validation_exception_handler(request, RequestValidationError(errores))
 
 # Configurar CORS - Permitir orígenes específicos
 # Defaults para desarrollo local. Para agregar dominios productivos,

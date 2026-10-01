@@ -32,6 +32,11 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifica una contraseña contra su hash"""
     password_bytes = plain_password.encode('utf-8')
+    # bcrypt no guarda más de 72 bytes, así que ninguna contraseña más larga
+    # puede ser la correcta: es «incorrecta», no un error. Comparar sólo los
+    # primeros 72 sería truncar, y dejaría entrar con una contraseña distinta.
+    if len(password_bytes) > 72:
+        return False
     hashed_bytes = hashed_password.encode('utf-8')
     return bcrypt.checkpw(password_bytes, hashed_bytes)
 

@@ -14,7 +14,7 @@ from app.models.product import Product, ProductStatus
 from app.models.order import Order, OrderStatus
 from app.core.dependencies import get_current_user
 from app.core.security import hash_password
-from app.schemas.auth import UserResponse
+from app.schemas.auth import ClaveNueva, UserResponse
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -31,7 +31,7 @@ def require_admin(current_user: User = Depends(get_current_user)):
 class CreateUserRequest(BaseModel):
     """Request para crear un usuario desde admin"""
     email: EmailStr
-    password: str = Field(..., min_length=6)
+    password: ClaveNueva
     full_name: str = Field(..., min_length=2, max_length=255)
     phone: Optional[str] = None
     role: UserRole = UserRole.USER
@@ -225,10 +225,15 @@ def toggle_user_active(
     }
 
 
+class ResetPasswordRequest(BaseModel):
+    """La contraseña nueva de un restablecimiento, con la regla de todas."""
+    password: ClaveNueva
+
+
 @router.post("/users/{user_id}/reset-password")
 def reset_user_password(
     user_id: str,
-    new_password: dict,
+    new_password: ResetPasswordRequest,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
@@ -237,11 +242,7 @@ def reset_user_password(
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    password = new_password.get("password")
-    if not password or len(password) < 6:
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
-    
-    user.password_hash = hash_password(password)
+    user.password_hash = hash_password(new_password.password)
     user.updated_at = datetime.utcnow()
     db.commit()
     

@@ -1,11 +1,44 @@
 """
 Schemas de Autenticación - Validación de requests y responses
 """
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
-from typing import List, Literal, Optional
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
+from typing import Annotated, List, Literal, Optional
 from datetime import datetime
 
 from app.models.user import UserRole
+
+
+# === LA CONTRASEÑA NUEVA === #
+#
+# Una sola regla para toda contraseña que se guarda: el registro, el cambio, el
+# alta y el restablecer desde el panel. Antes eran cuatro y no decían lo mismo.
+#
+# Va de 6 caracteres a 72 bytes porque bcrypt no guarda más: desde la 5.0 lo
+# dice con un error —que llegaba como un 500— y antes truncaba en silencio, así
+# que dos contraseñas distintas entraban igual. Acá se rechaza con un motivo.
+#
+# El tipo del error es propio para que la pantalla muestre el mensaje tal cual:
+# ya dice qué campo es.
+CLAVE_MINIMO = 6
+CLAVE_MAXIMO_BYTES = 72
+
+
+def _clave_nueva(valor: str) -> str:
+    if len(valor) < CLAVE_MINIMO:
+        raise PydanticCustomError(
+            "clave_nueva", "La contraseña tiene que tener al menos 6 caracteres."
+        )
+    if len(valor.encode("utf-8")) > CLAVE_MAXIMO_BYTES:
+        raise PydanticCustomError(
+            "clave_nueva",
+            "La contraseña puede tener hasta 72 caracteres. Las letras con acento y "
+            "la ñ cuentan doble.",
+        )
+    return valor
+
+
+ClaveNueva = Annotated[str, AfterValidator(_clave_nueva)]
 
 
 # === REGISTRO === #
@@ -13,7 +46,7 @@ from app.models.user import UserRole
 class UserRegisterRequest(BaseModel):
     """Request para registro de usuario"""
     email: EmailStr
-    password: str = Field(..., min_length=6, max_length=100)
+    password: ClaveNueva
     full_name: str = Field(..., min_length=2, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
     # El rol NO es un dato del cliente. Se declara acotado a `user` por dos
@@ -218,7 +251,7 @@ class UserUpdateRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     """Request para cambiar contraseña"""
     current_password: str
-    new_password: str = Field(..., min_length=6, max_length=100)
+    new_password: ClaveNueva
 
 
 # === VERIFICACIÓN DE CORREO === #

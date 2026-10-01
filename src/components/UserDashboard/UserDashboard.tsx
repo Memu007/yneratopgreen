@@ -14,6 +14,7 @@ import {
 import { ETIQUETA_DE_ESTADO, type MiDocumentacion } from '../../utils/documentacion';
 import { type TipoDeCarga } from '../../utils/logistica';
 import { ProductImage } from '../ProductImage/ProductImage';
+import { CambiarClave } from './CambiarClave';
 import { User } from '../../types';
 import {
   ANIO_MINIMO,
@@ -2785,6 +2786,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
           )}
         </div>
       </div>
+
+      <CambiarClave />
 
     </div>
   );
