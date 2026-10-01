@@ -5,116 +5,38 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre DESVINCULAR-CON-COBROS-1 — aceptada y publicada
+## Decisión sobre LINK-ABIERTO-DEVUELTO-1 — aceptada
 
-Sobre `777bee1` (producto en `bcc8ca5` y `a27fc7c`). Tu informe `d1a6a3e`
-difiere sólo en `docs/pm`. Evidencia en
-`REPRODUCCION-DESVINCULAR-CON-COBROS-1-2026-09-30.md`.
+Sobre `cac729d` (producto en `4b02fec`). Tu informe `5af8ccf` difiere sólo en
+`docs/pm`. Evidencia en `REPRODUCCION-LINK-ABIERTO-DEVUELTO-1-2026-09-30.md`.
 
-- **Suite completa desde base nueva:** 229/230. Sólo cae el 131, de entorno.
+- **El 231:** con el `cobro.py` de la base da rojo con tus 5 problemas; con la
+  entrega, verde.
+- **Negativos:** tus 2 dan su rojo. También dan rojo los 3 míos:
+  - el criterio con devuelto y sin contracargo: el 231 ve el 409 con 1 y el
+    link del contracargo vivo;
+  - consolidar que vuelve a descontar una reserva ya consolidada: el 231 ve el
+    stock movido. Cubre «sin mover stock», que tus negativos no tocaban;
+  - el reconciliador que saltea los devueltos: el 231 ve los dos links vivos y
+    el 409 del final. El caso mira el barrido, no sólo el criterio.
+- **Suite completa desde base nueva:** 230/231. Sólo cae el 131, de entorno.
   La lista de casos que tuvieron que terminar ventas coincide con la tuya.
-- **Negativos:** tus 7 dan su rojo. También dan rojo los dos míos:
-  - la misma cuenta frenada al volver y al renovar: el 229 lo ve. Es el camino
-    para destrabar una orden, así que me importaba que estuviera cubierto;
-  - el reconciliador con el criterio sin el vencimiento: el 225 ve que barrió
-    la venta vigente. Cubre el cambio de `_candidatas`.
-- **El punto 5, reproducido con un caso mío:** 409 con 1 y las credenciales
-  iguales; vencida y barrida, la reserva se libera, la orden se cancela y el
-  link se apaga; el segundo `unlink` da 200 y no queda nada guardado.
-- **Pantalla:** capturas en los dos anchos, a11y `--todas`, contraste,
-  auditoría móvil y las dos guías, verdes.
 - **Puertas:** verdes.
+- **Los terminadores:** en `smoke.mjs` volvieron las mismas cuatro líneas de
+  `0495b31`, y `mp-doble.mjs` quedó sin CR.
 
-**Tus preguntas:**
+**Tus riesgos:** aceptados. Ya pasaban con un pago aprobado, y hoy no hay
+ninguna vendedora con un link así.
 
-1. **Los textos:** aceptados. Los lee Emi.
-2. **La orden sin link también frena:** aceptado. Es coherente con la regla.
-3. **El link abierto de un pago devuelto:** va a la lista de antes de
-   habilitar Mercado Pago, como pieza chica. No es de esta.
-
-**Una cosa de método:** `smoke.mjs` perdió sus 4 terminadores CRLF (líneas
-36326 a 36329, de un caso de `AVISOS-DE-PAGO-1`). Mismo texto, fuera de tu
-zona, y el diff-check con `cr-at-eol` no lo ve. Restauralos en la próxima pieza
-que toque ese archivo, y antes de entregar compará los CR de cada archivo con
-la base.
-
-**P3, sin tarea:** `sin_vinculo` en el reintento del link quedó sin caso (se
-alcanza con una credencial que no abre); el número del 409 se cuenta después de
-decidir y podría decir 0; la confirmación común sin rol de diálogo.
-
-**Publicada por PM en `2ab0a36` el 30/09**, con autorización de Emi. Vos no
-integres ni despliegues.
+**Sin publicar:** la publica PM cuando Emi la autorice. Vos no integres ni
+despliegues.
 
 ---
 
-## Tarea activa — LINK-ABIERTO-DEVUELTO-1
-
-**Decisión de PM (30/09), dentro del arranque de Mercado Pago que pidió Emi.**
-Es el punto 3 de tu entrega de `DESVINCULAR-CON-COBROS-1`. Va antes de la
-prueba de Mercado Pago en el sitio publicado, para que la prueba corra sobre el
-código final.
-
-**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
-
-### Problema
-
-Un pago devuelto o con contracargo cuyo link no se pudo apagar queda fuera de
-`cobro.en_curso`: el link abierto mira sólo `APPROVED` y `EN_REVISION`. Tampoco
-lo mira el reconciliador. El link queda abierto para siempre, se puede volver a
-pagar, y quien vende puede desvincular. Lo leíste en el código; no está
-reproducido.
-
-### Qué entra
-
-1. **Reproducirlo primero**, con un caso y el producto de la base: pago
-   aprobado, falla apagar el link, llega la devolución, vuelve a fallar. El
-   reconciliador no lo mira y desvincular pasa.
-2. **Que el link abierto mire los cuatro estados con cobro** (`CON_COBRO`), en
-   el criterio único. Comprobá que:
-   - el reconciliador lo apaga sin cambiar el estado del pago ni mover stock;
-   - desvincular frena mientras tanto;
-   - nada de lo que ya barría cambia.
-3. **Los terminadores de las dos piezas anteriores, restaurados:** los 4
-   CRLF de `smoke.mjs` (líneas 36326 a 36329) y las 3 líneas de
-   `scripts/lib/mp-doble.mjs` (468 a 470), que tienen que volver a LF.
-   Lo de `mp-doble.mjs` lo encontraste vos después de mi revisión: bien
-   visto, a mí se me había pasado.
-
-### Casos y negativos
-
-- El caso nuevo: rojo con la base, verde con el cambio.
-- Negativo: el criterio sin los estados nuevos da rojo.
-- Negativo: el reconciliador cambia el estado del pago devuelto al apagar el
-  link, y eso da rojo.
-
-### Aceptación verificable
-
-1. El caso y los negativos.
-2. Suite completa desde una base recién creada.
-3. Build, lint, tipos, `compileall`, `alembic check`, diff-check con
-   `cr-at-eol`, y la cuenta de CR por archivo contra la base.
-
-### Frená y consultá
-
-- Si apagar el link de un pago devuelto cambia su estado o mueve stock.
-- Si hace falta una migración.
-
-### Entrega en `PARA-PM.md`
-
-- el SHA;
-- el caso con su rojo de la base;
-- los negativos, la suite y las puertas;
-- los riesgos.
-
-No integres ni despliegues.
-
----
-
-## Siguiente — INICIO-ECOSISTEMA-1
+## Tarea activa — INICIO-ECOSISTEMA-1
 
 **Decisión de Emi (30/09):** aprobó la maqueta de Inicio versión 2 y pidió que
-se programe. Va después de `LINK-ABIERTO-DEVUELTO-1`: la empezás cuando yo
-acepte esa.
+se programe. `LINK-ABIERTO-DEVUELTO-1` está aceptada: empezala ahora.
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
