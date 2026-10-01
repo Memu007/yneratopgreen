@@ -16,7 +16,7 @@ from app.models.user import User, UserRole
 security = HTTPBearer(auto_error=False)
 
 # Lo que contesta una sesión que ya no vale: la contraseña cambió, se
-# restableció desde el panel o la cuenta se desactivó.
+# restableció desde el panel o la cuenta cambió de estado.
 SESION_CERRADA = "Tu sesión se cerró. Ingresá de nuevo."
 
 

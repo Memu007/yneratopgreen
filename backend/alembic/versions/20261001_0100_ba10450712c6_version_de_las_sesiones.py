@@ -5,8 +5,8 @@ Cambiar la contraseña no cerraba ninguna sesión: un token de renovación dura
 dispositivo no vencía nunca (SESIONES-AL-CAMBIAR-1).
 
 `users.sesion_version` es un número que viaja en cada token. Cambiar la
-contraseña, restablecerla desde el panel o desactivar la cuenta lo suben, y un
-token con otro número deja de servir.
+contraseña, restablecerla desde el panel o cambiar el estado de la cuenta lo
+suben, y un token con otro número deja de servir.
 
 Es aditiva: la columna nace en 0 para todas las cuentas, y un token emitido
 antes de esta pieza, que no lleva el número, cuenta como 0. Nadie pierde la
