@@ -5456,6 +5456,7 @@ async function conUnaCopiaDeLaBase(sufijo, trabajo) {
   try {
     return await trabajo({
       opciones: { base: COPIA },
+      url: aLaCopia[0].slice('DATABASE_URL='.length),
       alembic: (comando, variables = []) => correrAlembic(comando, [...aLaCopia, ...variables]),
     });
   } finally {
@@ -39043,6 +39044,354 @@ await runCase(235, 'Cambiar la contraseña desde Mi cuenta: la nueva entra, la v
     + 'del panel; 73 bytes en el ingreso es «incorrecta»; ningún 500 y ningún 422 devuelve la contraseña. En la '
     + 'pantalla, las nuevas distintas no mandan nada, la actual mal no cambia nada ni borra lo escrito, y después del '
     + `cambio la vieja no entra y la nueva sí. Medido: ${medidos.join('; ')}`;
+});
+
+// 236. SESIONES-AL-CAMBIAR-1. Cambiar la contraseña no cerraba ninguna
+// sesión: el token de renovación dura 30 días y cada renovación emite otro,
+// así que una sesión abierta en otro dispositivo no vencía nunca. Ahora cada
+// cuenta tiene una versión de sesiones que viaja en cada token, y cambiar la
+// contraseña, restablecerla desde el panel o cambiar el estado de la cuenta
+// la sube.
+//
+// A. Dos sesiones de la misma cuenta. Cambiar la contraseña en una: la otra
+//    recibe 401 con el token de acceso y con el de renovación; la que cambió
+//    sigue, con los tokens que le devuelve el cambio.
+// B. Restablecer desde el panel: ninguna sesión de antes sirve, tampoco la
+//    que había cambiado.
+// C. Desactivar y reactivar, por el botón y por la edición: la sesión de antes
+//    no vuelve.
+// D. Un token de antes de esta pieza, que no lleva la versión, sigue sirviendo:
+//    nadie pierde la sesión al desplegar. Se cierra igual que los otros, y el
+//    de una cuenta que ya estaba inactiva al desplegar no vuelve al reactivarla.
+// E. Choque: la persona cambia la contraseña mientras el panel se la
+//    restablece. Gana siempre el panel.
+// F. En el navegador: la pestaña que cambió sigue adentro después de recargar,
+//    aunque otra pestaña tuviera un pedido en vuelo con el token viejo; el
+//    otro dispositivo queda afuera.
+// G. La migración, en una base sin siembra y como en producción.
+//
+// Las cuentas son del caso, también la de administración: no usa ninguna de
+// la siembra. Las sesiones de otras cuentas no se tocan.
+// Los avisos de cada tabla que arrastra a otra no dicen nada: se callan.
+const VACIAR_LA_BASE = `SET client_min_messages TO warning; DO $$ DECLARE r record; BEGIN
+  FOR r IN SELECT c.oid::regclass AS n FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace
+    AND c.relkind IN ('r', 'p') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')
+  LOOP EXECUTE format('DROP TABLE IF EXISTS %s CASCADE', r.n); END LOOP;
+  FOR r IN SELECT t.oid::regtype AS n FROM pg_type t WHERE t.typnamespace = 'public'::regnamespace
+    AND t.typtype = 'e' AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = t.oid AND d.deptype = 'e')
+  LOOP EXECUTE format('DROP TYPE IF EXISTS %s CASCADE', r.n); END LOOP;
+END $$`;
+const TABLAS_DE_LA_APLICACION = `SELECT count(*) FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace
+  AND c.relkind IN ('r', 'p') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')`;
+
+// Corre un comando con lo que tiene la imagen de producción: los archivos que
+// copia backend/Dockerfile.railway, su entrypoint, ENV=production y sin .env.
+async function comoEnProduccion(comando, pisar) {
+  const entrada = JSON.stringify({
+    comando, copias: copiasDeLaImagen(), entrypoint: readFileSync('backend/railway-entrypoint.sh', 'utf8'),
+    variables: ['DATABASE_URL', 'JWT_SECRET'], pisar, tope: 120,
+  });
+  const salida = JSON.parse((await correrEnLaApiSinBloquear(SERVICIO_DEL_RECONCILIADOR, entrada)).trim().split('\n').pop());
+  return { ...salida, todo: `${salida.stdout}\n${salida.stderr}` };
+}
+
+// Tokens como los que emitía la API antes de esta pieza: sólo `sub`.
+function tokensSinVersion(id) {
+  const salida = correrEnLaApi(`
+import json, sys
+from app.core.security import create_access_token, create_refresh_token
+sub = sys.stdin.read().strip()
+print(json.dumps({"access_token": create_access_token(data={"sub": sub}), "refresh_token": create_refresh_token(data={"sub": sub})}))
+`, id);
+  return JSON.parse(salida.split('\n').pop());
+}
+
+const contenidoDelToken = (token) => JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+
+await runCase(236, 'Cambiar o restablecer la contraseña, o cambiar el estado de la cuenta, cierra todas sus sesiones', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  const SESION_CERRADA = 'Tu sesión se cerró. Ingresá de nuevo.';
+  const nuevaCuenta = async (nombre, extra = {}) => {
+    const datos = { email: `sesiones.${nombre}.${sello}@example.com`, password: 'Primera1', full_name: `Sesiones ${nombre} ${sello}` };
+    await registrarYVerificar({ ...datos, role: 'user' });
+    const id = queryRows(`SELECT id FROM users WHERE email = ${sqlLiteral(datos.email)}`)[0][0];
+    if (extra.admin) querySql(`UPDATE users SET role = 'ADMIN' WHERE id = ${sqlLiteral(id)}`);
+    return { ...datos, id };
+  };
+  const entrar = async (email, password) => {
+    const r = await pedirCrudo('/auth/login', { method: 'POST', body: { email, password } });
+    return r.status === 200 ? r.datos : null;
+  };
+  const acceso = async (sesion) => pedirCrudo('/auth/me', { header: sesion.access_token });
+  const renovar = async (sesion) => pedirCrudo('/auth/refresh', { method: 'POST', header: sesion.refresh_token });
+  // Una sesión cerrada: 401 con los dos tokens.
+  const cerrada = async (sesion, que) => {
+    const [a, r] = [await acceso(sesion), await renovar(sesion)];
+    if (a.status !== 401) problemas.push(`${que}: con el token de acceso, /auth/me responde ${a.status} y tenía que ser 401`);
+    else if (a.datos?.detail !== SESION_CERRADA) problemas.push(`${que}: el 401 del acceso dice «${a.datos?.detail}»`);
+    if (r.status !== 401) problemas.push(`${que}: con el token de renovación, /auth/refresh responde ${r.status} y tenía que ser 401`);
+  };
+  const abierta = async (sesion, que) => {
+    const a = await acceso(sesion);
+    if (a.status !== 200) problemas.push(`${que}: /auth/me responde ${a.status} y tenía que seguir en 200`);
+    return a.status === 200;
+  };
+
+  const admin = await nuevaCuenta('admin', { admin: true });
+  const delPanel = await entrar(admin.email, admin.password);
+  const otra = await nuevaCuenta('otra');
+  const deOtra = await entrar(otra.email, otra.password);
+
+  // --- A. Dos sesiones; cambiar la contraseña en una -------------------------
+  const titular = await nuevaCuenta('titular');
+  const primera = await entrar(titular.email, titular.password);
+  const segunda = await entrar(titular.email, titular.password);
+  await abierta(primera, 'A, antes del cambio, la primera sesión');
+  const cambio = await pedirCrudo('/auth/change-password', {
+    method: 'POST', header: segunda.access_token, body: { current_password: titular.password, new_password: 'Segunda2' } });
+  if (cambio.status !== 200) problemas.push(`A: el cambio respondió ${cambio.status}: ${JSON.stringify(cambio.datos).slice(0, 160)}`);
+  if (JSON.stringify(cambio.datos ?? '').includes('Segunda2')) problemas.push('A: la respuesta del cambio devuelve la contraseña');
+  await cerrada(primera, 'A, la otra sesión');
+  await cerrada(segunda, 'A, los tokens viejos de la sesión que cambió');
+  const nueva = { access_token: cambio.datos?.access_token, refresh_token: cambio.datos?.refresh_token };
+  let renovada = null;
+  if (!nueva.access_token || !nueva.refresh_token) {
+    problemas.push('A: el cambio no le devuelve tokens nuevos a la sesión que cambió');
+  } else {
+    await abierta(nueva, 'A, la sesión que cambió');
+    const r = await renovar(nueva);
+    if (r.status !== 200) problemas.push(`A: la sesión que cambió no se renueva: HTTP ${r.status}`);
+    else renovada = r.datos;
+  }
+  if (!(await entrar(titular.email, 'Segunda2'))) problemas.push('A: con la contraseña nueva no entra');
+
+  // --- B. Restablecer desde el panel -----------------------------------------
+  const tercera = await entrar(titular.email, 'Segunda2');
+  const restablecer = await pedirCrudo(`/admin/users/${titular.id}/reset-password`, {
+    method: 'POST', header: delPanel.access_token, body: { password: 'DelPanel3' } });
+  if (restablecer.status !== 200) problemas.push(`B: el restablecer respondió ${restablecer.status}`);
+  await cerrada(tercera, 'B, una sesión abierta antes de restablecer');
+  if (nueva.access_token) await cerrada(nueva, 'B, la sesión que había cambiado la contraseña');
+  if (renovada) await cerrada(renovada, 'B, la renovación de esa sesión');
+  const conLaDelPanel = await entrar(titular.email, 'DelPanel3');
+  if (!conLaDelPanel) problemas.push('B: con la contraseña del panel no entra');
+  else await abierta(conLaDelPanel, 'B, una sesión nueva con la contraseña del panel');
+
+  // --- C. Desactivar y reactivar ----------------------------------------------
+  for (const [como, desactivar, activar] of [
+    ['con el botón', () => pedirCrudo(`/admin/users/${titular.id}/toggle-active`, { method: 'POST', header: delPanel.access_token }),
+      () => pedirCrudo(`/admin/users/${titular.id}/toggle-active`, { method: 'POST', header: delPanel.access_token })],
+    ['con la edición', () => pedirCrudo(`/admin/users/${titular.id}`, { method: 'PATCH', header: delPanel.access_token, body: { is_active: false } }),
+      () => pedirCrudo(`/admin/users/${titular.id}`, { method: 'PATCH', header: delPanel.access_token, body: { is_active: true } })],
+  ]) {
+    const antes = await entrar(titular.email, 'DelPanel3');
+    const d = await desactivar();
+    if (d.status !== 200) { problemas.push(`C, ${como}: desactivar respondió ${d.status}`); continue; }
+    const mientras = await acceso(antes);
+    if (mientras.status < 400) problemas.push(`C, ${como}: desactivada, la sesión sigue entrando: HTTP ${mientras.status}`);
+    const a = await activar();
+    if (a.status !== 200) { problemas.push(`C, ${como}: reactivar respondió ${a.status}`); continue; }
+    await cerrada(antes, `C, ${como}: reactivada, la sesión de antes de desactivarla`);
+    if (!(await entrar(titular.email, 'DelPanel3'))) problemas.push(`C, ${como}: reactivada, no puede entrar`);
+  }
+
+  // --- D. Un token de antes de esta pieza -------------------------------------
+  const deAntes = await nuevaCuenta('antes');
+  const viejos = tokensSinVersion(deAntes.id);
+  if ('sv' in contenidoDelToken(viejos.access_token)) problemas.push('D: el token fabricado como los de antes lleva la versión');
+  await abierta(viejos, 'D, un token de antes de la versión');
+  const renovadoDeAntes = await renovar(viejos);
+  if (renovadoDeAntes.status !== 200) problemas.push(`D: un token de renovación de antes no renueva: HTTP ${renovadoDeAntes.status}`);
+  else if (contenidoDelToken(renovadoDeAntes.datos.access_token).sv !== 0) {
+    problemas.push(`D: al renovar, el token nuevo lleva sv=${contenidoDelToken(renovadoDeAntes.datos.access_token).sv} y tenía que ser 0`);
+  }
+  const conVersion = await entrar(deAntes.email, deAntes.password);
+  const cambioDeAntes = await pedirCrudo('/auth/change-password', {
+    method: 'POST', header: conVersion.access_token, body: { current_password: deAntes.password, new_password: 'Segunda2' } });
+  if (cambioDeAntes.status !== 200) problemas.push(`D: el cambio respondió ${cambioDeAntes.status}`);
+  await cerrada(viejos, 'D, el token de antes, después de cambiar la contraseña');
+  // Una cuenta que ya estaba inactiva antes de esta pieza: sus tokens no
+  // llevan la versión y su versión es 0. Reactivarla no se los devuelve.
+  const inactivaDeAntes = await nuevaCuenta('inactiva');
+  const suyos = tokensSinVersion(inactivaDeAntes.id);
+  querySql(`UPDATE users SET is_active = false WHERE id = ${sqlLiteral(inactivaDeAntes.id)}`);
+  const reactivarla = await pedirCrudo(`/admin/users/${inactivaDeAntes.id}/toggle-active`, { method: 'POST', header: delPanel.access_token });
+  if (reactivarla.status !== 200) problemas.push(`D: reactivar la cuenta inactiva desde antes respondió ${reactivarla.status}`);
+  await cerrada(suyos, 'D, una cuenta inactiva desde antes de esta pieza, reactivada: su token de antes');
+
+  // --- E. Choque: el cambio propio y el restablecer, a la vez ------------------
+  // El restablecer sale con un retraso distinto en cada vuelta, para que unas
+  // veces confirme antes que el cambio y otras después.
+  let actual = 'DelPanel3';
+  const resultados = [];
+  for (const [vuelta, retraso] of [0, 50, 150, 300, 600].entries()) {
+    const sesion = await entrar(titular.email, actual);
+    if (!sesion) { problemas.push(`E, vuelta ${vuelta}: no pudo entrar para empezar`); break; }
+    const suya = `Suya${vuelta}x`;
+    const delPanelAhora = `Panel${vuelta}x`;
+    const [c] = await Promise.all([
+      pedirCrudo('/auth/change-password', { method: 'POST', header: sesion.access_token, body: { current_password: actual, new_password: suya } }),
+      new Promise((listo) => { setTimeout(listo, retraso); }).then(() => pedirCrudo(`/admin/users/${titular.id}/reset-password`, {
+        method: 'POST', header: delPanel.access_token, body: { password: delPanelAhora } })),
+    ]);
+    resultados.push(c.status);
+    const entraLaSuya = Boolean(await entrar(titular.email, suya));
+    const entraLaDelPanel = Boolean(await entrar(titular.email, delPanelAhora));
+    if (entraLaSuya || !entraLaDelPanel) {
+      problemas.push(`E, vuelta ${vuelta} (${retraso} ms): quedó la contraseña ${entraLaSuya ? 'del cambio' : 'de nadie'} y no la del panel`);
+    }
+    if (c.status === 200) await cerrada(c.datos, `E, vuelta ${vuelta} (${retraso} ms): la sesión que dejó el cambio`);
+    actual = entraLaDelPanel ? delPanelAhora : suya;
+  }
+  medidos.push(`choque: el cambio respondió ${resultados.join(', ')}`);
+
+  // --- F. En el navegador -----------------------------------------------------
+  const quien = await nuevaCuenta('navegador');
+  const browser = await chromium.launch({ headless: true });
+  const diferido = () => { let soltar; const promesa = new Promise((r) => { soltar = r; }); return { promesa, soltar }; };
+  try {
+    const viewport = { width: 1440, height: 900 };
+    const salir = (page) => page.getByRole('button', { name: 'Salir' }).first();
+    const ingresar = (page) => page.getByRole('button', { name: 'Ingresar', exact: true }).first();
+    const adentro = async (page) => {
+      await esperarA(async () => (await salir(page).isVisible()) || (await ingresar(page).isVisible()),
+        'la página no terminó de decir si hay sesión', 20_000);
+      return salir(page).isVisible();
+    };
+    // La sesión se guarda una vez y no con un script de arranque, que la
+    // volvería a poner en cada recarga y taparía lo que se mide.
+    const conSesion = async (contexto) => {
+      const datos = await entrar(quien.email, quien.password);
+      const page = await contexto.newPage();
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.evaluate(({ a, r }) => { localStorage.setItem('access_token', a); localStorage.setItem('refresh_token', r); },
+        { a: datos.access_token, r: datos.refresh_token });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      return page;
+    };
+    const dispositivo = await browser.newContext({ viewport });
+    const otroDispositivo = await browser.newContext({ viewport });
+    const pestana = await conSesion(dispositivo);
+    const lejos = await conSesion(otroDispositivo);
+    if (!(await adentro(pestana)) || !(await adentro(lejos))) throw new Error('F: las sesiones del navegador no arrancaron adentro');
+
+    // La pestaña 1 cambia la contraseña. Su respuesta se retiene hasta que la
+    // pestaña 2, que arrancó con el token viejo, ya pidió renovarlo; y esa
+    // renovación se retiene hasta que la pestaña 1 guardó la sesión nueva. Así
+    // el rechazo del token viejo llega DESPUÉS de la sesión nueva.
+    const cambioHecho = diferido();
+    const soltarCambio = diferido();
+    await pestana.route('**/auth/change-password', async (route) => {
+      const respuesta = await route.fetch();
+      cambioHecho.soltar(respuesta.status());
+      await soltarCambio.promesa;
+      await route.fulfill({ response: respuesta });
+    });
+    await abrirPestanaDeCuenta(pestana, 'Mi Perfil', 'Mi Perfil');
+    const seccion = pestana.locator('section').filter({ has: pestana.getByRole('heading', { name: 'Cambiar contraseña', exact: true }) });
+    await seccion.getByLabel('Contraseña actual', { exact: true }).fill(quien.password);
+    await seccion.getByLabel('Contraseña nueva', { exact: true }).fill('Segunda2');
+    await seccion.getByLabel('Repetí la contraseña nueva', { exact: true }).fill('Segunda2');
+    await seccion.getByRole('button', { name: 'Cambiar contraseña', exact: true }).click();
+    const estadoDelCambio = await Promise.race([cambioHecho.promesa, new Promise((r) => { setTimeout(() => r('sin respuesta'), 20_000); })]);
+    if (estadoDelCambio !== 200) problemas.push(`F: el cambio desde la pantalla respondió ${estadoDelCambio}`);
+
+    const segundaPestana = await dispositivo.newPage();
+    const renovacionPedida = diferido();
+    const soltarRenovacion = diferido();
+    await segundaPestana.route('**/auth/refresh', async (route) => {
+      renovacionPedida.soltar();
+      await soltarRenovacion.promesa;
+      await route.continue();
+    });
+    await segundaPestana.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    const pidio = await Promise.race([renovacionPedida.promesa.then(() => true), new Promise((r) => { setTimeout(() => r(false), 20_000); })]);
+    if (!pidio) problemas.push('F: la segunda pestaña no pidió renovar el token viejo');
+    soltarCambio.soltar();
+    await pestana.getByText('Cambiaste tu contraseña.').first().waitFor({ state: 'visible', timeout: 15_000 })
+      .catch(() => problemas.push('F: el cambio no dijo «Cambiaste tu contraseña.»'));
+    soltarRenovacion.soltar();
+    await esperarA(async () => (await segundaPestana.evaluate(() => document.readyState)) === 'complete', 'la segunda pestaña no cargó', 20_000);
+    if (!(await adentro(segundaPestana))) problemas.push('F: la segunda pestaña del mismo navegador quedó afuera');
+    await pestana.unroute('**/auth/change-password');
+    await segundaPestana.unroute('**/auth/refresh');
+
+    const guardada = await pestana.evaluate(() => localStorage.getItem('access_token'));
+    if (!guardada) problemas.push('F: la pestaña que cambió se quedó sin sesión guardada');
+    else if ((await acceso({ access_token: guardada })).status !== 200) problemas.push('F: la sesión guardada en la pestaña que cambió no sirve');
+    await pestana.reload({ waitUntil: 'domcontentloaded' });
+    if (!(await adentro(pestana))) problemas.push('F: después de recargar, la pestaña que cambió la contraseña quedó afuera');
+
+    await lejos.reload({ waitUntil: 'domcontentloaded' });
+    if (await adentro(lejos)) problemas.push('F: el otro dispositivo sigue adentro después del cambio');
+    const quedoLejos = await lejos.evaluate(() => [localStorage.getItem('access_token'), localStorage.getItem('refresh_token')]);
+    if (quedoLejos.some(Boolean)) problemas.push('F: el otro dispositivo conserva sus tokens viejos');
+    await dispositivo.close();
+    await otroDispositivo.close();
+    medidos.push('navegador en 1440');
+  } finally {
+    await browser.close();
+  }
+
+  // Las sesiones de las otras cuentas no se tocaron.
+  await abierta(deOtra, 'una cuenta ajena, después de todo lo anterior');
+  await abierta(delPanel, 'la sesión del panel, después de todo lo anterior');
+
+  // --- G. La migración, en una base sin siembra y como en producción ----------
+  const ANTERIOR = 'a47300b5554c';
+  const ESTA = 'ba10450712c6';
+  const preDeploy = (readFileSync('backend/railway.toml', 'utf8').match(/^preDeployCommand\s*=\s*"([^"]+)"/m) || [])[1];
+  if (!preDeploy) problemas.push('G: backend/railway.toml no tiene preDeployCommand');
+  else {
+    await conUnaCopiaDeLaBase('caso236', async ({ opciones, url }) => {
+      querySql(VACIAR_LA_BASE, opciones);
+      const quedan = queryCount(TABLAS_DE_LA_APLICACION, opciones);
+      if (quedan !== 0) { problemas.push(`G: la base sin siembra conserva ${quedan} tablas de la aplicación`); return; }
+      const pisar = { DATABASE_URL: url };
+      const hasta = await comoEnProduccion(`railway-entrypoint alembic upgrade ${ANTERIOR}`, pisar);
+      if (hasta.codigo !== 0) { problemas.push(`G: migrar hasta ${ANTERIOR} salió con ${hasta.codigo}: ${hasta.todo.slice(-300)}`); return; }
+      // Dos cuentas de antes de esta pieza, una activa y otra no.
+      querySql(`INSERT INTO users (id, email, full_name, password_hash, role, is_active, is_verified, rating_average,
+        rating_count, sales_count, purchases_count, created_at, updated_at) VALUES
+        ('antes236a', 'antes.a@example.com', 'Cuenta de antes', 'x', 'USER', true, true, 0, 0, 0, 0, now(), now()),
+        ('antes236b', 'antes.b@example.com', 'Cuenta de antes', 'x', 'USER', false, true, 0, 0, 0, 0, now(), now())`, opciones);
+      const subida = await comoEnProduccion(preDeploy, pisar);
+      if (subida.codigo !== 0) {
+        const motivo = subida.todo.split('\n').filter((l) => /Error/.test(l) && !/Background on this error/.test(l)).pop();
+        problemas.push(`G: «${preDeploy}» salió con ${subida.codigo}: ${(motivo ?? subida.todo.trim().split('\n').pop()).slice(0, 300)}`);
+        return;
+      }
+      if (!new RegExp(`Running upgrade ${ANTERIOR} -> ${ESTA}`).test(subida.todo)) {
+        problemas.push(`G: «${preDeploy}» no corrió ${ANTERIOR} -> ${ESTA}: ${subida.todo.slice(-300)}`);
+        return;
+      }
+      const versiones = queryRows(`SELECT id, sesion_version FROM users ORDER BY id`, opciones);
+      if (versiones.length !== 2 || versiones.some(([, v]) => v !== '0')) problemas.push(`G: después de migrar, las cuentas quedaron ${JSON.stringify(versiones)}`);
+      const [columna] = queryRows(`SELECT is_nullable, column_default FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'sesion_version'`, opciones);
+      if (!columna || columna[0] !== 'NO' || columna[1] !== '0') problemas.push(`G: la columna quedó ${JSON.stringify(columna)}`);
+      const check = await comoEnProduccion('railway-entrypoint alembic check', pisar);
+      if (!/No new upgrade operations detected/.test(check.todo)) problemas.push(`G: alembic check: ${check.todo.slice(-300)}`);
+      const bajada = await comoEnProduccion(`railway-entrypoint alembic downgrade ${ANTERIOR}`, pisar);
+      if (!new RegExp(`Running downgrade ${ESTA} -> ${ANTERIOR}`).test(bajada.todo)) problemas.push(`G: la vuelta atrás no corrió: ${bajada.todo.slice(-300)}`);
+      if (queryCount(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'sesion_version'`, opciones) !== 0) {
+        problemas.push('G: la vuelta atrás dejó la columna');
+      }
+      if (queryCount('SELECT count(*) FROM users', opciones) !== 2) problemas.push('G: la vuelta atrás perdió cuentas');
+      const otraVez = await comoEnProduccion(preDeploy, pisar);
+      if (otraVez.codigo !== 0) problemas.push(`G: volver a subir salió con ${otraVez.codigo}`);
+      medidos.push(`migración: «${preDeploy}» con ENV=production, sin .env, sobre una base sin siembra, en ${subida.segundos} s`);
+    });
+  }
+
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'cambiar la contraseña deja en 401 el acceso y la renovación de la otra sesión y la que cambió sigue; '
+    + 'restablecer desde el panel cierra todas; desactivar y reactivar no revive la sesión de antes; un token sin '
+    + 'la versión sigue sirviendo hasta el primer cierre; en el choque gana el panel; en el navegador la pestaña que '
+    + 'cambió sigue adentro y el otro dispositivo queda afuera; las otras cuentas no se tocan; la migración sube, '
+    + `deja todo en 0, pasa alembic check y baja. Medido: ${medidos.join('; ')}`;
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del

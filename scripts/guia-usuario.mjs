@@ -1931,6 +1931,8 @@ const RECORRIDOS = {
       .catch(() => { throw new Falla(`la sección no dice «${texto}»`); });
     const pedidos = [];
     page.on('request', (r) => { if (r.url().includes('/auth/change-password')) pedidos.push(r.url()); });
+    // La misma cuenta, abierta en otro dispositivo antes del cambio.
+    const enOtroDispositivo = await entrar(email);
 
     await v.afirma('«La contraseña nueva y su repetición no coinciden.»: en ese caso no se manda', async () => {
       await campo('Contraseña actual').fill(CLAVE);
@@ -1966,6 +1968,20 @@ const RECORRIDOS = {
       await v.mirar(page);
       exigir(await entra(NUEVA) === 200, 'con la nueva no entra');
       exigir(await entra(CLAVE) === 401, 'con la anterior todavía entra');
+    });
+    await v.afirma('Al cambiarla se cierran las sesiones abiertas con tu cuenta en otros dispositivos', async () => {
+      const acceso = await pedir('/auth/me', { token: enOtroDispositivo.access_token });
+      const renovacion = await pedir('/auth/refresh', { method: 'POST', token: enOtroDispositivo.refresh_token });
+      exigir(acceso.status === 401 && renovacion.status === 401,
+        `la sesión del otro dispositivo sigue: /auth/me ${acceso.status}, /auth/refresh ${renovacion.status}`);
+    });
+    await v.afirma('En el que la cambiaste seguís adentro.', async () => {
+      // Sin recargar: la pestaña arrancó con la sesión de antes puesta por un
+      // script de arranque, que la volvería a poner. Se mira la que guardó.
+      const guardada = await page.evaluate(() => localStorage.getItem('access_token'));
+      exigir(guardada && (await pedir('/auth/me', { token: guardada })).status === 200,
+        'la sesión que guardó la pestaña después del cambio no sirve');
+      exigir(await cabecera(page).getByRole('button', { name: 'Salir' }).isVisible(), 'la cabecera ya no muestra «Salir»');
     });
   },
 };

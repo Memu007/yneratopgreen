@@ -646,6 +646,12 @@ const RECORRIDOS = {
       const otraVez = await pedir('/auth/login', { method: 'POST', body: { email: c.nueva.email, password: c.nueva.clave } });
       exigir(otraVez.status === 200, `reactivada, no puede entrar con su contraseña: HTTP ${otraVez.status}`);
     });
+    await v.afirma('Las sesiones que tenía abiertas no vuelven: tiene que ingresar de nuevo.', async () => {
+      const acceso = await pedir('/auth/me', { token: suSesion.access_token });
+      const renovacion = await pedir('/auth/refresh', { method: 'POST', token: suSesion.refresh_token });
+      exigir(acceso.status === 401 && renovacion.status === 401,
+        `reactivada, la sesión de antes vuelve: /auth/me ${acceso.status}, /auth/refresh ${renovacion.status}`);
+    });
     await v.afirma({
       limites: ['Nadie recibe un aviso de lo que se cambia desde el panel.',
         'Si pausás una publicación o desactivás una cuenta, la persona no recibe ningún mensaje.'],
@@ -664,6 +670,8 @@ const RECORRIDOS = {
     await panel.getByRole('button', { name: 'Buscar usuarios' }).click();
     const fila = panel.locator('tbody tr', { hasText: c.nueva.email });
     await fila.waitFor({ timeout: 15_000 });
+    // Una sesión abierta de esa persona, para ver que se cierra.
+    const suSesion = await entrar(c.nueva.email, c.nueva.clave);
     await fila.getByRole('button', { name: 'Restablecer contraseña' }).click();
     await confirmar(page, 'Restablecer la contraseña', 'Generar contraseña nueva', v);
     const ventana = page.getByRole('dialog', { name: /^Contraseña nueva de/ });
@@ -682,6 +690,12 @@ const RECORRIDOS = {
     await v.afirma('Aparece la ventana «Contraseña nueva de …» con la contraseña.', async () => {
       const conLaNueva = await pedir('/auth/login', { method: 'POST', body: { email: c.nueva.email, password: nueva } });
       exigir(conLaNueva.status === 200, `la contraseña que mostró no sirve: HTTP ${conLaNueva.status}`);
+    });
+    await v.afirma('Se cierran todas las sesiones abiertas con esa cuenta, en cualquier dispositivo: tiene que ingresar con la nueva.', async () => {
+      const acceso = await pedir('/auth/me', { token: suSesion.access_token });
+      const renovacion = await pedir('/auth/refresh', { method: 'POST', token: suSesion.refresh_token });
+      exigir(acceso.status === 401 && renovacion.status === 401,
+        `restablecida, la sesión de antes sigue: /auth/me ${acceso.status}, /auth/refresh ${renovacion.status}`);
     });
     c.nueva.clave = nueva;
   },

@@ -499,6 +499,10 @@ En «Mi cuenta», «Mi Perfil», está «Cambiar contraseña».
 3. Tocá «Cambiar contraseña». Dice «Cambiaste tu contraseña.», y desde ahí
    entrás con la nueva: la anterior deja de funcionar.
 
+Al cambiarla se cierran las sesiones abiertas con tu cuenta en otros
+dispositivos: ahí tenés que ingresar de nuevo, con la nueva. En el que la
+cambiaste seguís adentro.
+
 Si algo no está bien, la sección lo dice y no cambia nada. Lo que escribiste
 queda, para que corrijas sólo lo que hace falta:
 

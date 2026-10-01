@@ -159,6 +159,7 @@ Qué pasa después:
 
 Para volver a habilitarla, tocá «Activar» y confirmá con «Activar la
 cuenta». El estado vuelve a «Activo» y entra con su contraseña de siempre.
+Las sesiones que tenía abiertas no vuelven: tiene que ingresar de nuevo.
 
 ![La confirmación antes de desactivar](guia-panel-admin/usuarios-desactivar-escritorio.png)
 
@@ -176,6 +177,8 @@ Sirve cuando alguien no puede entrar porque olvidó la contraseña.
 Qué pasa después:
 
 - La contraseña anterior deja de funcionar en ese momento.
+- Se cierran todas las sesiones abiertas con esa cuenta, en cualquier
+  dispositivo: tiene que ingresar con la nueva.
 - La nueva no vence sola: queda hasta que se restablezca otra vez.
 - Pasásela a la persona por un medio donde puedas confirmar con quién
   hablás, en persona o por llamada. No la mandes por un chat o un correo que
@@ -532,11 +535,12 @@ mirar su fuente.
   Paso 8: “Para eso hace falta otra persona administradora.” Sale del código:
   el panel sólo rechaza los cambios sobre la cuenta propia
   (`backend/app/api/admin.py`).
-- Paso 5: “sus órdenes quedan como estaban”. Sale del código: desactivar sólo
-  cambia el estado de la cuenta (`admin.py`, `toggle-active`).
+- Paso 5: “sus órdenes quedan como estaban”. Sale del código: desactivar
+  cambia el estado de la cuenta y cierra sus sesiones, y no toca sus órdenes
+  (`admin.py`, `toggle-active`).
 - Paso 6: “La nueva no vence sola: queda hasta que se restablezca otra vez.”
-  Sale del código: restablecer sólo cambia la contraseña, sin fecha de
-  vencimiento (`admin.py`, `reset-password`).
+  Sale del código: restablecer guarda la contraseña sin fecha de vencimiento
+  (`admin.py`, `reset-password`).
 - Paso 14: “Los estados los mueven quien compra y quien vende, desde su
   cuenta, y el pago por Mercado Pago cuando se acredita.” Sale del código
   (`backend/app/api/orders.py` y `backend/app/services/cobro.py`).
