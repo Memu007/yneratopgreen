@@ -28,7 +28,7 @@ La publicación a `main` la decide Emi. No integres ni despliegues.
 
 ## Tarea activa — SESIONES-AL-CAMBIAR-1
 
-**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM. Va antes de `HERO-COMPACTO-1` y de `VENDER-SIN-SESION-1`.
+**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM. Va antes de `VENDER-SIN-SESION-1`.
 
 ### Problema
 
@@ -76,7 +76,15 @@ hubiera entrado.
 
 ---
 
-## Después — HERO-COMPACTO-1 (apenas entregues SESIONES-AL-CAMBIAR-1)
+## En espera — HERO-COMPACTO-1 (no empezar)
+
+**En espera desde el 01/10.** La clienta pidió que Inicio explique mejor el
+concepto, y Emi eligió sumar una sección «Por qué AgroBoeda» debajo de la
+portada (maqueta v3, `maquetas/INICIO-CONCEPTO-V3-2026-10-01.html`). Cuando
+la clienta la apruebe, esta pieza y la sección nueva van juntas en una sola
+tarea. Va a cambiar el criterio de qué tiene que verse sin bajar. Lo de abajo
+queda como referencia.
+
 
 **Decisión de Emi (01/10), opción A.** Emi miró el Inicio publicado en su
 notebook: la portada ocupa toda la pantalla, y los servicios del ecosistema,
@@ -121,7 +129,7 @@ Entregala por separado.
 
 ---
 
-## Después — VENDER-SIN-SESION-1 (empezala apenas entregues HERO-COMPACTO-1)
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues SESIONES-AL-CAMBIAR-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.
