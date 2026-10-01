@@ -34,6 +34,25 @@ La publicación a `main` la decide Emi. No integres ni despliegues.
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
+### Respuesta al freno (01/10, `3f9f2e5`)
+
+- **Opción A.** Una sola regla en la API, de 6 caracteres a 72 bytes, y la
+  usan los cuatro lugares: registro, cambio, alta desde el panel y
+  restablecer desde el panel. Sin cambiar cómo se guarda nada.
+- **Los 72 bytes:** se acepta lo que elegiste.
+  - En el registro, el cambio y el panel: 422 con un mensaje claro.
+  - En el ingreso: «Email o contraseña incorrectos».
+  - Sin truncar y sin hash previo.
+
+  El mensaje final va en la entrega.
+- **Las sesiones abiertas:** gracias por medirlo. Va como pieza propia,
+  `SESIONES-AL-CAMBIAR-1`, apenas entregues ésta y antes de
+  `VENDER-SIN-SESION-1`. En esta pieza no se toca.
+- **El caso y la guía:** suman el alta y el restablecer desde el panel con
+  más de 72 bytes, sin 500.
+
+Seguí.
+
 ### Problema y prioridad
 
 Nadie puede cambiar su propia contraseña desde el sitio.
@@ -106,7 +125,57 @@ vez de «contraseña incorrecta», porque bcrypt no acepta más.
 
 ---
 
-## Siguiente — VENDER-SIN-SESION-1 (empezala apenas entregues CAMBIAR-CONTRASENA-1)
+## Siguiente — SESIONES-AL-CAMBIAR-1 (apenas entregues CAMBIAR-CONTRASENA-1)
+
+**Prioridad:** antes de `VENDER-SIN-SESION-1`. Entregala por separado.
+
+### Problema
+
+Cambiar la contraseña no cierra ninguna sesión. Lo midió la Dev en el freno
+`3f9f2e5`:
+
+- el token de renovación dura 30 días;
+- cada renovación emite otro de 30 días.
+
+Una sesión abierta en otro dispositivo no vence nunca. Es justo el caso de
+las dos contraseñas que quedaron en chats: cambiarlas no saca a quien ya
+hubiera entrado.
+
+### Qué entra
+
+1. **Cambiar la propia contraseña** deja sin valor todas las sesiones
+   anteriores de esa cuenta, de acceso y de renovación. La sesión desde la
+   que se cambió sigue abierta, o se reabre sola, sin pedir ingresar de
+   nuevo.
+2. **Restablecerla desde el panel** también invalida las sesiones
+   anteriores de esa cuenta.
+3. **Desactivar una cuenta desde el panel:** decí en el informe si hoy sus
+   sesiones siguen valiendo. Si siguen, que también se invaliden.
+4. **Cómo, lo elegís vos.** Por ejemplo, la marca de cuándo cambió que
+   propusiste. Si necesita migración, aditiva y probada en modo producción.
+
+### Aceptación verificable
+
+1. **Caso nuevo con dos sesiones de la misma cuenta.**
+   - Cambiar la contraseña en una:
+     - la otra recibe 401, tanto con el token de acceso como con el de
+       renovación;
+     - la que cambió sigue funcionando.
+   - Lo mismo al restablecer desde el panel.
+2. **Negativo:** sin la comprobación, la sesión vieja sigue entrando y da
+   rojo.
+3. **Migración:** si hay una, el caso corre sobre una base sin siembra y se
+   prueba en modo producción.
+4. Suite completa desde base nueva y las puertas de siempre.
+
+### Frená y consultá
+
+- Si invalidar obliga a cerrar la sesión de todas las cuentas a la vez, o a
+  cambiar `JWT_SECRET`.
+
+---
+
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues SESIONES-AL-CAMBIAR-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.

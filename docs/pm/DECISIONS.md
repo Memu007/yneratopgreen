@@ -10,6 +10,20 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-01 — Una sola regla de contraseña, y el cambio cierra las sesiones viejas
+
+PM, sobre el freno de `CAMBIAR-CONTRASENA-1` (`3f9f2e5`).
+
+- **Una regla en la API** (6 caracteres a 72 bytes) para el registro, el cambio, el alta y el
+  restablecer del panel. Más de 72 bytes se rechaza con un mensaje claro y en el ingreso es
+  «incorrecta»; nada se trunca ni cambia cómo se guarda.
+- **`SESIONES-AL-CAMBIAR-1`:** cambiar o restablecer una contraseña invalida las sesiones
+  anteriores de esa cuenta. Va antes de `VENDER-SIN-SESION-1`.
+
+Motivo: hoy las reglas difieren en cuatro lugares y más de 72 bytes da 500. Y una sesión
+renovada no vence nunca, así que cambiar las dos contraseñas que quedaron en chats no saca a
+quien ya hubiera entrado.
+
 ## 2026-10-01 — «Vender» se ve siempre, también sin sesión
 
 Al aceptar `INICIO-ECOSISTEMA-1` quedó un hueco: sin sesión no hay ningún botón para publicar.
