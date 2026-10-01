@@ -6,6 +6,9 @@ Actualizado: 2026-09-30.
 
 ## Resumen ejecutivo
 
+- **Traspaso de PM (01/10):** Emi sigue con PM en otra cuenta. Todo lo de esta sesión está en la rama y en `main`. Nada espera revisión: la Dev trabaja `INICIO-ECOSISTEMA-1`, con el texto aprobado entero en `PARA-DEV.md` y la maqueta en `maquetas/`. Quedó fuera del repositorio:
+  - el documento «Inicio de AgroBoeda: propuesta de texto», que es de la cuenta anterior. Su texto final está en la tarea;
+  - los scripts de los negativos de PM, que corrieron desde fuera del repositorio. Cada `REPRODUCCION-*.md` dice qué rompían y qué rojo dieron.
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `77d3d2c`, publicado el 01/10 con autorización de Emi («Dale»), por fast-forward desde `2ab0a36`. Suma `LINK-ABIERTO-DEVUELTO-1` y documentos de PM. Sin migraciones. La verificación previa fue sobre el mismo código (`cac729d`, que difiere sólo en `docs/pm`): el 231 rojo con la base y verde con la entrega, suite 230/231 (131 de entorno), 5 negativos (3 de PM) y puertas verdes. No cambia nada visible: sólo actúa con Mercado Pago habilitado.
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `main` (`77d3d2c`) tiene todo lo aceptado. La Dev trabaja `INICIO-ECOSISTEMA-1`.
