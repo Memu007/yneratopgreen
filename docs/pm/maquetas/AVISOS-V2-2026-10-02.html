@@ -1,0 +1,131 @@
+<!doctype html>
+<!--
+  Maqueta de los avisos, versión 2 (PM, 02/10/2026). Emi rechazó la v1: «Siguen
+  siendo genéricas». Esta toma el estilo que hoy usan los productos más
+  cuidados (Sonner, Vercel, Linear): avisos chicos, oscuros, abajo, que se
+  apilan con profundidad y llevan una acción. Dos opciones con la marca.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Maqueta de avisos v2</title>
+<style>
+@font-face { font-family: 'Inter Tight'; src: url('../../../public/fuentes/InterTight.woff2') format('woff2-variations'); font-weight: 100 900; }
+@font-face { font-family: 'Inter'; src: url('../../../public/fuentes/Inter.woff2') format('woff2-variations'); font-weight: 100 900; }
+:root { --display: 'Inter Tight', 'Inter', system-ui, sans-serif; --ui: 'Inter', system-ui, sans-serif;
+  --canvas: #f7f6f2; --text: #1e2420; --text-2: #4c544b; --brand: #1e4a34; --brand-dark: #143526; --signal: #c49a43; --accent: #8a671c; --err: #e8746c; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--ui); background: #e9e8e2; color: var(--text); padding: 36px 40px 48px; -webkit-font-smoothing: antialiased; }
+h1 { font: 800 30px/1.1 var(--display); letter-spacing: -.02em; }
+.bajada { margin-top: 8px; color: var(--text-2); font-size: 15px; max-width: 980px; line-height: 1.5; }
+.etiqueta { font: 700 12px/1 var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 30px 0 10px; display: flex; gap: 10px; align-items: center; }
+.etiqueta::before { content: ""; width: 14px; height: 3px; background: var(--signal); }
+.grilla { display: grid; grid-template-columns: 1fr 360px; gap: 24px; }
+.pantalla { position: relative; background: var(--canvas); border: 1px solid #cfcfc6; height: 360px; overflow: hidden; }
+.cel { position: relative; background: var(--canvas); border: 1px solid #cfcfc6; height: 360px; overflow: hidden; }
+.header { height: 52px; background: var(--brand); display: flex; color: #fff; font: 500 13px var(--ui); }
+.header .logo { display: flex; align-items: center; padding: 0 18px; font: 700 17px var(--display); }
+.header .der { margin-left: auto; display: flex; }
+.header .der span { display: flex; align-items: center; padding: 0 14px; border-left: 1px solid rgba(255,255,255,.14); }
+.header .der .vender { background: var(--signal); color: #1e2420; font-weight: 650; }
+.contenido { padding: 22px 26px; }
+.contenido h2 { font: 800 24px var(--display); letter-spacing: -.015em; }
+.campo { height: 32px; background: #fff; border: 1px solid #d8dad2; margin-top: 12px; max-width: 420px; }
+
+/* La pila: abajo al centro; los de atrás, más chicos y apenas asomando */
+.pila { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); width: 380px; height: 70px; }
+.cel .pila { width: calc(100% - 24px); bottom: 18px; }
+.t { position: absolute; left: 0; right: 0; bottom: 0; }
+.t.atras1 { transform: translateY(-14px) scale(.94); opacity: .8; }
+.t.atras2 { transform: translateY(-26px) scale(.88); opacity: .55; }
+.t.atras1 > div, .t.atras2 > div { height: 62px; }
+.t.atras1 .ico, .t.atras2 .ico { visibility: hidden; }
+
+/* Opción A: píldora verde de la marca */
+.a { background: var(--brand); color: #fff; border-radius: 14px; padding: 12px 14px 12px 12px;
+  display: flex; align-items: center; gap: 12px; box-shadow: 0 12px 30px rgba(20,53,38,.28), 0 2px 6px rgba(20,53,38,.18); }
+.a .ico { width: 26px; height: 26px; border-radius: 50%; background: var(--signal); color: var(--brand-dark); display: grid; place-items: center; flex: none; }
+.a .ico svg { width: 14px; height: 14px; }
+.a .txt { flex: 1; font: 550 14.5px/1.35 var(--ui); }
+.a .txt small { display: block; font-weight: 400; font-size: 12.5px; color: rgba(255,255,255,.72); margin-top: 1px; }
+.a .accion { font: 650 13px var(--ui); color: var(--signal); padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,.08); white-space: nowrap; }
+.a.error .ico { background: var(--err); color: #3b0f0c; }
+
+/* Opción B: tarjeta casi negra, sobria */
+.b { background: #161b18; color: #f2f2ee; border-radius: 12px; padding: 13px 14px; display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 16px 36px rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.06); }
+.b .dot { width: 8px; height: 8px; border-radius: 50%; background: #5fc79a; flex: none; box-shadow: 0 0 0 4px rgba(95,199,154,.15); }
+.b.error .dot { background: var(--err); box-shadow: 0 0 0 4px rgba(232,116,108,.15); }
+.b .txt { flex: 1; font: 500 14px/1.35 var(--ui); }
+.b .txt small { display: block; color: #a5aba6; font-size: 12.5px; font-weight: 400; margin-top: 1px; }
+.b .accion { font: 600 13px var(--ui); color: #fff; padding: 6px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,.18); white-space: nowrap; }
+
+.notas { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; font-size: 14px; line-height: 1.55; color: var(--text-2); }
+.notas h3 { font: 750 18px var(--display); color: var(--text); margin-bottom: 6px; }
+.notas li { margin: 0 0 6px 18px; }
+.notas b { color: var(--text); }
+</style>
+</head>
+<body>
+<h1>Avisos, versión 2: dos opciones</h1>
+<p class="bajada">Así los usan hoy los productos más cuidados (Sonner, Vercel, Linear): chicos y oscuros, abajo al centro, lejos de la cabecera y de los botones. Entran desde abajo con un rebote corto. Si llegan varios, se apilan con profundidad en lugar de llenar la pantalla. Y cuando sirve, traen una acción, como «Ver» o «Deshacer».</p>
+
+<div class="etiqueta">Opción A · píldora verde de la marca</div>
+<div class="grilla">
+  <div class="pantalla">
+    <div class="header"><span class="logo">AgroBoeda</span><span class="der"><span class="vender">Vender</span><span>Carrito</span><span>Juan</span><span>Salir</span></span></div>
+    <div class="contenido"><h2>Mi cuenta</h2><div class="campo"></div><div class="campo"></div></div>
+    <div class="pila">
+      <div class="t atras2"><div class="a"><span class="ico"></span><span class="txt">&nbsp;</span></div></div>
+      <div class="t atras1"><div class="a"><span class="ico"></span><span class="txt">&nbsp;</span></div></div>
+      <div class="t"><div class="a"><span class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="txt">Agregaste el tractor al carrito<small>John Deere 5090E · $ 28.500.000</small></span><span class="accion">Ver carrito</span></div></div>
+    </div>
+  </div>
+  <div class="cel">
+    <div class="header"><span class="logo">AgroBoeda</span><span class="der"><span>Juan</span></span></div>
+    <div class="contenido"><h2>Mi cuenta</h2><div class="campo"></div><div class="campo"></div></div>
+    <div class="pila">
+      <div class="t"><div class="a error"><span class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M8 4v5M8 12v.01"/></svg></span><span class="txt">No se pudo guardar<small>Lo que escribiste sigue ahí.</small></span><span class="accion">Reintentar</span></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="etiqueta">Opción B · tarjeta casi negra, sobria</div>
+<div class="grilla">
+  <div class="pantalla">
+    <div class="header"><span class="logo">AgroBoeda</span><span class="der"><span class="vender">Vender</span><span>Carrito</span><span>Juan</span><span>Salir</span></span></div>
+    <div class="contenido"><h2>Mi cuenta</h2><div class="campo"></div><div class="campo"></div></div>
+    <div class="pila">
+      <div class="t atras2"><div class="b"><span class="dot"></span><span class="txt">&nbsp;</span></div></div>
+      <div class="t atras1"><div class="b"><span class="dot"></span><span class="txt">&nbsp;</span></div></div>
+      <div class="t"><div class="b"><span class="dot"></span><span class="txt">Cambiaste tu contraseña<small>Cerramos tus otras sesiones.</small></span><span class="accion">Listo</span></div></div>
+    </div>
+  </div>
+  <div class="cel">
+    <div class="header"><span class="logo">AgroBoeda</span><span class="der"><span>Juan</span></span></div>
+    <div class="contenido"><h2>Mi cuenta</h2><div class="campo"></div><div class="campo"></div></div>
+    <div class="pila">
+      <div class="t"><div class="b"><span class="dot"></span><span class="txt">Publicación pausada<small>Ya no se ve en el Mercado.</small></span><span class="accion">Deshacer</span></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="notas">
+  <div>
+    <h3>Cómo se mueven (las dos)</h3>
+    <ul>
+      <li><b>Entran desde abajo</b> con un rebote corto, de unos 0,3 segundos, y salen bajando.</li>
+      <li><b>Varios a la vez:</b> se apilan. Los de atrás quedan más chicos y apenas asoman. Con el mouse encima se despliegan.</li>
+      <li><b>En el celular</b> se cierran deslizando con el dedo.</li>
+      <li><b>Lo bueno se va solo</b> a los 4 segundos, y se pausa con el mouse encima. Un error se queda hasta cerrarlo.</li>
+      <li>Si la persona pidió menos movimiento, aparecen sin animación.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Cuál recomiendo</h3>
+    <p><b>La A.</b> Es inconfundiblemente AgroBoeda: el verde y el cereal de la marca, en lugar de un aviso que podría ser de cualquier sitio. La B es más neutra y elegante, pero se parece a la de cualquier producto de software.</p>
+    <p style="margin-top:8px">La acción («Ver carrito», «Deshacer», «Reintentar») es lo que más cambia la sensación: el aviso deja de ser un cartel y pasa a ser útil.</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!doctype html>
+<!--
+  Maqueta del panel de filtros del Mercado, versión 1 (PM, 02/10/2026). Emi:
+  «toda la parte se ve genérica; fijate cómo se usa ahora». Hoy es una columna
+  de desplegables iguales. La propuesta usa los patrones actuales de filtrado
+  (Baymard, guías de búsqueda facetada): opciones a la vista con su cantidad,
+  filtros puestos como etiquetas que se sacan con una cruz, y en el celular una
+  hoja que sube desde abajo con «Ver N publicaciones». Los datos son de ejemplo.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Maqueta de filtros</title>
+<style>
+@font-face { font-family: 'Inter Tight'; src: url('../../../public/fuentes/InterTight.woff2') format('woff2-variations'); font-weight: 100 900; }
+@font-face { font-family: 'Inter'; src: url('../../../public/fuentes/Inter.woff2') format('woff2-variations'); font-weight: 100 900; }
+:root { --display: 'Inter Tight', 'Inter', system-ui, sans-serif; --ui: 'Inter', system-ui, sans-serif;
+  --canvas: #f7f6f2; --surface: #fff; --subtle: #edf0ec; --muted: #f0efe9; --text: #1e2420; --text-2: #4c544b; --steel: #5a6b60;
+  --brand: #1e4a34; --brand-dark: #143526; --signal: #c49a43; --accent: #8a671c; --border: #d8dad2; --control: #79837a; --ok-bg: #e7f3ed; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--ui); background: #e9e8e2; color: var(--text); padding: 32px 36px 44px; -webkit-font-smoothing: antialiased; }
+h1 { font: 800 30px/1.1 var(--display); letter-spacing: -.02em; }
+.bajada { margin-top: 8px; color: var(--text-2); font-size: 15px; max-width: 1080px; line-height: 1.5; }
+.etiqueta { font: 700 12px/1 var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 26px 0 10px; display: flex; gap: 10px; align-items: center; }
+.etiqueta::before { content: ""; width: 14px; height: 3px; background: var(--signal); }
+.fila { display: grid; grid-template-columns: 1fr 390px; gap: 24px; align-items: start; }
+
+/* computadora */
+.pc { background: var(--canvas); border: 1px solid #cfcfc6; display: grid; grid-template-columns: 290px 1fr; min-height: 900px; }
+.panel { background: var(--surface); border-right: 1px solid var(--border); padding: 22px 22px 30px; }
+.panel-cab { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+.panel-cab h2 { font: 800 22px var(--display); letter-spacing: -.015em; }
+.limpiar { font: 600 13px var(--ui); color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--muted); border-radius: 10px; padding: 3px; margin-bottom: 20px; }
+.seg span { text-align: center; font: 600 13px var(--ui); padding: 8px 0; border-radius: 8px; color: var(--text-2); }
+.seg span.si { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.grupo { border-top: 1px solid var(--border); padding: 16px 0 14px; }
+.grupo-cab { display: flex; justify-content: space-between; align-items: center; font: 700 14px var(--ui); margin-bottom: 10px; }
+.grupo-cab i { font-style: normal; color: var(--control); font-size: 13px; }
+.cat { list-style: none; font-size: 14px; }
+.cat li { display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 6px; color: var(--text-2); }
+.cat li b { font-weight: 600; color: var(--text); }
+.cat li.sub { padding-left: 22px; }
+.cat li.si { background: var(--ok-bg); color: var(--brand); font-weight: 650; box-shadow: inset 3px 0 0 var(--brand); }
+.n { font: 500 12.5px var(--ui); color: var(--control); font-variant-numeric: tabular-nums; }
+.si .n { color: var(--brand); }
+.buscar { display: flex; align-items: center; gap: 8px; height: 36px; border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; color: var(--control); font-size: 13.5px; margin-bottom: 8px; }
+.opc { display: flex; align-items: center; gap: 10px; padding: 6px 2px; font-size: 14px; color: var(--text); }
+.opc .caja { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--control); flex: none; display: grid; place-items: center; }
+.opc.si .caja { border-color: var(--brand); }
+.opc.si .caja::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--brand); }
+.opc.si { font-weight: 650; }
+.opc .n { margin-left: auto; }
+.mas { font: 600 13px var(--ui); color: var(--brand); margin-top: 4px; display: inline-block; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: 600 13px var(--ui); padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); display: inline-flex; gap: 6px; align-items: baseline; }
+.chip .n { font-size: 12px; }
+.chip.si { background: var(--brand); border-color: var(--brand); color: #fff; }
+.chip.si .n { color: rgba(255,255,255,.75); }
+.rango { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rango span { height: 38px; border: 1px solid var(--border); border-radius: 8px; display: flex; align-items: center; padding: 0 10px; font-size: 13.5px; color: var(--control); }
+.histo { display: flex; align-items: flex-end; gap: 3px; height: 30px; margin-bottom: 8px; }
+.histo i { flex: 1; background: #cdd8d0; border-radius: 2px 2px 0 0; }
+.histo i.en { background: var(--brand); opacity: .55; }
+.declarado { font-weight: 400; font-size: 12px; color: var(--steel); }
+
+.resultados { padding: 22px 26px; }
+.res-cab { display: flex; justify-content: space-between; align-items: center; }
+.res-cab h3 { font: 800 26px var(--display); letter-spacing: -.015em; }
+.res-cab h3 small { font: 500 15px var(--ui); color: var(--text-2); letter-spacing: 0; margin-left: 6px; }
+.orden { font-size: 13.5px; color: var(--text-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--surface); }
+.puestos { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 20px; align-items: center; }
+.puesto { font: 600 13px var(--ui); padding: 6px 8px 6px 12px; border-radius: 999px; background: var(--brand); color: #fff; display: inline-flex; align-items: center; gap: 8px; }
+.puesto em { font-style: normal; width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.16); display: grid; place-items: center; font-size: 12px; }
+.tarjetas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.tarjeta { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; height: 250px; overflow: hidden; }
+.tarjeta .f { height: 120px; background: linear-gradient(135deg, #c9b98c, #8fa07e); }
+.tarjeta .l { margin: 14px 16px 0; height: 12px; background: var(--subtle); border-radius: 3px; }
+.tarjeta .l.c { width: 50%; }
+
+/* celular */
+.cel { width: 390px; height: 844px; background: #1e2420; border: 1px solid #cfcfc6; position: relative; overflow: hidden; }
+.cel .fondo { position: absolute; inset: 0; background: var(--canvas); opacity: .45; }
+.hoja { position: absolute; left: 0; right: 0; bottom: 0; top: 64px; background: var(--surface); border-radius: 18px 18px 0 0; display: flex; flex-direction: column; box-shadow: 0 -10px 30px rgba(0,0,0,.25); }
+.asa { width: 40px; height: 4px; border-radius: 4px; background: #c8ccc4; margin: 10px auto 4px; }
+.hoja-cab { display: flex; justify-content: space-between; align-items: center; padding: 8px 18px 12px; border-bottom: 1px solid var(--border); }
+.hoja-cab h2 { font: 800 21px var(--display); }
+.cerrar { width: 32px; height: 32px; border-radius: 50%; background: var(--muted); display: grid; place-items: center; font-size: 16px; color: var(--text-2); }
+.hoja-cuerpo { flex: 1; overflow: hidden; padding: 14px 18px 0; }
+.hoja-pie { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 12px 18px 22px; border-top: 1px solid var(--border); background: var(--surface); align-items: center; }
+.hoja-pie .limpiar { padding: 0 6px; }
+.ver { background: var(--brand); color: #fff; font: 650 15.5px var(--ui); text-align: center; padding: 15px 0; border-radius: 12px; }
+.ver b { color: var(--signal); }
+
+.notas { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; font-size: 14px; line-height: 1.55; color: var(--text-2); max-width: 1300px; }
+.notas h3 { font: 750 18px var(--display); color: var(--text); margin-bottom: 6px; }
+.notas li { margin: 0 0 6px 18px; }
+.notas b { color: var(--text); }
+</style>
+</head>
+<body>
+<h1>Filtros del Mercado: propuesta</h1>
+<p class="bajada">Hoy son ocho listas desplegables iguales, una abajo de la otra: para saber qué hay, hay que abrir cada una. La propuesta deja las opciones a la vista, con cuántas publicaciones tiene cada una. Lo que elegiste aparece arriba de los resultados como etiquetas que se sacan con una cruz. En el celular, los filtros suben en una hoja desde abajo, con un botón que dice cuántas publicaciones vas a ver.</p>
+
+<div class="fila">
+<div>
+<div class="etiqueta">Computadora · con Tractores, John Deere y Usado elegidos</div>
+<div class="pc">
+  <aside class="panel">
+    <div class="panel-cab"><h2>Filtrar</h2><span class="limpiar">Limpiar todo</span></div>
+    <div class="seg"><span>Todo</span><span class="si">Productos</span><span>Servicios</span></div>
+
+    <div class="grupo">
+      <div class="grupo-cab">Categoría <i>▾</i></div>
+      <ul class="cat">
+        <li><b>Maquinaria agrícola</b><span class="n">12</span></li>
+        <li class="sub si">Tractores<span class="n">5</span></li>
+        <li class="sub">Cosecha<span class="n">3</span></li>
+        <li class="sub">Siembra y plantación<span class="n">2</span></li>
+        <li class="sub">Preparación del suelo<span class="n">2</span></li>
+        <li>Insumos agrícolas<span class="n">6</span></li>
+        <li>Riego y drenaje<span class="n">4</span></li>
+      </ul>
+      <span class="mas">Ver las 7 categorías</span>
+    </div>
+
+    <div class="grupo">
+      <div class="grupo-cab">Marca <i>▾</i></div>
+      <div class="buscar">⌕ Buscar marca</div>
+      <div class="opc si"><span class="caja"></span>John Deere<span class="n">2</span></div>
+      <div class="opc"><span class="caja"></span>Pauny<span class="n">2</span></div>
+      <div class="opc"><span class="caja"></span>Massey Ferguson<span class="n">1</span></div>
+    </div>
+
+    <div class="grupo">
+      <div class="grupo-cab">Potencia <i>▾</i></div>
+      <div class="chips"><span class="chip">Hasta 59 HP <span class="n">1</span></span><span class="chip">60 a 120 HP <span class="n">3</span></span><span class="chip">Más de 120 <span class="n">1</span></span></div>
+    </div>
+
+    <div class="grupo">
+      <div class="grupo-cab">Condición <i>▾</i></div>
+      <div class="chips"><span class="chip">Nuevo <span class="n">1</span></span><span class="chip si">Usado <span class="n">4</span></span></div>
+    </div>
+
+    <div class="grupo">
+      <div class="grupo-cab">Año <i>▾</i></div>
+      <div class="histo"><i style="height:20%"></i><i style="height:35%"></i><i style="height:60%"></i><i class="en" style="height:90%"></i><i class="en" style="height:70%"></i><i class="en" style="height:100%"></i><i style="height:40%"></i><i style="height:25%"></i></div>
+      <div class="rango"><span>Desde 2010</span><span>Hasta 2024</span></div>
+    </div>
+
+    <div class="grupo">
+      <div class="grupo-cab">Precio <i>▾</i></div>
+      <div class="rango"><span>$ Mínimo</span><span>$ Máximo</span></div>
+    </div>
+
+    <div class="grupo">
+      <div class="grupo-cab">Origen <span class="declarado">declarado por quien vende</span></div>
+      <div class="chips"><span class="chip">Concesionaria <span class="n">2</span></span><span class="chip">Dueño directo <span class="n">3</span></span></div>
+    </div>
+
+    <div class="grupo">
+      <div class="grupo-cab">Dónde <i>▾</i></div>
+      <div class="buscar">⌕ Provincia o localidad</div>
+    </div>
+  </aside>
+  <section class="resultados">
+    <div class="res-cab"><h3>Tractores <small>2 publicaciones</small></h3><span class="orden">Más recientes ▾</span></div>
+    <div class="puestos">
+      <span class="puesto">Tractores <em>×</em></span><span class="puesto">John Deere <em>×</em></span><span class="puesto">Usado <em>×</em></span>
+      <span class="limpiar" style="margin-left:4px">Limpiar todo</span>
+    </div>
+    <div class="tarjetas">
+      <div class="tarjeta"><div class="f"></div><div class="l"></div><div class="l c"></div><div class="l"></div></div>
+      <div class="tarjeta"><div class="f" style="background:linear-gradient(135deg,#a9b88e,#6f8a6a)"></div><div class="l"></div><div class="l c"></div><div class="l"></div></div>
+    </div>
+  </section>
+</div>
+</div>
+
+<div>
+<div class="etiqueta">Celular · la hoja de filtros</div>
+<div class="cel">
+  <div class="fondo"></div>
+  <div class="hoja">
+    <div class="asa"></div>
+    <div class="hoja-cab"><h2>Filtros</h2><span class="cerrar">×</span></div>
+    <div class="hoja-cuerpo">
+      <div class="seg"><span>Todo</span><span class="si">Productos</span><span>Servicios</span></div>
+      <div class="grupo" style="border-top:0;padding-top:4px">
+        <div class="grupo-cab">Categoría</div>
+        <div class="chips"><span class="chip si">Tractores <span class="n">5</span></span><span class="chip">Cosecha <span class="n">3</span></span><span class="chip">Siembra <span class="n">2</span></span><span class="chip">Ver todas</span></div>
+      </div>
+      <div class="grupo">
+        <div class="grupo-cab">Marca</div>
+        <div class="opc si"><span class="caja"></span>John Deere<span class="n">2</span></div>
+        <div class="opc"><span class="caja"></span>Pauny<span class="n">2</span></div>
+        <div class="opc"><span class="caja"></span>Massey Ferguson<span class="n">1</span></div>
+      </div>
+      <div class="grupo">
+        <div class="grupo-cab">Condición</div>
+        <div class="chips"><span class="chip">Nuevo <span class="n">1</span></span><span class="chip si">Usado <span class="n">4</span></span></div>
+      </div>
+      <div class="grupo">
+        <div class="grupo-cab">Potencia</div>
+        <div class="chips"><span class="chip">Hasta 59 HP</span><span class="chip">60 a 120 HP</span><span class="chip">Más de 120</span></div>
+      </div>
+    </div>
+    <div class="hoja-pie"><span class="limpiar">Limpiar</span><span class="ver">Ver <b>2</b> publicaciones</span></div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="notas">
+  <div>
+    <h3>Qué cambia</h3>
+    <ul>
+      <li><b>Las opciones a la vista con su cantidad</b>, en vez de listas desplegables cerradas. La regla de ayer se mantiene: sólo lo que tiene publicaciones.</li>
+      <li><b>Lo elegido arriba de los resultados</b>, como etiquetas verdes que se sacan con una cruz, más «Limpiar todo».</li>
+      <li><b>Controles según el dato:</b> lista con buscador para la marca; etiquetas para la potencia, la condición y el origen; «Desde y hasta» para el año y el precio.</li>
+      <li><b>«Todo, Productos o Servicios»</b> como un selector de tres partes, arriba de todo.</li>
+      <li><b>En el celular, una hoja desde abajo</b> con el botón fijo «Ver N publicaciones», que dice cuántas vas a ver antes de tocarlo.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Lo que no cambia</h3>
+    <ul>
+      <li>Qué se filtra y cómo se cuenta: es sólo cómo se ve.</li>
+      <li>Una marca por vez, como hoy. Elegir varias a la vez sería otra tarea.</li>
+      <li>El buscador de texto de arriba.</li>
+    </ul>
+    <p style="margin-top:10px">Las barritas sobre «Año» muestran cuántas publicaciones hay por año. Son opcionales: si complican, se sacan.</p>
+  </div>
+</div>
+</body>
+</html>

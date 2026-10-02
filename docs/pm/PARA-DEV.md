@@ -86,7 +86,7 @@ Entregala por separado.
 **Decisión de Emi (02/10).** Lo declaraste en tu informe de FILTROS: una
 marca escrita con «Otra marca» no se puede corregir, unir ni dar de baja
 desde el sitio, y queda en la lista para siempre. Va antes de
-`VENDER-SIN-SESION-1`. Entregala por separado.
+`INICIO-CIERRE-CELULAR-1` y `VENDER-SIN-SESION-1`. Entregala por separado.
 
 ### Qué entra
 
@@ -137,7 +137,139 @@ alguien al publicar.
 
 ---
 
-## Después — VENDER-SIN-SESION-1 (empezala apenas entregues MARCAS-PANEL-1)
+## Después — INICIO-CIERRE-CELULAR-1 (apenas entregues MARCAS-PANEL-1)
+
+**Decisión de Emi (02/10), opción A.** En el celular, después de las siete
+tarjetas aparece «¿Te interesa alguno?», un bloque verde grande, y debajo
+queda suelto el crédito de las fotos. Corta la lectura a mitad de página. En
+la computadora es la octava tarjeta y completa la grilla, así que ahí está
+bien.
+
+### Qué entra
+
+1. **En el celular, «¿Te interesa alguno?» pasa al final de Inicio,**
+   después de «Principio de AgroBoeda», como cierre. Lleva los mismos
+   textos y el mismo botón.
+2. **El crédito de las fotos queda pegado a las tarjetas.**
+3. **En la computadora no cambia nada.** Decí desde qué ancho cambia, y por
+   qué ahí.
+4. **El orden de lectura** (lector de pantalla y tabulación) tiene que
+   coincidir con lo que se ve en cada ancho.
+
+### Aceptación verificable
+
+1. **Caso nuevo:**
+   - en 390, «¿Te interesa alguno?» está después de «Principio de
+     AgroBoeda» y el crédito está inmediatamente después de la tarjeta 07;
+   - en 1440, sigue como octava tarjeta;
+   - en los dos anchos, el bloque aparece una sola vez en el árbol del
+     documento.
+2. **Negativo:** el bloque otra vez en el medio, en el celular, da rojo.
+3. El 232 y el 233 siguen verdes. Suite, a11y, contraste, móvil y las
+   puertas.
+
+---
+
+## Después — AVISOS-1 (apenas entregues INICIO-CIERRE-CELULAR-1)
+
+**Decisión de Emi (02/10): opción A de `maquetas/AVISOS-V2-2026-10-02.html`**
+(y `.jpg`), la «píldora verde de la marca». Los avisos de hoy le parecen
+feos y genéricos. Entregala por separado.
+
+### Qué entra
+
+1. **El aviso de la maqueta, opción A:**
+   - fondo verde de la marca, texto blanco y esquinas redondeadas;
+   - ícono redondo cereal con tilde, o rojo con «!» si es un error;
+   - una segunda línea opcional, más tenue.
+2. **Abajo al centro**, en la computadora y en el celular. Nunca tapa la
+   cabecera.
+3. **Entra desde abajo** con un rebote corto y sale bajando. Con
+   `prefers-reduced-motion`, sin animación.
+4. **Varios a la vez se apilan con profundidad:** los de atrás, más chicos y
+   asomando. Con el mouse encima se despliegan.
+5. **En el celular se cierran deslizando.** También tienen un botón para
+   cerrar, que se puede usar con teclado.
+6. **Tiempos:** lo que salió bien se va a los 4 s, y se pausa con el mouse o
+   el foco encima. Un error se queda hasta cerrarlo, con `role="alert"`; lo
+   demás, `role="status"`.
+7. **Una acción opcional** («Ver carrito», «Deshacer», «Reintentar»). Sumala
+   donde ya exista lo que hace: por ejemplo, «Ver carrito» al agregar. No
+   inventes acciones que el producto no tiene. Decí en el informe dónde la
+   pusiste.
+8. **Sin rótulo en mayúsculas** («ÉXITO», «ERROR»).
+9. **Una librería** como Sonner, si la usás, va por npm, con licencia libre
+   y sin cargar nada de afuera (CSP). Si no, a mano. Lo elegís vos.
+
+### Aceptación verificable
+
+1. **Caso nuevo, en 1440 y 390:**
+   - el aviso aparece abajo y no se superpone con la cabecera;
+   - el de éxito se va a los 4 s y el de error se queda;
+   - tres seguidos quedan apilados, sin superponer el texto;
+   - se cierra con el botón y con teclado.
+2. **Negativo:** el error que se va solo a los 4 s da rojo.
+3. **Los casos que leen avisos** siguen verdes o se ajustan, y el informe
+   dice cuáles.
+4. **Capturas** de éxito, error y pila, en los dos anchos.
+5. Suite, a11y (contraste del texto sobre el verde incluido), móvil y las
+   puertas.
+
+---
+
+## Después — FILTROS-VISUAL-1 (apenas entregues AVISOS-1)
+
+**Decisión de Emi (02/10): aprobó `maquetas/FILTROS-V1-2026-10-02.html`**
+(y `.jpg`). El panel de filtros de hoy, con ocho desplegables iguales, se ve
+genérico. Es un cambio de cómo se ve: qué se filtra y cómo se cuenta no
+cambian. Entregala por separado.
+
+### Qué entra
+
+1. **Computadora**, como la maqueta:
+   - «Todo / Productos / Servicios» como selector de tres partes;
+   - la categoría y la subcategoría, como lista con su cantidad, y lo
+     elegido marcado;
+   - la marca, como lista con su cantidad y un buscador cuando hay más de
+     seis;
+   - la potencia, la condición y el origen, como etiquetas que se tocan;
+   - el año y el precio, con «desde» y «hasta»;
+   - «Dónde», con buscador de provincia o localidad;
+   - los grupos se pliegan.
+2. **Arriba de los resultados**, lo elegido como etiquetas verdes con cruz,
+   más «Limpiar todo». Sacar una saca ese filtro.
+3. **Celular:** una hoja que sube desde abajo, con «Limpiar» y un botón fijo
+   «Ver N publicaciones», con el número de la búsqueda que se va a ver.
+4. **Las barritas por año** son opcionales. Si suman un pedido o una
+   consulta pesada, no van; decilo.
+5. **Sin cambiar las reglas de hoy:** sólo opciones con publicaciones, la
+   elegida en cero a la vista, una marca por vez y la URL que conserva los
+   filtros.
+
+### Aceptación verificable
+
+1. **Los casos de filtros** (173, 175, 195, 198, 199, 200, 237 y los que
+   lean el panel) siguen verdes o se ajustan sin cambiar lo que miden. El
+   informe dice cuáles y por qué.
+2. **Caso nuevo:**
+   - las etiquetas de arriba coinciden con los filtros puestos, y sacar una
+     la saca de la búsqueda y de la URL;
+   - en 390, «Ver N publicaciones» dice el mismo número que muestra la lista
+     al cerrar la hoja.
+3. **Teclado y lector de pantalla:** cada opción se elige con teclado y
+   anuncia su cantidad; la hoja del celular atrapa el foco y lo devuelve al
+   cerrar.
+4. **Capturas** en 1440 y 390, junto a la maqueta.
+5. Suite, a11y, contraste, móvil, las dos guías y las puertas.
+
+### Frená y consultá
+
+- Si algún control de la maqueta obliga a cambiar la API o a hacer más
+  pedidos por cada cambio de filtro.
+
+---
+
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues FILTROS-VISUAL-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.

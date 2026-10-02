@@ -10,6 +10,21 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-02 — Avisos: la píldora verde de la marca
+
+Emi rechazó la v1 de los avisos por genérica y eligió la opción A de
+`maquetas/AVISOS-V2-2026-10-02.html`: una píldora verde de la marca, abajo al centro, que se
+apila con profundidad, trae una acción cuando sirve y entra con un rebote corto. Es
+`AVISOS-1`, después de `INICIO-CIERRE-CELULAR-1`. Emi pidió el mismo trabajo para los filtros:
+la maqueta es `maquetas/FILTROS-V1-2026-10-02.html` y espera su aprobación.
+
+## 2026-10-02 — En el celular, «¿Te interesa alguno?» cierra Inicio
+
+Emi vio en su celular que el bloque «¿Te interesa alguno?» corta la lectura entre los servicios
+y «Cómo funciona», con el crédito de las fotos suelto debajo. Eligió la opción A: en el celular
+pasa al final de Inicio, y en la computadora sigue como octava tarjeta. Es
+`INICIO-CIERRE-CELULAR-1`, después de `MARCAS-PANEL-1`.
+
 ## 2026-10-02 — Las marcas se corrigen, se unen y se dan de baja desde el panel
 
 Con «Otra marca» (`FILTROS-DE-PUBLICACIONES-1`), una marca mal escrita queda en el alta y en el
