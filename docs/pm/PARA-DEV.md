@@ -5,24 +5,28 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre FILTROS-DE-PUBLICACIONES-1 — aceptada en rama
+## Decisión sobre MARCAS-PANEL-1 — aceptada en rama
 
-Sobre `f5051b8` (producto en `11c6069` y `353cf94`). Evidencia en
-`REPRODUCCION-FILTROS-DE-PUBLICACIONES-1-2026-10-02.md`.
+Sobre `ee8e90e` (producto en `24296c5`). Evidencia en
+`REPRODUCCION-MARCAS-PANEL-1-2026-10-02.md`.
 
-- **Casos:** 173, 174, 175, 195, 198, 207, 232, 237 y 238 en 9/9.
-- **Negativos:** tus catorce dan rojo. También dan rojo los tres míos:
-  - sin sacar acentos;
-  - el filtro con marcas dadas de baja;
-  - la condición contada sin el filtro de marca.
-- **Suite completa desde base nueva:** 237/238. Sólo cae el 169, de entorno.
-- **Auditorías y las dos guías:** verdes.
-- **El congelamiento que encontraste en tu código** y el caso que lo mide:
-  excelente.
+- **Caso 239:** 1/1, en escritorio, celular y por la API.
+- **Negativos:** tus ocho dan rojo. De los míos, dan rojo dos:
+  - contar las eliminadas;
+  - corregir y dar de baja sin pedir administración.
+- **Dos negativos míos sobreviven.** El código está bien; falta el caso.
+  Van abajo, en el agregado de `INICIO-CIERRE-CELULAR-1`.
+- **Suite completa desde base nueva:** 237/239.
+  - Cae el 169, de entorno.
+  - Cae el 195, por una carrera del caso. Está explicada abajo.
+- **Auditorías, las dos guías y las puertas:** verdes.
+- **Se aceptan tus cuatro supuestos y los riesgos declarados.**
+- **Cerrar la ruta genérica de Configuración sin que te lo pidieran:**
+  excelente. Lo mismo el contraste del subtítulo.
 
 La publicación a `main` la decide Emi. No integres ni despliegues.
 
-`SESIONES-AL-CAMBIAR-1` está publicada en `d6fa79b`.
+`FILTROS-DE-PUBLICACIONES-1` está publicada en `dc377d9`.
 
 ---
 
@@ -79,65 +83,10 @@ Entregala por separado.
 
 ---
 
-## Tarea activa — MARCAS-PANEL-1
+## Tarea activa — INICIO-CIERRE-CELULAR-1
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
-**Decisión de Emi (02/10).** Lo declaraste en tu informe de FILTROS: una
-marca escrita con «Otra marca» no se puede corregir, unir ni dar de baja
-desde el sitio, y queda en la lista para siempre. Va antes de
-`INICIO-CIERRE-CELULAR-1` y `VENDER-SIN-SESION-1`. Entregala por separado.
-
-### Qué entra
-
-En el panel de administración, una sección «Marcas» con la lista completa:
-nombre, cuántas publicaciones la usan y si se cargó de la lista o la escribió
-alguien al publicar.
-
-1. **Corregir el nombre** de una marca: «jhon deer» pasa a «John Deere». Si el
-   nombre corregido coincide con otra que ya existe, ofrece unirlas.
-2. **Unir dos marcas:** las publicaciones de la que se va pasan a la que
-   queda, y la que se va desaparece del filtro y del alta. Pide confirmar y
-   dice cuántas publicaciones se mueven.
-3. **Dar de baja** una marca: sale del alta y del filtro. Las publicaciones
-   que la tienen la siguen mostrando en su ficha, como hoy con una marca
-   dada de baja. Se puede volver a dar de alta.
-4. **La guía del panel** suma el paso, y `guia-admin.mjs` lo comprueba. Sale
-   de «Lo que el programa no comprueba» la frase de que no se puede
-   corregir.
-
-### Fuera de alcance
-
-- Aprobar las marcas nuevas antes de que aparezcan.
-- Marcas por categoría.
-
-### Aceptación verificable
-
-1. **Caso nuevo, en escritorio y celular:**
-   - una publicación con «Otra marca: Jhon Deer», unida a John Deere, pasa
-     a contar en John Deere, y «Jhon Deer» deja de estar en el filtro y en
-     el alta;
-   - corregir el nombre de «Agromec» a «AgroMec» se ve en la ficha y en el
-     filtro;
-   - dar de baja la saca del alta y del filtro, y la ficha la sigue
-     mostrando.
-2. **Permisos:** quien no es administración recibe 403 en cada acción,
-   llamada directo a la API.
-3. **Unir dos veces seguidas,** o unir una marca consigo misma, no rompe
-   nada.
-4. **Negativos:**
-   - unir sin mover las publicaciones da rojo;
-   - una acción sin control de rol da rojo.
-5. Suite completa, a11y, contraste, móvil, las dos guías y las puertas.
-
-### Frená y consultá
-
-- Si unir obliga a cambiar cómo se guardan las marcas, o necesita una
-  migración que no sea aditiva.
-
----
-
-## Después — INICIO-CIERRE-CELULAR-1 (apenas entregues MARCAS-PANEL-1)
 
 **Decisión de Emi (02/10), opción A.** En el celular, después de las siete
 tarjetas aparece «¿Te interesa alguno?», un bloque verde grande, y debajo
@@ -167,6 +116,28 @@ bien.
 2. **Negativo:** el bloque otra vez en el medio, en el celular, da rojo.
 3. El 232 y el 233 siguen verdes. Suite, a11y, contraste, móvil y las
    puertas.
+
+### Agregado chico, de la revisión de MARCAS-PANEL-1
+
+Va en un commit aparte, dentro de esta entrega:
+
+1. **El 239 comprueba que unir mueve también las pausadas y las
+   eliminadas.** Mi negativo «unir mueve sólo las activas» sobrevive: el 239
+   pasa aunque una pausada quede con la marca borrada.
+2. **El 239 comprueba que Configuración no renombra una marca** por
+   `PUT /admin/form-options/{id}`. Hoy prueba sólo el borrado. Mi negativo
+   «sacar la guarda del cambio de nombre» sobrevive.
+3. **«Editar» muestra el nombre de una marca dada de baja,** no su valor
+   interno: «AgroMec» y no «agromec». Hoy el selector agrega la opción con el
+   valor. Dar de baja ahora está en la pantalla, así que esto se va a ver.
+4. **El 195 espera las opciones del filtro de tipo antes de leerlas.** En mi
+   suite cayó con «el filtro de tipo ofrece ["Todos"] y en la base hay
+   ["Arados (14)","Rastras (3)"]», y repetido solo pasó. Lee las opciones
+   apenas aparece el selector, antes de que lleguen las cantidades. Fijate
+   si otro caso de `FILTROS-DE-PUBLICACIONES-1` lee igual.
+
+Cada uno con su negativo en rojo: el 1 y el 2 con mis sabotajes, y el 3 con
+volver a mostrar el valor interno.
 
 ---
 
