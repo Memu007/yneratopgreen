@@ -5,27 +5,24 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre SESIONES-AL-CAMBIAR-1 — aceptada en rama
+## Decisión sobre FILTROS-DE-PUBLICACIONES-1 — aceptada en rama
 
-Sobre `6265cc2` (producto en `cc439b9`, `f306af7` y `f0ac6df`). Evidencia en
-`REPRODUCCION-SESIONES-AL-CAMBIAR-1-2026-10-02.md`.
+Sobre `f5051b8` (producto en `11c6069` y `353cf94`). Evidencia en
+`REPRODUCCION-FILTROS-DE-PUBLICACIONES-1-2026-10-02.md`.
 
-- **Casos:** 130, 235 y 236 en 3/3.
-- **Negativos:** tus once dan rojo. De los míos, dos dan rojo:
-  - la edición del panel que no cierra;
-  - las sesiones firmadas en 0.
-- **El tercero mío quedó verde:** `get_current_user_optional` sin mirar la
-  versión. El código está bien y el riesgo es mínimo; queda como P3 de
-  cobertura.
-- **Migración en modo producción:** sube sobre una copia con datos, deja 23
-  cuentas en 0 sin tocar nada más, y repetirla no cambia nada.
-- **Suite completa desde base nueva:** 235/236. Sólo cae el 169, de entorno.
+- **Casos:** 173, 174, 175, 195, 198, 207, 232, 237 y 238 en 9/9.
+- **Negativos:** tus catorce dan rojo. También dan rojo los tres míos:
+  - sin sacar acentos;
+  - el filtro con marcas dadas de baja;
+  - la condición contada sin el filtro de marca.
+- **Suite completa desde base nueva:** 237/238. Sólo cae el 169, de entorno.
 - **Auditorías y las dos guías:** verdes.
-- **Los bordes del choque y de la pestaña en vuelo:** muy bien encontrados.
+- **El congelamiento que encontraste en tu código** y el caso que lo mide:
+  excelente.
 
 La publicación a `main` la decide Emi. No integres ni despliegues.
 
-`CAMBIAR-CONTRASENA-1` está publicada en `c21fb9d`.
+`SESIONES-AL-CAMBIAR-1` está publicada en `d6fa79b`.
 
 ---
 
@@ -82,86 +79,9 @@ Entregala por separado.
 
 ---
 
-## Tarea activa — FILTROS-DE-PUBLICACIONES-1
+## Tarea activa — MARCAS-PANEL-1
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
-
-**Decisión de Emi (01/10), por pedido de la clienta.** Revierte la decisión
-del 25/09 («el filtro de marca muestra las 44»). Va antes de
-`VENDER-SIN-SESION-1`. Entregala por separado.
-
-### Problema
-
-La clienta eligió Maquinaria agrícola, después Tractores, y el filtro le
-ofreció todas las marcas, aunque nadie haya publicado un tractor de la
-mayoría. Ella quiere que los filtros salgan de las publicaciones:
-
-- sólo se ofrece lo que alguien publicó;
-- una marca nueva que alguien escriba aparece sola.
-
-Su prototipo está en `originales/BUSCADOR-AGROMARKET-CLIENTA-2026-10-01.html`.
-
-### Qué entra
-
-1. **Cada filtro del Mercado ofrece sólo opciones con publicaciones** dentro
-   de la búsqueda de ese momento, con su cantidad. Vale para la marca, el
-   tipo, los rangos de potencia, el origen y la condición.
-   - Con Tractores elegido, sólo las marcas que tienen tractores publicados.
-   - Una opción ya elegida se sigue mostrando aunque quede en cero, para
-     poder sacarla.
-   - Sin categoría que use marca, sigue la regla del caso 175.
-2. **«Otra marca» al publicar y en «Editar»,** en las categorías con
-   `usa_marca`.
-   - Se escribe el nombre: de 2 a 40 caracteres, sin espacios de más.
-   - Si coincide con una marca que ya existe, sin importar mayúsculas,
-     acentos ni espacios, se usa esa y no se crea otra.
-   - Si es nueva, aparece sola en el filtro con su cantidad, y en la ficha
-     con el nombre como se escribió.
-   - La lista del alta la ofrece desde ahí para las publicaciones
-     siguientes.
-   - Cómo se guarda lo elegís vos. Si necesita migración, aditiva y probada
-     en modo producción, con un caso sobre una base sin siembra.
-3. **«Tecnologizar» pasa a «Tecnificar»** en «Cómo funciona» de Inicio (la
-   clienta, 01/10). Actualizá los casos que lo lean.
-
-### Fuera de alcance
-
-- Unir o corregir marcas desde el panel: es otra pieza.
-- Las categorías («Bienes y Ganado», agrícola o pecuario, la hacienda) y
-  «Origen y Destino»: esperan una reunión de Emi con la clienta.
-- Integración y despliegue.
-
-### Aceptación verificable
-
-1. **Caso nuevo, en el Mercado, en escritorio y celular:**
-   - con Tractores elegido, la marca ofrece exactamente las marcas de los
-     tractores publicados, con su cantidad, y ninguna en cero;
-   - lo mismo con el tipo y la potencia;
-   - una marca elegida que queda en cero sigue a la vista.
-2. **Caso nuevo de «Otra marca»:**
-   - publicar un tractor con «Otra marca: Agromec» hace que «Agromec»
-     aparezca en el filtro, con 1, y en la ficha;
-   - otro con «AGROMEC » usa la misma marca, y el filtro dice 2;
-   - «Otra marca: john deere» usa John Deere;
-   - la API rechaza una de 1 o de 41 caracteres, con su motivo.
-3. **Negativos:**
-   - el filtro con opciones en cero da rojo;
-   - una marca nueva que no aparece en el filtro da rojo;
-   - «AGROMEC» creada como una segunda marca da rojo.
-4. **Las dos guías** se actualizan si nombran el filtro de marca o la lista
-   cerrada.
-5. Suite completa desde base nueva, a11y, contraste, móvil y las puertas de
-   siempre.
-
-### Frená y consultá
-
-- Si quitar las opciones en cero rompe la regla del caso 175, o algún filtro
-  que dependa de otro.
-- Si «Otra marca» obliga a cambiar cómo se guardan las marcas que ya existen.
-
----
-
-## Siguiente — MARCAS-PANEL-1 (apenas PM cierre FILTROS-DE-PUBLICACIONES-1)
 
 **Decisión de Emi (02/10).** Lo declaraste en tu informe de FILTROS: una
 marca escrita con «Otra marca» no se puede corregir, unir ni dar de baja
