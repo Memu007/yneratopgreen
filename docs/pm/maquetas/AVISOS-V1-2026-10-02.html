@@ -1,0 +1,131 @@
+<!doctype html>
+<!--
+  Maqueta de los avisos (los «toasts»), versión 1 (PM, 02/10/2026). Emi: «Esas
+  notificaciones están feas». Compara el aviso de hoy con la propuesta, en
+  computadora y en celular. Usa las fuentes de public/ y los colores de la
+  maqueta de Inicio. Es una propuesta para Emi, no producto.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maqueta de avisos</title>
+<style>
+@font-face { font-family: 'Inter Tight'; src: url('../../../public/fuentes/InterTight.woff2') format('woff2-variations'); font-weight: 100 900; }
+@font-face { font-family: 'Inter'; src: url('../../../public/fuentes/Inter.woff2') format('woff2-variations'); font-weight: 100 900; }
+:root { --display: 'Inter Tight', 'Inter', system-ui, sans-serif; --ui: 'Inter', system-ui, sans-serif;
+  --canvas: #f7f6f2; --surface: #fff; --text: #1e2420; --text-2: #4c544b; --brand: #1e4a34; --signal: #c49a43;
+  --accent: #8a671c; --border: #d8dad2; --ok: #1f6b4f; --ok-bg: #e7f3ed; --err: #a22f2f; --err-bg: #f8e7e5; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--ui); background: #e9e8e2; color: var(--text); padding: 36px 40px 48px; -webkit-font-smoothing: antialiased; }
+h1 { font: 800 30px/1.1 var(--display); letter-spacing: -.02em; }
+.bajada { margin-top: 8px; color: var(--text-2); font-size: 15px; max-width: 900px; line-height: 1.5; }
+.fila { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 28px; }
+.etiqueta { font: 700 12px/1 var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+.etiqueta::before { content: ""; width: 14px; height: 3px; background: var(--signal); }
+.pantalla { position: relative; background: var(--canvas); border: 1px solid #cfcfc6; height: 330px; overflow: hidden; }
+.header { height: 54px; background: var(--brand); display: flex; align-items: stretch; color: #fff; font: 500 13px var(--ui); }
+.header .logo { display: flex; align-items: center; padding: 0 18px; font: 700 17px var(--display); }
+.header .nav { display: flex; }
+.header .nav span { display: flex; align-items: center; padding: 0 14px; border-left: 1px solid rgba(255,255,255,.14); }
+.header .der { margin-left: auto; display: flex; }
+.header .der span { display: flex; align-items: center; padding: 0 14px; border-left: 1px solid rgba(255,255,255,.14); }
+.header .der .vender { background: var(--signal); color: #1e2420; font-weight: 650; }
+.contenido { padding: 22px 26px; }
+.contenido h2 { font: 800 24px var(--display); letter-spacing: -.015em; }
+.campo { height: 34px; background: #fff; border: 1px solid var(--border); margin-top: 12px; max-width: 420px; }
+.boton { display: inline-block; margin-top: 14px; background: var(--brand); color: #fff; font: 650 13px var(--ui); padding: 10px 16px; border-radius: 2px; }
+
+/* HOY: como está publicado */
+.hoy { position: absolute; top: 14px; right: 14px; width: 340px; display: flex; align-items: center; gap: 12px; padding: 13px 16px;
+  border-radius: 2px; box-shadow: 0 10px 30px rgba(0,0,0,.18); background: var(--ok-bg); border-left: 4px solid var(--brand); color: var(--brand); }
+.hoy .rot { align-self: flex-start; padding: 2px 7px; border-left: 2px solid currentColor; font: 650 11px var(--ui); letter-spacing: .06em; text-transform: uppercase; }
+.hoy .msj { flex: 1; font: 500 14px/1.4 var(--ui); }
+.hoy .x { font-size: 20px; opacity: .6; }
+.hoy.error { background: var(--err-bg); border-left-color: var(--err); color: var(--err); top: 92px; }
+.nota-hoy { position: absolute; left: 26px; bottom: 16px; right: 26px; font-size: 12.5px; color: var(--err); line-height: 1.45; }
+
+/* PROPUESTA */
+.aviso { position: absolute; right: 18px; width: 360px; background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--ok); border-radius: 4px; box-shadow: 0 10px 28px rgba(22,34,28,.12);
+  display: grid; grid-template-columns: 28px 1fr 22px; gap: 4px 12px; padding: 14px 14px 16px 14px; overflow: hidden; }
+.aviso .ico { width: 24px; height: 24px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); display: grid; place-items: center; grid-row: span 2; margin-top: 1px; }
+.aviso .ico svg { width: 13px; height: 13px; }
+.aviso b { font: 650 14.5px/1.35 var(--ui); color: var(--text); }
+.aviso p { grid-column: 2; font: 400 13.5px/1.45 var(--ui); color: var(--text-2); }
+.aviso .cerrar { grid-column: 3; grid-row: 1; font-size: 18px; line-height: 1; color: #79837a; text-align: center; }
+.aviso .tiempo { position: absolute; left: 0; bottom: 0; height: 2px; width: 62%; background: var(--ok); opacity: .55; }
+.aviso.error { border-left-color: var(--err); }
+.aviso.error .ico { background: var(--err-bg); color: var(--err); }
+.aviso.uno { top: 66px; }
+.aviso.dos { top: 186px; }
+
+/* celular */
+.fila-cel { display: grid; grid-template-columns: repeat(2, 360px) 1fr; gap: 28px; margin-top: 28px; align-items: start; }
+.cel { position: relative; width: 360px; height: 470px; background: var(--canvas); border: 1px solid #cfcfc6; overflow: hidden; }
+.cel .header { height: 50px; }
+.cel .hoy { left: 10px; right: auto; width: 340px; top: 10px; }
+.cel .aviso { left: 10px; right: 10px; width: auto; top: 60px; }
+.reglas { font-size: 14px; line-height: 1.55; color: var(--text-2); }
+.reglas h3 { font: 750 18px var(--display); color: var(--text); margin-bottom: 8px; }
+.reglas li { margin: 0 0 8px 18px; }
+.reglas b { color: var(--text); }
+</style>
+</head>
+<body>
+<h1>Los avisos del sitio: hoy y propuesta</h1>
+<p class="bajada">El aviso que aparece al guardar algo, por ejemplo «Cambiaste tu contraseña.». Hoy entra deslizándose desde la derecha, tapa la cabecera y tiene un rótulo en mayúsculas. La propuesta usa el lenguaje de Inicio: tarjeta blanca, una línea de color fina y texto oscuro. Aparece debajo de la cabecera, sin tapar «Vender» ni «Salir».</p>
+
+<div class="fila">
+  <div>
+    <div class="etiqueta">Hoy · computadora</div>
+    <div class="pantalla">
+      <div class="header"><span class="logo">AgroBoeda</span><span class="nav"><span>Inicio</span><span>Mercado</span><span>Contacto</span></span><span class="der"><span class="vender">Vender</span><span>Carrito</span><span>Juan</span><span>Salir</span></span></div>
+      <div class="contenido"><h2>Mi cuenta</h2><div class="campo"></div><div class="campo"></div><span class="boton">Cambiar contraseña</span></div>
+      <div class="hoy"><span class="rot">Éxito</span><span class="msj">Cambiaste tu contraseña.</span><span class="x">×</span></div>
+      <div class="hoy error"><span class="rot">Error</span><span class="msj">No se pudo guardar. Probá de nuevo.</span><span class="x">×</span></div>
+      <p class="nota-hoy">Tapa «Vender», «Carrito» y «Salir». Entra deslizándose desde el borde. El error también desaparece solo a los 4 segundos, aunque no se haya llegado a leer.</p>
+    </div>
+  </div>
+  <div>
+    <div class="etiqueta">Propuesta · computadora</div>
+    <div class="pantalla">
+      <div class="header"><span class="logo">AgroBoeda</span><span class="nav"><span>Inicio</span><span>Mercado</span><span>Contacto</span></span><span class="der"><span class="vender">Vender</span><span>Carrito</span><span>Juan</span><span>Salir</span></span></div>
+      <div class="contenido"><h2>Mi cuenta</h2><div class="campo"></div><div class="campo"></div><span class="boton">Cambiar contraseña</span></div>
+      <div class="aviso uno"><span class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><b>Cambiaste tu contraseña.</b><span class="cerrar">×</span><p>Se cerraron las sesiones en tus otros dispositivos.</p><i class="tiempo"></i></div>
+      <div class="aviso dos error"><span class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8 4v5M8 12v.01"/></svg></span><b>No se pudo guardar.</b><span class="cerrar">×</span><p>Revisá tu conexión y probá de nuevo. Lo que escribiste sigue ahí.</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="fila-cel">
+  <div>
+    <div class="etiqueta">Hoy · celular</div>
+    <div class="cel">
+      <div class="header"><span class="logo">AgroBoeda</span><span class="der"><span>Juan</span><span>Salir</span></span></div>
+      <div class="contenido"><h2>Mi cuenta</h2><div class="campo"></div><div class="campo"></div><span class="boton">Cambiar contraseña</span></div>
+      <div class="hoy"><span class="rot">Éxito</span><span class="msj">Cambiaste tu contraseña.</span><span class="x">×</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="etiqueta">Propuesta · celular</div>
+    <div class="cel">
+      <div class="header"><span class="logo">AgroBoeda</span><span class="der"><span>Juan</span><span>Salir</span></span></div>
+      <div class="contenido" style="padding-top:110px"><h2>Mi cuenta</h2><div class="campo"></div><div class="campo"></div><span class="boton">Cambiar contraseña</span></div>
+      <div class="aviso"><span class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><b>Cambiaste tu contraseña.</b><span class="cerrar">×</span><p>Se cerraron las sesiones en tus otros dispositivos.</p><i class="tiempo"></i></div>
+    </div>
+  </div>
+  <div class="reglas">
+    <h3>Cómo se comporta</h3>
+    <ul>
+      <li><b>Aparece sin deslizarse:</b> un fundido corto, de unos 0,2 segundos, sin cruzar la pantalla. Si la persona pidió menos movimiento, aparece directo.</li>
+      <li><b>No tapa la cabecera:</b> va debajo, a la derecha en la computadora y a lo ancho en el celular.</li>
+      <li><b>Uno por vez:</b> el nuevo reemplaza al anterior, no se apilan.</li>
+      <li><b>Lo bueno se va solo</b> a los 4 segundos, con una línea fina que lo marca, y se pausa con el mouse encima.</li>
+      <li><b>Un error se queda</b> hasta cerrarlo, y dice qué hacer.</li>
+      <li><b>Sin rótulo en mayúsculas:</b> el ícono y el color ya dicen si salió bien o mal.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
