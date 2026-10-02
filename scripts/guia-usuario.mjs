@@ -875,11 +875,31 @@ const RECORRIDOS = {
     await panel.locator('#catalog-brand').waitFor({ timeout: 10_000 });
     await v.inventario('el panel de filtros con «Maquinaria agrícola»', page.locator('aside').filter({ has: panel }));
     const quedan = async () => (await titulosDelMercado(page)).filter((t) => t.includes(c.sello)).sort();
-    await v.afirma('«Marca», con cuántas publicaciones tiene cada una con los otros filtros que pusiste.', async () => {
-      const opcion = (await panel.locator('#catalog-brand option').allInnerTexts()).find((o) => o.startsWith('John Deere'));
+    const opcionesDe = async (control) => (await panel.locator(`${control} option`).allInnerTexts()).map((o) => o.trim());
+    await v.afirma('ofrecen sólo lo que tiene publicaciones con los otros filtros que pusiste, y cada opción dice cuántas tiene', async () => {
+      const opcion = (await opcionesDe('#catalog-brand')).find((o) => o.startsWith('John Deere'));
       const conMarca = (await pedir(`/catalog/products?category=${c.maquinaria.id}`
         + `&search=${encodeURIComponent(`uso ${c.sello}`)}&brand=john-deere`)).data.total;
       exigir(opcion === `John Deere (${conMarca})`, `la opción dice «${opcion}» y hay ${conMarca}`);
+      for (const control of ['#catalog-brand', '#catalog-condition', '#catalog-origin']) {
+        const enCero = (await opcionesDe(control)).filter((o) => o.endsWith('(0)'));
+        exigir(enCero.length === 0, `${control} ofrece opciones sin publicaciones: ${JSON.stringify(enCero)}`);
+      }
+    });
+    await v.afirma('Si lo que elegiste se queda sin publicaciones por otro filtro, sigue a la vista, con cero, para que lo puedas sacar.', async () => {
+      await panel.locator('#catalog-brand').selectOption('john-deere');
+      await esperarResultados(page);
+      await panel.getByPlaceholder('Máximo').fill('1');
+      await esperarResultados(page);
+      await c.esperarA(async () => (await opcionesDe('#catalog-brand')).includes('John Deere (0)')
+        && await panel.locator('#catalog-brand').inputValue() === 'john-deere',
+      `con «Máximo» 1, la marca ofrece ${JSON.stringify(await opcionesDe('#catalog-brand'))}`);
+      await panel.locator('#catalog-brand').selectOption('');
+      await esperarResultados(page);
+      await c.esperarA(async () => !(await opcionesDe('#catalog-brand')).some((o) => o.startsWith('John Deere')),
+        'sacada y sin publicaciones, «John Deere» sigue en la lista');
+      await panel.getByPlaceholder('Máximo').fill('');
+      await esperarResultados(page);
     });
     await v.afirma(['Se puede poner uno solo.', 'Una publicación que no declaró el año, por ejemplo, no aparece al filtrar por año.'], async () => {
       await panel.getByPlaceholder('Desde').fill('2010');
@@ -890,12 +910,12 @@ const RECORRIDOS = {
       await esperarResultados(page);
     });
     await v.afirma('Un filtro de estos trae sólo las publicaciones que declararon ese dato.', async () => {
-      await panel.locator('#catalog-origin').selectOption({ label: 'Dueño directo' });
+      await panel.locator('#catalog-origin').selectOption('dueno_directo');
       await esperarResultados(page);
       await c.esperarA(async () => JSON.stringify(await quedan()) === JSON.stringify([c.tractor.name]),
         `con «Dueño directo» quedan ${JSON.stringify(await quedan())}`);
       await panel.locator('#catalog-origin').selectOption('');
-      await panel.locator('#catalog-condition').selectOption({ label: 'Nuevo' });
+      await panel.locator('#catalog-condition').selectOption('nuevo');
       await esperarResultados(page);
       await c.esperarA(async () => JSON.stringify(await quedan()) === JSON.stringify([c.cosechadora.name]),
         `con «Nuevo» quedan ${JSON.stringify(await quedan())}`);
@@ -1454,7 +1474,16 @@ const RECORRIDOS = {
     await formulario.locator('#operation-kind').selectOption('activo');
     await formulario.locator('#power-hp').fill('150');
     await formulario.locator('#condition').selectOption('usado');
-    await formulario.locator('#brand').selectOption('john-deere');
+    await v.afirma('elegí «Otra marca» y escribila en «Nombre de la marca», de 2 a 40 caracteres', async () => {
+      await formulario.locator('#brand').selectOption({ label: 'Otra marca' });
+      const campo = formulario.getByLabel('Nombre de la marca');
+      await campo.waitFor({ timeout: 10_000 }).catch(() => { throw new Falla('«Otra marca» no abrió «Nombre de la marca»'); });
+      exigir(await campo.getAttribute('maxlength') === '40', `«Nombre de la marca» deja escribir ${await campo.getAttribute('maxlength')}`);
+      const corta = await pedir('/products', { method: 'POST', token: c.vendedora.access_token, body: { otra_marca: 'J' } });
+      exigir(corta.status === 422 && JSON.stringify(corta.data).includes('al menos 2 caracteres'),
+        `una marca de 1 carácter respondió ${corta.status}`);
+      await campo.fill('john deere');
+    });
     await formulario.locator('#model').fill(modelo);
     await formulario.locator('#year').fill('2019');
     await formulario.locator('#origin').selectOption('concesionaria');
@@ -1491,6 +1520,13 @@ const RECORRIDOS = {
     const [id] = queryRows(`SELECT id, 'fin' FROM products WHERE name = ${sqlLiteral(nombre)}`)[0] || [];
     exigir(id, 'la publicación no quedó guardada');
     c.publicado = { id, name: nombre, seller_id: c.vendedora.user.id };
+    await v.afirma('Si ya está en la lista escrita de otra forma, como john deere en minúsculas, se usa la de la lista.', async () => {
+      const [marca] = queryRows(`SELECT coalesce(brand, '(sin marca)'), 'fin' FROM products WHERE id = ${sqlLiteral(id)}`)[0];
+      exigir(marca === 'john-deere', `con «Otra marca» john deere, la publicación guardó «${marca}»`);
+      const iguales = queryRows(`SELECT value, 'fin' FROM form_options WHERE option_type = 'brand'
+        AND regexp_replace(lower(label), '[^a-z0-9]', '', 'g') = 'johndeere'`);
+      exigir(iguales.length === 1, `hay ${iguales.length} marcas John Deere`);
+    });
     await v.afirma('Al publicar, la publicación aparece enseguida en el Mercado.', async () => {
       exigir(await enElMercado(nombre), 'no está en el Mercado');
     });
@@ -1560,12 +1596,13 @@ const RECORRIDOS = {
     });
     const marcaGuardada = () => queryRows(`SELECT coalesce(brand, '(sin marca)'), 'fin' FROM products
       WHERE id = ${sqlLiteral(c.publicado.id)}`)[0][0];
-    await v.afirma('En «Marca», «Sin declarar» la quita.', async () => {
-      for (const [opcion, esperada] of [['Case', 'case'], ['Sin declarar', '(sin marca)']]) {
+    await v.afirma(['En «Marca», «Otra marca» deja escribirla, como al publicar', 'y «Sin declarar» la quita.'], async () => {
+      for (const [opcion, esperada, escrita] of [['Case', 'case'], ['Otra marca', 'case-ih', 'case ih'], ['Sin declarar', '(sin marca)']]) {
         await tarjeta(c.publicado).getByRole('button', { name: 'Editar' }).click();
         await edicion.waitFor({ timeout: 15_000 });
         await c.esperarA(async () => (await edicion.locator('#edit-marca option').count()) > 2, 'la edición no ofrece las marcas');
         await edicion.getByLabel('Marca', { exact: true }).selectOption({ label: opcion });
+        if (escrita) await edicion.getByLabel('Nombre de la marca').fill(escrita);
         await edicion.getByRole('button', { name: /Guardar Cambios/ }).click();
         await edicion.waitFor({ state: 'hidden', timeout: 15_000 });
         await c.esperarA(async () => marcaGuardada() === esperada, `con «${opcion}» la marca quedó «${marcaGuardada()}»`);

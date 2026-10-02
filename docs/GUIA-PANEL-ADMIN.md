@@ -43,7 +43,8 @@ plataforma y no se cambian desde el panel.
   administradora.
 - **Las marcas no se administran desde este panel.** Las marcas que se
   ofrecen al publicar maquinaria no están entre las listas de
-  «Configuración».
+  «Configuración». Quien publica puede sumar una que no está en la lista, y
+  desde el panel no se puede corregir, unir ni dar de baja.
 
 ## Cuentas de prueba
 
@@ -527,6 +528,9 @@ mirar su fuente.
   elegirlo” y “el transportista no recibe el contacto de quien compra”. Es
   una decisión (`DECISIONS.md`, 05/08/2026) y la comprueban los casos 52 y 54
   del smoke.
+- Antes de empezar: “Quien publica puede sumar una que no está en la lista”
+  pasa en el sitio, no en el panel. Lo comprueba el caso 238 de
+  `scripts/smoke.mjs`.
 - Antes de empezar: “Todavía no existen.”, “El panel no tiene cómo activar
   una suscripción” y “el acceso a contactos por plan no está definido para
   esta etapa”. Es una decisión: los candados de contacto por plan pasan a la

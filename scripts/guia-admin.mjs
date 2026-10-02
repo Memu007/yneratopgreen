@@ -1288,7 +1288,8 @@ const RECORRIDOS = {
     const LISTAS = { 'Tipos de Cobro': 'pricing_type', Disponibilidad: 'availability', 'Tiempo de Respuesta': 'response_time', Unidades: 'unit' };
     await v.afirma({
       paso: 'cuatro listas',
-      limites: ['Las marcas no se administran desde este panel.', 'no están entre las listas de «Configuración»'],
+      limites: ['Las marcas no se administran desde este panel.', 'no están entre las listas de «Configuración»',
+        'desde el panel no se puede corregir, unir ni dar de baja'],
     }, async () => {
       const botones = panel.locator('[class*="_configTabs_"] button');
       await botones.first().waitFor({ timeout: 10_000 });

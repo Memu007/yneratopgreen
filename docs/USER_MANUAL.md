@@ -143,8 +143,7 @@ publicaciones, «Ordenar por» las ordena y «Vista» elige «Cuadrícula» o
 Con la categoría «Maquinaria agrícola» elegida aparecen más filtros, que
 dependen de lo que declaró quien vende:
 
-- «Marca», con cuántas publicaciones tiene cada una con los otros filtros que
-  pusiste.
+- «Marca».
 - «Año», con «Desde» y «Hasta». Se puede poner uno solo.
 - «Condición»: «Nuevo» o «Usado».
 - «Origen · declarado por quien vende»: «Agencia / Concesionaria» o «Dueño
@@ -152,6 +151,11 @@ dependen de lo que declaró quien vende:
 
 Al elegir la subcategoría aparece uno más: «Potencia» en «Tractores», y
 «Tipo» en las que tienen tipos, como «Cosecha».
+
+«Marca», «Condición», «Origen», «Potencia» y «Tipo» ofrecen sólo lo que tiene
+publicaciones con los otros filtros que pusiste, y cada opción dice cuántas
+tiene. Si lo que elegiste se queda sin publicaciones por otro filtro, sigue a
+la vista, con cero, para que lo puedas sacar.
 
 Un filtro de estos trae sólo las publicaciones que declararon ese dato. Una
 publicación que no declaró el año, por ejemplo, no aparece al filtrar por año.
@@ -339,6 +343,11 @@ Según la categoría, el formulario pide más datos. Ninguno es obligatorio:
 - En la subcategoría «Tractores», además «Potencia (HP)»; en las que tienen
   tipos, como «Cosecha», además «Tipo».
 
+Si tu marca no está en «Marca», elegí «Otra marca» y escribila en «Nombre de
+la marca», de 2 a 40 caracteres. Si ya está en la lista escrita de otra forma,
+como john deere en minúsculas, se usa la de la lista. Si es nueva, se suma a la
+lista y al filtro «Marca».
+
 Los datos que cargás aparecen en la página de la publicación y sirven para los
 filtros del Mercado; la marca también se usa en el filtro «Marca». El origen se
 muestra con «declarado por quien vende».
@@ -365,7 +374,8 @@ En «Mi cuenta», abrí «Mis publicaciones». Cada una muestra su estado:
   «Descripción», «Subcategoría», «Clase de publicación», «Condición»,
   «Precio ($)», «Stock», «Unidad», «Provincia», «Localidad», las imágenes y
   los datos declarados: «Tipo», «Potencia (HP)», «Marca», «Modelo», «Año» y
-  «Origen (declarado por vos)». En «Marca», «Sin declarar» la quita.
+  «Origen (declarado por vos)». En «Marca», «Otra marca» deja escribirla,
+  como al publicar, y «Sin declarar» la quita.
   «Guardar Cambios» guarda y «Cancelar» cierra sin guardar. La «Categoría» no
   se cambia desde acá.
 - «Pausar» la saca del Mercado sin borrarla. «Activar» la vuelve a mostrar.
@@ -554,6 +564,9 @@ mirarlas.
 - Paso 14: “AgroBoeda nunca ve tu contraseña de Mercado Pago”: la contraseña
   se escribe en Mercado Pago. El programa comprueba que el botón lleve a
   autorizar en Mercado Pago, no lo que pasa allá.
+- Paso 15: “Si es nueva, se suma a la lista y al filtro «Marca».” El programa
+  no crea marcas: una marca nueva queda en la lista para siempre, y no hay
+  cómo sacarla desde el sitio. Lo comprueba el caso 238 de `scripts/smoke.mjs`.
 - Paso 18: “Cancelar no devuelve dinero: si ya cobraste, la devolución la
   arreglás directamente con quien compró” pasa fuera de AgroBoeda.
 - Paso 19: “no certifica tu identidad” es un límite de lo que significa el

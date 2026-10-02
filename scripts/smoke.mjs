@@ -28554,9 +28554,13 @@ await runCase(173, 'La condición filtra el conjunto entero y nunca completa lo 
 
     assert(await control.count() === 1,
       'no hay control de condición en la barra de filtros del Mercado');
-    const opciones = await control.locator('option').allInnerTexts();
-    assert(['Cualquiera', 'Nuevo', 'Usado'].every((r) => opciones.some((t) => t.trim() === r)),
-      `el control de condición ofrece ${JSON.stringify(opciones)}`);
+    // Desde FILTROS-DE-PUBLICACIONES-1 cada condición dice cuántas publicaciones
+    // tiene con lo demás que está elegido, y la que no tiene ninguna no se ofrece.
+    const opciones = (await control.locator('option').allInnerTexts()).map((t) => t.trim());
+    const esperadas = ['Cualquiera', `Nuevo (${NUEVOS})`, `Usado (${USADOS})`];
+    assert(JSON.stringify(opciones) === JSON.stringify(esperadas),
+      `el control de condición ofrece ${JSON.stringify(opciones)} y tenía que ofrecer `
+      + `${JSON.stringify(esperadas)}`);
 
     await control.selectOption('nuevo');
     await esperarElConteo(NUEVOS, 'elegir «Nuevo» no acotó el conteo al subconjunto');
@@ -34206,9 +34210,18 @@ await runCase(195, 'Filtrar por tipo y por potencia cuenta en el servidor, deja 
     await page.goto(`${dePreparacion}&page=2`, { waitUntil: 'domcontentloaded' });
     await page.locator('#catalog-subtype').waitFor({ state: 'visible', timeout: 25_000 });
     await esperarA(async () => barra().get('page') === '2', 'no se llegó a la página 2 de Preparación del suelo', 20_000);
+    // Desde FILTROS-DE-PUBLICACIONES-1 el tipo ofrece sólo los que tienen
+    // publicaciones en el subrubro, con su cantidad, en el orden de la lista.
+    const tiposConPublicaciones = queryRows(`
+      SELECT t.name, COUNT(p.id)::text FROM subcategory_types t
+      JOIN products p ON p.subcategory_type_id = t.id AND p.status = 'ACTIVE'
+      WHERE t.subcategory_id = ${sqlLiteral(preparacion.id)} AND t.is_active
+      GROUP BY t.id, t.name, t.display_order ORDER BY t.display_order, t.name`)
+      .map(([nombre, cuantas]) => `${nombre} (${cuantas})`);
     const ofrecidas = (await page.locator('#catalog-subtype option').allInnerTexts()).map((o) => o.trim());
-    if (JSON.stringify(ofrecidas) !== JSON.stringify(['Todos', 'Arados', 'Rastras', 'Cultivadores', 'Subsoladores', 'Otros'])) {
-      problemas.push(`pantalla: el filtro de tipo ofrece ${JSON.stringify(ofrecidas)}`);
+    if (JSON.stringify(ofrecidas) !== JSON.stringify(['Todos', ...tiposConPublicaciones])) {
+      problemas.push(`pantalla: el filtro de tipo ofrece ${JSON.stringify(ofrecidas)} y en la base hay `
+        + `${JSON.stringify(tiposConPublicaciones)}`);
     }
     await page.locator('#catalog-subtype').selectOption('arados');
     await esperarA(async () => barra().get('subtype') === 'arados', 'elegir «Arados» no llegó a la barra', 20_000);
@@ -34496,95 +34509,110 @@ await runCase(197, 'Las marcas y las localidades llegan a producción con la mig
   });
 });
 
-// 198. Con una categoría que usa marca, el filtro ofrece TODAS las marcas.
+// Las marcas activas en el orden del alta: el de la lista y, a igual orden, el
+// nombre sin mayúsculas ni acentos. Se ordena acá y no en la base, que ordena
+// bytes y pondría «Zeta» antes que «agromec».
+function marcasActivasEnElOrdenDelAlta() {
+  const sinAcentos = (texto) => texto.normalize('NFKD').replace(/[^\x00-\x7f]/g, '').toLowerCase();
+  return queryRows(`
+    SELECT value, label, display_order::text FROM form_options
+    WHERE option_type = 'brand' AND is_active`)
+    .map(([value, label, orden]) => ({ value, label, orden: Number(orden), clave: sinAcentos(label) }))
+    .sort((a, b) => a.orden - b.orden || (a.clave < b.clave ? -1 : a.clave > b.clave ? 1 : 0));
+}
+
+// 198. Con una categoría que usa marca, el filtro ofrece sólo las marcas que
+// tienen publicaciones.
 //
-// Decisión de Emi (25/09): con Maquinaria agrícola elegida, «Marca» aparece
-// siempre, con las marcas activas y cuántas publicaciones tiene cada una,
-// también las que están en cero. Los conteos siguen siendo del servidor, con
-// los demás filtros puestos. Elegir una en cero da el vacío de siempre, sin
-// error. Sin esa categoría sigue la regla del 175: sólo lo que el conjunto
-// tiene.
-await runCase(198, 'Con una categoría que usa marca, el filtro ofrece todas las marcas activas, también las que están en cero', async () => {
+// Decisión de Emi (01/10), por pedido de la clienta, que revierte la del 25/09
+// («el filtro de marca muestra todas, también las que están en cero»): con
+// Maquinaria agrícola elegida, «Marca» ofrece las marcas que tienen
+// publicaciones en la búsqueda de ese momento, con su cantidad, y ninguna en
+// cero. La elegida se sigue mostrando aunque quede en cero, para poder
+// sacarla. Es la regla del 175, ahora también con esa categoría.
+await runCase(198, 'Con una categoría que usa marca, el filtro ofrece sólo las marcas con publicaciones, y la elegida aunque quede en cero', async () => {
   const medidos = [];
   const problemas = [];
   const [[idCategoria, nombreCategoria]] = queryRows(`
     SELECT id, name FROM categories WHERE usa_marca = true AND is_active = true ORDER BY name LIMIT 1`);
-  const activas = () => queryRows(`
-    SELECT value || '|' || label, 'fin' FROM form_options
-    WHERE option_type = 'brand' AND is_active ORDER BY display_order, label`).map(([m]) => m);
+  const activas = marcasActivasEnElOrdenDelAlta;
   const pedir = async (extra = '') => {
     const respuesta = await apiRequest(
       `/catalog/products?category=${idCategoria}&page_size=1&page=1${extra}`);
     assert(respuesta.status === 200, `el catálogo respondió HTTP ${respuesta.status} para «${extra}»`);
     return respuesta.data;
   };
-  const DESACTIVADA = 'zoomlion';
+  const clave = (m) => `${m.value}|${m.label}|${m.count}`;
 
   // --- A. La API ------------------------------------------------------------
-  // A1. Todas las activas, en el orden del alta, cada una con su cantidad.
+  // A1. Las activas que tienen publicaciones, en el orden del alta, cada una
+  //     con su cantidad, y ninguna en cero.
   //
   // Lo esperado NO sale de la lista que se está midiendo: las marcas salen de
   // la base, y cada cantidad es el total que da el servidor al elegirla.
-  const revisarLista = async (extra, donde) => {
-    const esperadas = [];
-    for (const marca of activas()) {
-      const [valor, rotulo] = marca.split('|');
-      esperadas.push({ value: valor, label: rotulo, count: (await pedir(`${extra}&brand=${valor}`)).total });
+  const contarCadaUna = async (extra) => {
+    const todas = [];
+    for (const { value, label } of activas()) {
+      todas.push({ value, label, count: (await pedir(`${extra}&brand=${value}`)).total });
     }
-    const clave = (m) => `${m.value}|${m.label}|${m.count}`;
+    return todas;
+  };
+  const revisarLista = async (extra, donde) => {
+    const todas = await contarCadaUna(extra);
+    const esperadas = todas.filter((m) => m.count > 0);
     const ofrecidas = ((await pedir(extra)).brands ?? []).map(clave);
     if (JSON.stringify(ofrecidas) !== JSON.stringify(esperadas.map(clave))) {
+      const enCero = ofrecidas.filter((m) => m.endsWith('|0'));
       const faltan = esperadas.map(clave).filter((m) => !ofrecidas.includes(m));
-      problemas.push(`API, ${donde}: ofrece ${ofrecidas.length} marcas y hay ${esperadas.length} activas; `
-        + `faltan o no cuentan lo que da el servidor ${JSON.stringify(faltan.slice(0, 4))}`
-        + `${faltan.length > 4 ? '…' : ''}`);
+      problemas.push(`API, ${donde}: ofrece ${ofrecidas.length} marcas y hay ${esperadas.length} con `
+        + `publicaciones; ${enCero.length} en cero ${JSON.stringify(enCero.slice(0, 3))}; faltan o no `
+        + `cuentan lo que da el servidor ${JSON.stringify(faltan.slice(0, 3))}`);
     }
-    return esperadas;
+    return todas;
   };
   const todas = await revisarLista('', 'la categoría sola');
+  const conPublicaciones = todas.filter((m) => m.count > 0);
   const enCero = todas.filter((m) => m.count === 0);
-  assert(enCero.length > 0 && todas.some((m) => m.count > 0),
+  assert(enCero.length > 0 && conPublicaciones.length > 1,
     `la base demo no tiene marcas con y sin publicaciones: ${JSON.stringify(todas.map((m) => m.count))}`);
   const conOtro = await revisarLista('&condition=usado', 'con «usado»');
-  medidos.push(`en «${nombreCategoria}» la API ofrece las ${todas.length} marcas activas en el orden del alta, `
-    + `${enCero.length} en cero, y cada conteo es el total que da el servidor al elegirla, también con `
-    + `otro filtro puesto (${conOtro.filter((m) => m.count > 0).length} con publicaciones usadas)`);
+  medidos.push(`en «${nombreCategoria}» la API ofrece ${conPublicaciones.length} de las ${todas.length} marcas `
+    + `activas —las que tienen publicaciones—, en el orden del alta, ninguna de las ${enCero.length} en cero, y `
+    + 'cada conteo es el total que da el servidor al elegirla; con otro filtro puesto ofrece '
+    + `${conOtro.filter((m) => m.count > 0).length}`);
 
-  // A2. Una marca dada de baja no se ofrece.
+  // A2. Una marca dada de baja no se ofrece, aunque tenga publicaciones.
+  const DESACTIVADA = conPublicaciones[conPublicaciones.length - 1];
   try {
     querySql(`UPDATE form_options SET is_active = false
-      WHERE option_type = 'brand' AND value = ${sqlLiteral(DESACTIVADA)}`);
+      WHERE option_type = 'brand' AND value = ${sqlLiteral(DESACTIVADA.value)}`);
     const sinElla = (await pedir()).brands ?? [];
-    if (sinElla.some((m) => m.value === DESACTIVADA) || sinElla.length !== todas.length - 1) {
-      problemas.push(`API: con «${DESACTIVADA}» dada de baja ofrece ${sinElla.length} marcas, ella incluida: `
-        + `${sinElla.some((m) => m.value === DESACTIVADA)}`);
+    if (sinElla.some((m) => m.value === DESACTIVADA.value) || sinElla.length !== conPublicaciones.length - 1) {
+      problemas.push(`API: con «${DESACTIVADA.value}» dada de baja ofrece ${sinElla.length} marcas, ella `
+        + `incluida: ${sinElla.some((m) => m.value === DESACTIVADA.value)}`);
     }
   } finally {
     querySql(`UPDATE form_options SET is_active = true
-      WHERE option_type = 'brand' AND value = ${sqlLiteral(DESACTIVADA)}`);
+      WHERE option_type = 'brand' AND value = ${sqlLiteral(DESACTIVADA.value)}`);
   }
 
-  // A3. Elegir una en cero: vacío, sin error, y la lista entera sigue.
+  // A3. La elegida sigue aunque quede en cero, en su lugar de la lista.
   const laVacia = enCero[0];
   const vacio = await pedir(`&brand=${laVacia.value}`);
-  if (vacio.total !== 0 || (vacio.brands ?? []).length !== todas.length) {
+  const conLaVacia = todas.filter((m) => m.count > 0 || m.value === laVacia.value).map(clave);
+  if (vacio.total !== 0 || JSON.stringify((vacio.brands ?? []).map(clave)) !== JSON.stringify(conLaVacia)) {
     problemas.push(`API: eligiendo «${laVacia.value}» el total es ${vacio.total} y la lista trae `
-      + `${(vacio.brands ?? []).length} marcas`);
+      + `${JSON.stringify((vacio.brands ?? []).map(clave))}; tenía que traer ${JSON.stringify(conLaVacia)}`);
   }
 
-  // A4. Sin esa categoría, la regla de antes: nada en cero.
+  // A4. Sin esa categoría, la misma regla: nada en cero.
   const sinCategoria = await apiRequest('/catalog/products?page_size=1&page=1');
   if ((sinCategoria.data.brands ?? []).some((m) => m.count === 0)) {
     problemas.push('API: sin categoría la lista ofrece marcas en cero');
   }
-  const [[otraCategoria]] = queryRows(`
-    SELECT id, 'fin' FROM categories WHERE usa_marca = false AND is_active = true ORDER BY name LIMIT 1`);
-  const otra = await apiRequest(`/catalog/products?category=${otraCategoria}&page_size=1&page=1`);
-  if ((otra.data.brands ?? []).some((m) => m.count === 0)) {
-    problemas.push('API: una categoría que no usa marca ofrece marcas en cero');
-  }
-  medidos.push('una marca dada de baja no se ofrece; elegir una en cero da total 0 con la lista entera; sin '
-    + 'categoría, o con una que no usa marca, no se ofrece ninguna en cero');
+  medidos.push('una marca dada de baja no se ofrece aunque tenga publicaciones; elegir una en cero da total 0 '
+    + 'y la lista trae las que tienen publicaciones más la elegida, en su lugar; sin categoría tampoco se '
+    + 'ofrece ninguna en cero');
 
   // --- B. La pantalla -------------------------------------------------------
   const browser = await chromium.launch({ headless: true });
@@ -34600,35 +34628,42 @@ await runCase(198, 'Con una categoría que usa marca, el filtro ofrece todas las
           && (await plegador.getAttribute('aria-expanded')) !== 'true';
         if (plegado) await plegador.click();
       };
-      await page.goto(`${FRONTEND_URL}/?section=marketplace&category=${encodeURIComponent(nombreCategoria)}`,
-        { waitUntil: 'domcontentloaded' });
-      await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
-      await abrirLosFiltros();
-      try {
-        await control.waitFor({ state: 'visible', timeout: 20_000 });
-      } catch {
-        problemas.push(`${donde}: con «${nombreCategoria}» no se ve el filtro de marca`);
-        await contexto.close();
-        continue;
-      }
-      const textos = (await control.locator('option').allInnerTexts()).map((t) => t.trim());
-      const esperados = ['Todas las marcas', ...todas.map((m) => `${m.label} (${m.count})`)];
-      if (JSON.stringify(textos) !== JSON.stringify(esperados)) {
-        problemas.push(`${donde}: el filtro ofrece ${textos.length - 1} marcas y tenía que ofrecer `
-          + `${esperados.length - 1}; la primera en cero, «${laVacia.label} (0)», `
-          + `${textos.includes(`${laVacia.label} (0)`) ? 'está' : 'no está'}`);
-      }
-      if (textos.includes(`${laVacia.label} (0)`)) {
-        await control.selectOption(laVacia.value);
-        await esperarA(async () => new URL(page.url()).searchParams.get('brand') === laVacia.value,
-          `${donde}: la marca en cero no se escribió en la barra`, 20_000)
-          .catch((e) => problemas.push(e.message));
-        await page.getByRole('heading', { name: 'No hay publicaciones con estos filtros.' })
-          .waitFor({ state: 'visible', timeout: 20_000 })
-          .catch(() => problemas.push(`${donde}: eligiendo «${laVacia.label}» no aparece el vacío de siempre`));
-        if (await page.locator('[role="alert"]').count() > 0) {
-          problemas.push(`${donde}: eligiendo una marca en cero aparece un error`);
+      const verLaMarca = async (momento) => {
+        await abrirLosFiltros();
+        try {
+          await control.waitFor({ state: 'visible', timeout: 20_000 });
+          return (await control.locator('option').allInnerTexts()).map((t) => t.trim());
+        } catch {
+          problemas.push(`${donde}: ${momento} no se ve el filtro de marca`);
+          return null;
         }
+      };
+      const MERCADO = `${FRONTEND_URL}/?section=marketplace&category=${encodeURIComponent(nombreCategoria)}`;
+
+      await page.goto(MERCADO, { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+      const textos = await verLaMarca(`con «${nombreCategoria}»`);
+      const esperados = ['Todas las marcas', ...conPublicaciones.map((m) => `${m.label} (${m.count})`)];
+      if (textos && JSON.stringify(textos) !== JSON.stringify(esperados)) {
+        problemas.push(`${donde}: el filtro ofrece ${JSON.stringify(textos)} y tenía que ofrecer `
+          + `${JSON.stringify(esperados)}`);
+      }
+
+      // Un enlace con una marca en cero: se ve elegida, con su cero, y el vacío.
+      await page.goto(`${MERCADO}&brand=${laVacia.value}`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'No hay publicaciones con estos filtros.' })
+        .waitFor({ state: 'visible', timeout: 20_000 })
+        .catch(() => problemas.push(`${donde}: con «${laVacia.label}» no aparece el vacío de siempre`));
+      const conLaElegida = await verLaMarca(`con «${laVacia.label}» elegida`);
+      if (conLaElegida && !conLaElegida.includes(`${laVacia.label} (0)`)) {
+        problemas.push(`${donde}: «${laVacia.label}», elegida y en cero, no se ve en el filtro: `
+          + `${JSON.stringify(conLaElegida)}`);
+      }
+      if (conLaElegida && (await control.inputValue()) !== laVacia.value) {
+        problemas.push(`${donde}: el filtro de marca no muestra elegida a «${laVacia.label}»`);
+      }
+      if (await page.locator('[role="alert"]').count() > 0) {
+        problemas.push(`${donde}: con una marca en cero aparece un error`);
       }
       await contexto.close();
     }
@@ -34636,8 +34671,8 @@ await runCase(198, 'Con una categoría que usa marca, el filtro ofrece todas las
     await browser.close();
   }
   medidos.push('en escritorio y en celular el filtro muestra «Todas las marcas» y las mismas marcas con su '
-    + 'conteo, las en cero incluidas; elegir una en cero la escribe en la barra y muestra «No hay '
-    + 'publicaciones con estos filtros.», sin error');
+    + 'conteo, ninguna en cero; un enlace con una marca en cero la muestra elegida con «(0)» y el vacío de '
+    + 'siempre, sin error');
 
   assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
   return medidos.join('; ');
@@ -35667,8 +35702,11 @@ await runCase(207, 'El alta no ofrece características ni etiquetas; la ficha mu
       await page.waitForFunction(() => (document.querySelector('#edit-marca')?.options.length ?? 0) > 2, null, { timeout: 15_000 });
       const alta = (await apiRequest('/catalog/form-options')).data.brand.map((o) => o.label);
       const opciones = (await selector.locator('option').allInnerTexts()).map((t) => t.trim());
-      if (opciones[0] !== 'Sin declarar' || JSON.stringify(opciones.slice(1)) !== JSON.stringify(alta)) {
-        problemas.push(`«Editar» ofrece otra lista que el alta: ${opciones.length - 1} marcas y el alta ${alta.length}`);
+      // Desde FILTROS-DE-PUBLICACIONES-1 la lista termina en «Otra marca».
+      if (opciones[0] !== 'Sin declarar' || opciones[opciones.length - 1] !== 'Otra marca'
+        || JSON.stringify(opciones.slice(1, -1)) !== JSON.stringify(alta)) {
+        problemas.push(`«Editar» ofrece otra lista que el alta: ${opciones.length - 2} marcas y el alta ${alta.length}, `
+          + `entre «${opciones[0]}» y «${opciones[opciones.length - 1]}»`);
       }
       if (await selector.inputValue() !== 'john-deere') problemas.push(`«Editar» abre con la marca «${await selector.inputValue()}»`);
       await selector.selectOption('case');
@@ -38550,7 +38588,7 @@ const PASOS = [
   ['01', 'Producir', 'Qué producto, dónde, escala y etapa.', 'Ruta productiva'],
   ['02', 'Destinar', 'Consumo, industria, exportación u otro destino.', 'Ruta productiva'],
   ['03', 'Cumplir', 'Requisitos, documentos, controles y certificaciones.', 'Trazabilidad y cumplimiento'],
-  ['04', 'Tecnologizar', 'Lo necesario, recomendable y avanzado.', 'Tecnología'],
+  ['04', 'Tecnificar', 'Lo necesario, recomendable y avanzado.', 'Tecnología'],
   ['05', 'Comercializar', 'Oferta, comprador, logística y operación.', 'Mercado · Disponible hoy'],
 ];
 const NIVELES = [['Registro esencial', 'Ruta industrial'], ['Registro ampliado', null], ['Registro exhaustivo', 'Ruta exportación']];
@@ -39398,6 +39436,582 @@ await runCase(236, 'Cambiar o restablecer la contraseña, o cambiar el estado de
     + 'la versión sigue sirviendo hasta el primer cierre; en el choque gana el panel; en el navegador la pestaña que '
     + 'cambió sigue adentro y el otro dispositivo queda afuera; las otras cuentas no se tocan; la migración sube, '
     + `deja todo en 0, pasa alembic check y baja. Medido: ${medidos.join('; ')}`;
+});
+
+// 237. En el Mercado, cada filtro ofrece sólo lo publicado, con su cantidad.
+//
+// FILTROS-DE-PUBLICACIONES-1 (Emi, 01/10, por pedido de la clienta): la
+// marca, el tipo, la potencia, la condición y el origen ofrecen sólo las
+// opciones que tienen publicaciones en la búsqueda de ese momento, con su
+// cantidad, y ninguna en cero. La elegida se sigue mostrando aunque otro
+// filtro la deje en cero, para poder sacarla.
+//
+// Lo esperado sale de la base, contado con SQL y no con la API: cada opción
+// se cuenta con todos los filtros puestos menos el suyo, y se compara la
+// lista entera, en orden y con los números. Tractores no tiene tipos, así que
+// el tipo se mide en Preparación del suelo.
+await runCase(237, 'En el Mercado cada filtro ofrece sólo lo publicado, con su cantidad, y la opción elegida aunque quede en cero', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Facetas237 ${sello}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const preparacion = subrubroDe('maquinaria-agricola', 'preparacion-suelo');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const creadas = [];
+  const publicar = async (subrubro, nombre, extra) => {
+    const { data } = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: `${MARCADOR} ${nombre}`, description: 'Publicación del caso 237.', price: 2370, stock: 1,
+        unit: 'unidad', locality_id: localidad, publication_type: 'producto', operation_kind: 'activo',
+        category_id: subrubro.categoriaId, subcategory_id: subrubro.id, ...extra,
+      },
+    });
+    creadas.push(data.id);
+  };
+
+  // --- Lo esperado: la base, contada con SQL -------------------------------
+  const RANGO = `CASE WHEN p.power_hp IS NULL THEN NULL WHEN p.power_hp < 60 THEN 'compacto'
+    WHEN p.power_hp <= 120 THEN 'estandar' ELSE 'alta' END`;
+  const COLUMNA = { marca: 'p.brand', tipo: 't.slug', potencia: RANGO, condicion: 'p.condition', origen: 'p.origin' };
+  const contarEnLaBase = (subrubro, elegidos, faceta) => {
+    const donde = ["p.status = 'ACTIVE'", `p.subcategory_id = ${sqlLiteral(subrubro.id)}`];
+    if (elegidos.q) {
+      const patron = sqlLiteral(`%${elegidos.q}%`);
+      donde.push(`(p.name ILIKE ${patron} OR p.description ILIKE ${patron} OR p.model ILIKE ${patron})`);
+    }
+    for (const [otra, columna] of Object.entries(COLUMNA)) {
+      if (otra !== faceta && elegidos[otra]) donde.push(`${columna} = ${sqlLiteral(elegidos[otra])}`);
+    }
+    return Object.fromEntries(queryRows(`
+      SELECT ${COLUMNA[faceta]}, COUNT(DISTINCT p.id)::text
+      FROM products p JOIN categories c ON c.id = p.category_id JOIN users u ON u.id = p.seller_id
+      LEFT JOIN subcategory_types t ON t.id = p.subcategory_type_id
+      WHERE ${donde.join(' AND ')} AND ${COLUMNA[faceta]} IS NOT NULL GROUP BY 1`)
+      .map(([valor, cuantas]) => [valor, Number(cuantas)]));
+  };
+  // Los rótulos son los de la pantalla, escritos acá: son lo que se promete.
+  const POTENCIAS = [['compacto', 'Compacto (menos de 60 HP)'], ['estandar', 'Estándar (60 a 120 HP)'],
+    ['alta', 'Alta (más de 120 HP)']];
+  const CONTROLES = {
+    marca: ['#catalog-brand', 'Todas las marcas', () => marcasActivasEnElOrdenDelAlta().map((m) => [m.value, m.label])],
+    tipo: ['#catalog-subtype', 'Todos', (subrubro) => queryRows(`
+      SELECT slug, name FROM subcategory_types WHERE subcategory_id = ${sqlLiteral(subrubro.id)} AND is_active
+      ORDER BY display_order, name`)],
+    potencia: ['#catalog-power', 'Cualquiera', () => POTENCIAS],
+    condicion: ['#catalog-condition', 'Cualquiera', () => [['nuevo', 'Nuevo'], ['usado', 'Usado']]],
+    origen: ['#catalog-origin', 'Cualquiera', () => [['concesionaria', 'Agencia / Concesionaria'],
+      ['dueno_directo', 'Dueño directo']]],
+  };
+  const esperadaEnLaBase = (subrubro, elegidos, faceta) => {
+    const [, primera, lista] = CONTROLES[faceta];
+    const cuantas = contarEnLaBase(subrubro, elegidos, faceta);
+    const opciones = lista(subrubro)
+      .filter(([valor]) => (cuantas[valor] ?? 0) > 0 || valor === elegidos[faceta])
+      .map(([valor, rotulo]) => `${rotulo} (${cuantas[valor] ?? 0})`);
+    // Sin ninguna marca, el control de marca no se dibuja (regla del 175).
+    if (faceta === 'marca' && opciones.length === 0) return [];
+    return [primera, ...opciones];
+  };
+
+  // --- El escenario ----------------------------------------------------------
+  // Una marca activa sin tractores recibe UNO: compacto, nuevo y de
+  // concesionaria. Elegirla da 1, y sumarle la potencia «alta» la deja en cero.
+  // El otro tractor es el que hace que «alta» tenga publicaciones.
+  const [laSola] = queryRows(`
+    SELECT f.value, f.label FROM form_options f
+    WHERE f.option_type = 'brand' AND f.is_active AND NOT EXISTS (
+      SELECT 1 FROM products p WHERE p.brand = f.value AND p.status = 'ACTIVE'
+        AND p.subcategory_id = ${sqlLiteral(tractores.id)})
+    ORDER BY f.display_order DESC, f.value LIMIT 1`).map(([value, label]) => ({ value, label }));
+  assert(laSola, 'todas las marcas activas tienen tractores: no hay con cuál probar una elegida en cero');
+  await publicar(tractores, `tractor ${laSola.label}`,
+    { brand: laSola.value, power_hp: 50, condition: 'nuevo', origin: 'concesionaria' });
+  await publicar(tractores, 'tractor de alta potencia',
+    { brand: 'john-deere', power_hp: 150, condition: 'usado', origin: 'dueno_directo' });
+  // En Preparación del suelo, con el marcador: un arado nuevo y una rastra usada.
+  await publicar(preparacion, 'arado', { subcategory_type: 'arados', condition: 'nuevo' });
+  await publicar(preparacion, 'rastra', { subcategory_type: 'rastras', condition: 'usado' });
+
+  const enTractores = esperadaEnLaBase(tractores, {}, 'marca');
+  medidos.push(`con Tractores, la base tiene ${enTractores.length - 1} marcas con tractores publicados de `
+    + `${marcasActivasEnElOrdenDelAlta().length} activas`);
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const medida of [{ n: 'escritorio', width: 1440, height: 900 }, { n: 'celular', width: 390, height: 844 }]) {
+      const contexto = await browser.newContext({ viewport: { width: medida.width, height: medida.height } });
+      const page = await contexto.newPage();
+      const barra = () => new URL(page.url()).searchParams;
+      const plegador = page.getByRole('button', { name: /^Filtros/ });
+      const abrirLosFiltros = async () => {
+        const plegado = (await plegador.count()) > 0 && (await plegador.isVisible())
+          && (await plegador.getAttribute('aria-expanded')) !== 'true';
+        if (plegado) await plegador.click();
+      };
+      const textosDe = async (selector) => (await page.locator(`${selector} option`).allInnerTexts())
+        .map((t) => t.trim());
+      const revisar = async (subrubro, elegidos, facetas, momento) => {
+        await abrirLosFiltros();
+        for (const faceta of facetas) {
+          const [selector] = CONTROLES[faceta];
+          const esperada = esperadaEnLaBase(subrubro, elegidos, faceta);
+          try {
+            await esperarA(async () => JSON.stringify(await textosDe(selector)) === JSON.stringify(esperada),
+              momento, 20_000);
+          } catch {
+            problemas.push(`${medida.n}, ${momento}: «${faceta}» ofrece ${JSON.stringify(await textosDe(selector))} `
+              + `y en la base es ${JSON.stringify(esperada)}`);
+          }
+        }
+      };
+      const elegir = async (faceta, valor, parametro) => {
+        await abrirLosFiltros();
+        await page.locator(CONTROLES[faceta][0]).selectOption(valor);
+        await esperarA(async () => (barra().get(parametro) ?? '') === valor,
+          `${medida.n}: elegir «${valor || 'ninguno'}» en ${faceta} no llegó a la barra`, 20_000);
+      };
+      const buscar = async (texto) => {
+        await page.getByLabel('Buscar en el mercado').fill(texto);
+        await page.getByLabel('Buscar en el mercado').press('Enter');
+        await esperarA(async () => barra().get('q') === texto, `${medida.n}: la búsqueda no llegó a la barra`, 20_000);
+      };
+      const sigueElegida = async (faceta, valor, texto, momento) => {
+        await abrirLosFiltros();
+        const [selector] = CONTROLES[faceta];
+        if (!(await textosDe(selector)).includes(texto)) {
+          problemas.push(`${medida.n}, ${momento}: «${texto}» no está a la vista en ${faceta}`);
+        }
+        if ((await page.locator(selector).inputValue().catch(() => '')) !== valor) {
+          problemas.push(`${medida.n}, ${momento}: ${faceta} no muestra elegida «${valor}»`);
+        }
+      };
+      const MERCADO = `${FRONTEND_URL}/?section=marketplace&category=${encodeURIComponent(tractores.categoria)}`;
+      const TODAS = ['marca', 'potencia', 'condicion', 'origen'];
+
+      // A. Tractores, sin nada más: la marca, la potencia, la condición y el
+      //    origen ofrecen lo que tienen los tractores publicados.
+      await page.goto(`${MERCADO}&subcategory=${encodeURIComponent(tractores.nombre)}`,
+        { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+      await revisar(tractores, {}, TODAS, 'con Tractores');
+      if ((await page.locator('#catalog-subtype').count()) !== 0) {
+        problemas.push(`${medida.n}: Tractores ofrece un filtro de tipo`);
+      }
+
+      // B. La marca que tiene un solo tractor: las demás listas cuentan el suyo,
+      //    y la de marcas no cambia, porque no se cuenta con la marca puesta.
+      await elegir('marca', laSola.value, 'brand');
+      await revisar(tractores, { marca: laSola.value }, TODAS, `con «${laSola.label}»`);
+
+      // C. Una búsqueda que deja afuera a su tractor: queda en cero y a la vista.
+      //    Con filtros de lista sola no puede pasar —cada opción ofrecida tiene
+      //    publicaciones de la marca elegida—; pasa con lo que se escribe (la
+      //    búsqueda, el año, el precio, el lugar) o con un enlace.
+      const ALTO = `${MARCADOR} tractor de alta potencia`;
+      await buscar(ALTO);
+      await revisar(tractores, { marca: laSola.value, q: ALTO }, TODAS, `con «${laSola.label}» y la búsqueda del otro`);
+      await sigueElegida('marca', laSola.value, `${laSola.label} (0)`, 'con la búsqueda del otro');
+      await page.getByRole('heading', { name: 'No hay publicaciones con estos filtros.' })
+        .waitFor({ state: 'visible', timeout: 20_000 })
+        .catch(() => problemas.push(`${medida.n}: con «${laSola.label}» en cero no aparece el vacío de siempre`));
+
+      // D. Sacarla: ya no está elegida y está en cero, así que se va.
+      await elegir('marca', '', 'brand');
+      await revisar(tractores, { q: ALTO }, TODAS, 'con la búsqueda del otro, sin marca');
+      await abrirLosFiltros();
+      if ((await textosDe('#catalog-brand')).some((t) => t.startsWith(`${laSola.label} (`))) {
+        problemas.push(`${medida.n}: sacada y en cero, «${laSola.label}» sigue en la lista`);
+      }
+
+      // E. El tipo, en Preparación del suelo: el subrubro entero, y después la
+      //    búsqueda del caso, donde una rastra elegida queda en cero al buscar
+      //    el arado.
+      await page.goto(`${MERCADO}&subcategory=${encodeURIComponent(preparacion.nombre)}`,
+        { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+      await revisar(preparacion, {}, ['tipo', 'marca', 'condicion', 'origen'], 'con Preparación del suelo');
+      await page.goto(`${MERCADO}&subcategory=${encodeURIComponent(preparacion.nombre)}`
+        + `&q=${encodeURIComponent(MARCADOR)}`, { waitUntil: 'domcontentloaded' });
+      await page.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+      await revisar(preparacion, { q: MARCADOR }, ['tipo', 'condicion'], 'con la búsqueda del caso');
+      await elegir('tipo', 'rastras', 'subtype');
+      const ARADO = `${MARCADOR} arado`;
+      await buscar(ARADO);
+      await revisar(preparacion, { q: ARADO, tipo: 'rastras' }, ['tipo', 'condicion'],
+        'con «Rastras» y la búsqueda del arado');
+      await sigueElegida('tipo', 'rastras', 'Rastras (0)', 'con la búsqueda del arado');
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+    for (const id of creadas) await pedirCrudo(`/products/${id}`, { method: 'DELETE', header: vendedor.token }).catch(() => {});
+  }
+  medidos.push('en escritorio y en celular, con Tractores la marca, la potencia, la condición y el origen ofrecen '
+    + 'exactamente lo que cuenta la base, ninguna opción en cero; eligiendo una marca las demás listas cuentan lo '
+    + `suyo; con una búsqueda que deja afuera a su tractor, «${laSola.label} (0)» sigue elegida y a la vista con el `
+    + 'vacío de siempre, y al sacarla se va; en Preparación del suelo el tipo hace lo mismo, y «Rastras (0)» '
+    + 'elegida sigue a la vista');
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return medidos.join('; ');
+});
+
+// 238. «Otra marca»: la que no está en la lista se escribe y entra a la lista.
+//
+// FILTROS-DE-PUBLICACIONES-1 (Emi, 01/10): en las categorías que usan marca,
+// el alta y «Editar» ofrecen «Otra marca». Se escriben de 2 a 40 caracteres.
+// Si coincide con una que existe, sin importar mayúsculas, acentos ni
+// espacios, se usa esa; si es nueva, aparece sola en el filtro con su
+// cantidad y en la ficha con el nombre como se escribió, y el alta la ofrece
+// desde ahí. Dos altas a la vez con la misma marca nueva crean UNA.
+await runCase(238, '«Otra marca» al publicar y al editar: la nueva aparece en el filtro y en la ficha, y la que existe no se repite', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `OtraMarca238 ${sello}`;
+  const A_LA_VEZ = `Cooperativa ${sello}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const [[provincia]] = queryRows(`SELECT province_id FROM localities WHERE id = ${sqlLiteral(localidad)}`);
+  const [[insumos]] = queryRows("SELECT id, 'fin' FROM categories WHERE slug = 'insumos-agricolas'");
+  const creadas = [];
+  const clave = (texto) => texto.normalize('NFKD').replace(/[^\x00-\x7f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  // Las marcas, con cuántas publicaciones vivas tiene cada una. La clave se
+  // compara acá y no en SQL, que no saca los acentos: «Agrómec» es Agromec.
+  const todasLasMarcas = () => queryRows(`
+    SELECT f.value, f.label, f.is_active::text,
+      (SELECT COUNT(*) FROM products p WHERE p.brand = f.value AND p.status = 'ACTIVE')::text
+    FROM form_options f WHERE f.option_type = 'brand'`);
+  const opcionesCon = (texto) => todasLasMarcas()
+    .filter(([, label]) => clave(label) === clave(texto)).map(([valor, label, activa]) => [valor, label, activa]);
+  const marcaEnLaBase = (id) => queryRows(`SELECT coalesce(brand, '(sin marca)'), 'fin' FROM products WHERE id = ${sqlLiteral(id)}`)[0][0];
+  const cuerpo = (nombre, extra = {}) => ({
+    name: `${MARCADOR} ${nombre}`, description: 'Publicación del caso 238 sobre «Otra marca».', price: 2380,
+    stock: 1, unit: 'unidad', locality_id: localidad, publication_type: 'producto', operation_kind: 'activo',
+    category_id: tractores.categoriaId, subcategory_id: tractores.id, condition: 'usado', ...extra,
+  });
+  const publicar = async (nombre, extra) => {
+    const respuesta = await pedirCrudo('/products', { method: 'POST', header: vendedor.token, body: cuerpo(nombre, extra) });
+    if (respuesta.status === 201 || respuesta.status === 200) creadas.push(respuesta.datos.id);
+    return respuesta;
+  };
+  const marcaDelFiltro = async (valor) => ((await apiRequest(
+    `/catalog/products?subcategory=${tractores.id}&page_size=1`)).data.brands ?? []).find((m) => m.value === valor);
+  const retirar = (valores) => {
+    if (valores.length) {
+      querySql(`DELETE FROM form_options WHERE option_type = 'brand' AND value IN (${valores.map(sqlLiteral).join(',')})`);
+    }
+  };
+  // Una Agromec sin publicaciones vivas es de una corrida anterior que se
+  // cortó: se retira. Con publicaciones vivas, el caso no puede medir nada.
+  retirar(todasLasMarcas().filter(([, label, , vivas]) => clave(label) === 'agromec' && vivas === '0')
+    .map(([valor]) => valor));
+  assert(opcionesCon('Agromec').length === 0,
+    `ya hay una marca «Agromec» con publicaciones activas: ${JSON.stringify(opcionesCon('Agromec'))}`);
+  // Al terminar se retira toda marca que no estaba al empezar y quedó sin
+  // publicaciones vivas: también las que crea un código roto, como una «A».
+  const marcasDeAntes = new Set(todasLasMarcas().map(([valor]) => valor));
+  const retirarLasMarcasDelCaso = () => retirar(todasLasMarcas()
+    .filter(([valor, , , vivas]) => !marcasDeAntes.has(valor) && vivas === '0').map(([valor]) => valor));
+
+  try {
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const acceso = (await apiRequest('/auth/login', {
+        method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+      })).data;
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: acceso.access_token, r: acceso.refresh_token });
+      const page = await contexto.newPage();
+
+      // --- A. El alta real, con «Otra marca: Agromec» -----------------------
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /Vender/ }).first().click();
+      await page.getByRole('heading', { name: /Publicar un producto/i }).waitFor({ state: 'visible', timeout: 20_000 });
+      await page.locator('#category option').filter({ hasText: tractores.categoria })
+        .first().waitFor({ state: 'attached', timeout: 10_000 });
+      await page.locator('#category').selectOption({ label: tractores.categoria });
+      await page.locator('#brand').waitFor({ state: 'visible', timeout: 10_000 });
+      await page.locator('#name').fill(`${MARCADOR} Agromec por el alta`);
+      await page.locator('#subcategory').selectOption({ label: tractores.nombre });
+      const ultima = (await page.locator('#brand option').allInnerTexts()).map((t) => t.trim()).pop();
+      if (ultima !== 'Otra marca') problemas.push(`la lista del alta termina en «${ultima}» y no en «Otra marca»`);
+      if (await page.locator('#otra-marca').count() !== 0) problemas.push('el campo de la otra marca se ve sin elegirla');
+      await page.locator('#brand').selectOption({ label: 'Otra marca' });
+      const campo = page.getByLabel('Nombre de la marca');
+      await campo.waitFor({ state: 'visible', timeout: 10_000 });
+      if (await campo.getAttribute('maxlength') !== '40') {
+        problemas.push(`el campo de la otra marca deja escribir ${await campo.getAttribute('maxlength')} caracteres`);
+      }
+      await page.locator('#description').fill('Publicada por el formulario real en el caso 238.');
+      await page.locator('#price').fill('2380');
+      await page.locator('#stock').fill('1');
+      await page.locator('#province').selectOption(provincia);
+      await esperarA(async () => (await page.locator('#locality option').count()) > 1, 'el alta no cargó las localidades', 20_000);
+      await page.locator('#locality').selectOption(localidad);
+
+      // Vacía, no se manda: lo dice y se queda en el formulario.
+      let mandoVacia = false;
+      const espiar = (r) => {
+        if (new URL(r.url()).pathname.endsWith('/products') && r.method() === 'POST') mandoVacia = true;
+      };
+      page.on('request', espiar);
+      await page.locator('form button[type="submit"]').click();
+      await page.getByText('Escribí el nombre de la marca, o elegí una de la lista.').first()
+        .waitFor({ state: 'visible', timeout: 10_000 })
+        .catch(() => problemas.push('con «Otra marca» vacía, el alta no dice qué falta'));
+      page.off('request', espiar);
+      if (mandoVacia) problemas.push('con «Otra marca» vacía, el alta mandó la publicación igual');
+
+      await campo.fill('Agromec');
+      const [respuesta] = await Promise.all([
+        page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/products') && r.request().method() === 'POST',
+          { timeout: 30_000 }),
+        page.locator('form button[type="submit"]').click(),
+      ]);
+      assert(respuesta.ok(), `el alta con «Otra marca: Agromec» respondió ${respuesta.status()}: ${(await respuesta.text()).slice(0, 200)}`);
+      const porElAlta = (await respuesta.json()).id;
+      creadas.push(porElAlta);
+      await page.getByText(/publicado exitosamente!/i).waitFor({ state: 'visible', timeout: 20_000 });
+      const agromec = opcionesCon('Agromec');
+      if (agromec.length !== 1 || agromec[0][1] !== 'Agromec' || agromec[0][2] !== 'true') {
+        problemas.push(`después del alta, la lista tiene ${JSON.stringify(agromec)} y tenía que tener una «Agromec» activa`);
+      }
+      const valorAgromec = agromec[0]?.[0];
+      if (marcaEnLaBase(porElAlta) !== valorAgromec) {
+        problemas.push(`la publicación guardó la marca «${marcaEnLaBase(porElAlta)}» y no «${valorAgromec}»`);
+      }
+
+      // --- B. En el filtro, con 1, y en la ficha -----------------------------
+      const enElFiltro = await marcaDelFiltro(valorAgromec);
+      if (enElFiltro?.label !== 'Agromec' || enElFiltro?.count !== 1) {
+        problemas.push(`API: el filtro de Tractores ofrece «Agromec» como ${JSON.stringify(enElFiltro)} y tenía que ser 1`);
+      }
+      const textosDelFiltro = async () => {
+        await page.goto(`${FRONTEND_URL}/?section=marketplace&category=${encodeURIComponent(tractores.categoria)}`
+          + `&subcategory=${encodeURIComponent(tractores.nombre)}`, { waitUntil: 'domcontentloaded' });
+        await page.locator('#catalog-brand').waitFor({ state: 'visible', timeout: 25_000 });
+        return (await page.locator('#catalog-brand option').allInnerTexts()).map((t) => t.trim());
+      };
+      if (!(await textosDelFiltro()).includes('Agromec (1)')) problemas.push('pantalla: el filtro no ofrece «Agromec (1)»');
+      const filaDeLaMarca = async (id) => {
+        await page.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+        await page.locator('main dl[class*="_datos_"]').waitFor({ state: 'visible', timeout: 20_000 });
+        return Object.fromEntries(await page.locator('main dl[class*="_datos_"] > div').evaluateAll((filas) => filas
+          .map((f) => [f.querySelector('dt')?.textContent?.trim(), f.querySelector('dd')?.textContent?.trim()]))).Marca;
+      };
+      if ((await filaDeLaMarca(porElAlta)) !== 'Agromec') problemas.push(`la ficha dice «Marca: ${await filaDeLaMarca(porElAlta)}»`);
+      const detalle = (await apiRequest(`/catalog/products/${porElAlta}`)).data;
+      if (detalle.brand_label !== 'Agromec') problemas.push(`API: el detalle dice brand_label «${detalle.brand_label}»`);
+      medidos.push('el alta real con «Otra marca: Agromec» crea UNA marca «Agromec» activa, la publicación la guarda, '
+        + 'el filtro de Tractores ofrece «Agromec (1)» y la ficha dice «Marca: Agromec»; vacía, el alta no se manda y '
+        + 'dice «Escribí el nombre de la marca, o elegí una de la lista.»');
+
+      // --- C. «AGROMEC » usa la misma, y el filtro dice 2 ---------------------
+      const segunda = await publicar('AGROMEC con espacio', { otra_marca: 'AGROMEC ' });
+      if (segunda.status !== 201 && segunda.status !== 200) problemas.push(`«AGROMEC » respondió ${segunda.status}`);
+      else if (marcaEnLaBase(segunda.datos.id) !== valorAgromec) problemas.push(`«AGROMEC » guardó «${marcaEnLaBase(segunda.datos.id)}»`);
+      if (opcionesCon('Agromec').length !== 1) problemas.push(`«AGROMEC » creó otra marca: ${JSON.stringify(opcionesCon('Agromec'))}`);
+      if ((await marcaDelFiltro(valorAgromec))?.count !== 2) {
+        problemas.push(`API: con dos, el filtro dice ${JSON.stringify(await marcaDelFiltro(valorAgromec))}`);
+      }
+      if (!(await textosDelFiltro()).includes('Agromec (2)')) problemas.push('pantalla: con dos, el filtro no dice «Agromec (2)»');
+
+      // --- D. «john deere» usa John Deere ------------------------------------
+      const jdAntes = opcionesCon('John Deere').length;
+      const jd = await publicar('john deere escrita', { otra_marca: 'john deere' });
+      if (jd.status !== 201 && jd.status !== 200) problemas.push(`«john deere» respondió ${jd.status}`);
+      else if (marcaEnLaBase(jd.datos.id) !== 'john-deere') problemas.push(`«john deere» guardó «${marcaEnLaBase(jd.datos.id)}»`);
+      if (opcionesCon('John Deere').length !== jdAntes) problemas.push('«john deere» creó otra John Deere');
+      medidos.push('«AGROMEC » usa la misma y el filtro dice «Agromec (2)» en la API y en la pantalla; «john deere» '
+        + 'guarda john-deere sin crear otra');
+
+      // --- E. «Editar» con «Otra marca: Agrómec», con acento ------------------
+      await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /publicaciones/i }).first().click();
+      const tarjeta = page.locator('[class*="_productCard_"]').filter({ hasText: `${MARCADOR} john deere escrita` }).first();
+      await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+      await tarjeta.getByRole('button', { name: /editar/i }).first().click();
+      await page.locator('#edit-nombre').waitFor({ state: 'visible', timeout: 20_000 });
+      await page.waitForFunction(() => (document.querySelector('#edit-marca')?.options.length ?? 0) > 2, null, { timeout: 15_000 });
+      await page.locator('#edit-marca').selectOption({ label: 'Otra marca' });
+      await page.locator('#edit-otra-marca').fill('Agrómec');
+      const [guardado] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/products/${jd.datos?.id}`) && r.request().method() === 'PATCH',
+          { timeout: 20_000 }),
+        page.getByRole('button', { name: /Guardar Cambios/ }).click(),
+      ]);
+      if (!guardado.ok()) problemas.push(`«Editar» respondió ${guardado.status()}: ${(await guardado.text()).slice(0, 200)}`);
+      else if (marcaEnLaBase(jd.datos.id) !== valorAgromec) problemas.push(`«Editar» con «Agrómec» guardó «${marcaEnLaBase(jd.datos.id)}»`);
+      if (opcionesCon('Agromec').length !== 1) problemas.push(`«Agrómec» creó otra marca: ${JSON.stringify(opcionesCon('Agromec'))}`);
+      if ((await marcaDelFiltro(valorAgromec))?.count !== 3) {
+        problemas.push(`API: con tres, el filtro dice ${JSON.stringify(await marcaDelFiltro(valorAgromec))}`);
+      }
+      medidos.push('«Editar» con «Otra marca: Agrómec» la pasa a Agromec sin crear otra, y el filtro dice 3');
+
+      // --- F. El alta siguiente la ofrece, en su lugar alfabético -------------
+      const alta = (await apiRequest('/catalog/form-options')).data.brand.map((o) => o.label);
+      const donde = alta.indexOf('Agromec');
+      const vecinas = [alta[donde - 1], alta[donde + 1]];
+      if (donde === -1 || (vecinas[0] && clave(vecinas[0]) > 'agromec') || (vecinas[1] && clave(vecinas[1]) < 'agromec')) {
+        problemas.push(`la lista del alta tiene «Agromec» en el lugar ${donde}, entre ${JSON.stringify(vecinas)}`);
+      }
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /Vender/ }).first().click();
+      await page.getByRole('heading', { name: /Publicar un producto/i }).waitFor({ state: 'visible', timeout: 20_000 });
+      await page.locator('#category option').filter({ hasText: tractores.categoria })
+        .first().waitFor({ state: 'attached', timeout: 10_000 });
+      await page.locator('#category').selectOption({ label: tractores.categoria });
+      await page.locator('#brand').waitFor({ state: 'visible', timeout: 10_000 });
+      const enElAlta = (await page.locator('#brand option').allInnerTexts()).map((t) => t.trim());
+      if (!enElAlta.includes('Agromec')) problemas.push('el alta siguiente no ofrece «Agromec»');
+      medidos.push(`el alta siguiente ofrece «Agromec», entre ${JSON.stringify(vecinas)}`);
+      await contexto.close();
+    } finally {
+      await browser.close();
+    }
+
+    // --- G. La API rechaza lo que no es una marca, con su motivo -------------
+    const MOTIVOS = [
+      ['A', 'La marca tiene que tener al menos 2 caracteres.'],
+      ['   ', 'La marca tiene que tener al menos 2 caracteres.'],
+      ['x'.repeat(41), 'La marca puede tener hasta 40 caracteres.'],
+      ['--', 'La marca tiene que tener letras o números.'],
+    ];
+    for (const [escrita, motivo] of MOTIVOS) {
+      const rechazo = await publicar('rechazada', { otra_marca: escrita });
+      const mensajes = Array.isArray(rechazo.datos?.detail) ? rechazo.datos.detail.map((d) => d.msg) : [];
+      if (rechazo.status !== 422 || !mensajes.includes(motivo)) {
+        problemas.push(`«${escrita.length > 10 ? `${escrita.length} caracteres` : escrita}» respondió ${rechazo.status} `
+          + `con ${JSON.stringify(mensajes)} y tenía que ser 422 con «${motivo}»`);
+      }
+    }
+    const cuarenta = await publicar('cuarenta', { otra_marca: `Z${sello}`.padEnd(40, 'z') });
+    if (cuarenta.status !== 201 && cuarenta.status !== 200) problemas.push(`una de 40 caracteres respondió ${cuarenta.status}`);
+    const lasDos = await publicar('las dos', { brand: 'john-deere', otra_marca: 'Agromec' });
+    if (lasDos.status !== 400) problemas.push(`la lista y «Otra marca» a la vez respondió ${lasDos.status}`);
+    medidos.push('la API rechaza con 422 y su motivo una de 1 carácter, una de espacios, una de 41 y una sin letras ni '
+      + 'números; acepta una de 40; la lista y «Otra marca» a la vez dan 400');
+
+    // --- H. Donde la categoría no usa marca, no se crea nada ------------------
+    const fantasma = `Fantasma ${sello}`;
+    const insumo = await pedirCrudo('/products', {
+      method: 'POST', header: vendedor.token,
+      body: { ...cuerpo('insumo'), category_id: insumos, subcategory_id: null, operation_kind: 'insumo',
+        condition: undefined, otra_marca: fantasma },
+    });
+    if (insumo.status === 201 || insumo.status === 200) creadas.push(insumo.datos.id);
+    if (opcionesCon(fantasma).length !== 0) problemas.push('un insumo con «Otra marca» creó una marca');
+    if (insumo.datos?.id && marcaEnLaBase(insumo.datos.id) !== '(sin marca)') problemas.push('un insumo guardó marca');
+
+    // --- I. Cuatro altas a la vez con la misma marca nueva: UNA marca --------
+    const aLaVez = await Promise.all([0, 1, 2, 3].map((i) => publicar(`a la vez ${i}`,
+      { otra_marca: i % 2 ? A_LA_VEZ.toUpperCase() : A_LA_VEZ })));
+    const estados = aLaVez.map((r) => r.status);
+    const valores = new Set(aLaVez.filter((r) => r.datos?.id).map((r) => marcaEnLaBase(r.datos.id)));
+    if (!estados.every((s) => s === 201 || s === 200) || opcionesCon(A_LA_VEZ).length !== 1 || valores.size !== 1) {
+      problemas.push(`cuatro altas a la vez respondieron ${JSON.stringify(estados)}, dejaron `
+        + `${opcionesCon(A_LA_VEZ).length} marcas y guardaron ${JSON.stringify([...valores])}`);
+    }
+    medidos.push('un insumo con «Otra marca» no crea marca ni la guarda; cuatro altas a la vez con la misma marca '
+      + `nueva, en mayúsculas y minúsculas, responden ${JSON.stringify(estados)} y dejan una sola`);
+
+    // --- K. Ocho a la vez, en hilos: UNA marca --------------------------------
+    // La API corre en un solo proceso y sus rutas no se intercalan mientras
+    // resuelven la marca, así que las cuatro altas de arriba no compiten de
+    // verdad: darían una sola marca aunque no hubiera candado. Con hilos sí
+    // compiten (medido sin el candado: siete filas iguales). Es lo que pasaría
+    // con dos procesos o dos réplicas.
+    const EN_HILOS = `Hilos ${sello}`;
+    const guionDeHilos = `
+import json, sys, threading
+sys.dont_write_bytecode = True
+from app.services import marcas
+nombre = sys.argv[1]
+barrera = threading.Barrier(8)
+valores = []
+def una(i):
+    barrera.wait()
+    try:
+        valores.append(marcas.marca_escrita(nombre if i % 2 else nombre.upper()))
+    except Exception as error:
+        valores.append(repr(error))
+hilos = [threading.Thread(target=una, args=(i,)) for i in range(8)]
+for hilo in hilos: hilo.start()
+for hilo in hilos: hilo.join()
+print(json.dumps(sorted(set(valores))))
+`;
+    const enHilos = JSON.parse(execFileSync('docker',
+      ['exec', '-i', 'topgreen-api', 'python', '-c', guionDeHilos, EN_HILOS],
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim().split(/\r?\n/).at(-1));
+    const filasEnHilos = opcionesCon(EN_HILOS).length;
+    if (enHilos.length !== 1 || filasEnHilos !== 1) {
+      problemas.push(`ocho hilos a la vez con la misma marca nueva devolvieron ${JSON.stringify(enHilos)} y `
+        + `dejaron ${filasEnHilos} filas`);
+    }
+    medidos.push(`ocho hilos a la vez con la misma marca nueva dejan ${filasEnHilos} fila y devuelven `
+      + `${JSON.stringify(enHilos)}`);
+
+    // --- J. Una alta que falla después de la marca no traba a las demás ------
+    // Medido: con el candado tomado en la transacción de la publicación, una
+    // alta con «Otra marca» que fallaba por otro dato lo dejaba tomado hasta
+    // cerrar su sesión, y otra alta con «Otra marca» al mismo tiempo lo
+    // esperaba sin soltar el proceso: la API entera dejaba de responder,
+    // también /health. Va al final, y cada pedido con su límite, para que una
+    // API colgada dé rojo y no cuelgue la suite.
+    const conLimite = async (cuerpoDelPedido) => {
+      const desde = Date.now();
+      try {
+        const r = await fetch(`${API_URL}/products`, {
+          method: 'POST', signal: AbortSignal.timeout(15_000),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${vendedor.token}` },
+          body: JSON.stringify(cuerpoDelPedido),
+        });
+        const datos = await r.json().catch(() => null);
+        if (datos?.id) creadas.push(datos.id);
+        return { status: r.status, ms: Date.now() - desde };
+      } catch (error) {
+        return { status: error.name, ms: Date.now() - desde };
+      }
+    };
+    const FALLIDA = `Trabada ${sello}`;
+    const preparacion = subrubroDe('maquinaria-agricola', 'preparacion-suelo');
+    const fallaPorElTipo = (nombre, marca) => ({
+      ...cuerpo(nombre), subcategory_id: preparacion.id, subcategory_type: 'inventado', otra_marca: marca,
+    });
+    const juntas = await Promise.all([
+      conLimite(fallaPorElTipo('falla por el tipo', FALLIDA)),
+      conLimite(fallaPorElTipo('falla por el tipo 2', `${FALLIDA} B`)),
+      conLimite(cuerpo('a la par', { otra_marca: `${A_LA_VEZ} par` })),
+      conLimite(cuerpo('a la par 2', { otra_marca: `${A_LA_VEZ} par 2` })),
+    ]);
+    const salud = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(10_000) })
+      .then((r) => r.status).catch((error) => error.name);
+    const respondidas = juntas.map((r) => r.status);
+    if (JSON.stringify(respondidas) !== JSON.stringify([400, 400, 200, 200]) || salud !== 200) {
+      problemas.push('dos altas con «Otra marca» que fallan por el tipo, junto a otras dos, respondieron '
+        + `${JSON.stringify(juntas.map((r) => `${r.status} en ${r.ms} ms`))} y después /health respondió ${salud}`);
+    }
+    if (opcionesCon(FALLIDA).length !== 0 || opcionesCon(`${FALLIDA} B`).length !== 0) {
+      problemas.push('una alta rechazada por el tipo dejó creada su marca');
+    }
+    medidos.push('dos altas con «Otra marca» rechazadas por el tipo, a la par de otras dos, responden '
+      + `${JSON.stringify(respondidas)}, no dejan su marca, y la API sigue respondiendo (/health ${salud})`);
+  } finally {
+    // Por SQL y no por la API: si la API quedó colgada, la limpieza no la espera.
+    if (creadas.length) {
+      querySql(`UPDATE products SET status = 'DELETED' WHERE id IN (${creadas.map(sqlLiteral).join(',')})`);
+    }
+    retirarLasMarcasDelCaso();
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return medidos.join('; ');
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
