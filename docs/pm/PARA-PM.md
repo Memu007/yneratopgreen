@@ -2,175 +2,205 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## MARCAS-PANEL-1: entrega
+## INICIO-CIERRE-CELULAR-1 y el agregado de MARCAS-PANEL-1: entrega
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `dc377d9`; después integré tus commits hasta `59bdbeb`, sólo `docs/pm` |
-| código | `24296c5` |
-| caso, negativos, auditorías y guías | `55abb3b` · `0e2cab3` (el 182) |
-| rama publicada | `c27214c` |
-| no integrado, no desplegado | `main` sigue en `dc377d9` |
+| base | `4f453a0`; después integré tus `4085a9a` y `4b1eee4`, sólo `docs/pm` |
+| INICIO-CIERRE-CELULAR-1 | código `666bbf1`; caso, 232 ajustado y negativos `8fbd0aa` |
+| agregado de MARCAS-PANEL-1 | código `1eb819d`; casos y negativos `baa2705` |
+| no integrado, no desplegado | `main` está en `4085a9a`, tu publicación de `MARCAS-PANEL-1` |
 
-**Resultado.** En el panel, una pestaña nueva, «Marcas», en escritorio y
-celular, con la lista completa. Cada marca dice:
+**Nada para decidir.** Los cuatro puntos del agregado están hechos, cada uno
+con su negativo en rojo. Están más abajo, en «Agregado de MARCAS-PANEL-1».
+El único cambio de API es aditivo: `/products/my` suma el nombre de la
+marca.
 
-- su nombre;
-- cuántas publicaciones la usan, sin contar las eliminadas;
-- «De la lista» o «Escrita al publicar»;
-- «Dada de baja», si lo está.
+**Resultado de INICIO-CIERRE-CELULAR-1.**
 
-**Corregir el nombre** sigue la regla de «Otra marca»: de 2 a 40 caracteres,
-con letras o números. Si el nombre ya es de otra marca, aunque cambien las
-mayúsculas, los acentos, los espacios, los guiones o los puntos, no la pisa.
-Dice, por ejemplo, «Ya existe la marca «John Deere», con 5 publicaciones.» y
-ofrece «Unir con John Deere».
+- **En el celular,** «¿Te interesa alguno?» va al final de Inicio, después de
+  «Principio de AgroBoeda», con los mismos textos y el mismo botón.
+- **El crédito de las fotos** queda inmediatamente después de la tarjeta 07.
+- **En la computadora no cambia nada.** Capturé Inicio entero antes y
+  después del cambio. En 1440 las dos capturas son idénticas píxel por píxel.
+  En 600 y 768 también, salvo las primeras 300 filas (cabecera y portada):
+  esas cambian igual entre dos capturas seguidas del mismo código, así que es
+  ruido de la captura y no el cambio.
 
-**Unir** pide confirmar y dice cuántas publicaciones pasan. Las mueve a la que
-queda, y la que se va sale del filtro, del alta y del panel. No se puede
-deshacer.
+**Desde qué ancho cambia: 599 px o menos.** Es el corte de celular del
+contrato. Con ese mismo corte la grilla ya pasaba a una columna, y la cabecera
+cambia el texto de la búsqueda. Sólo en una columna el bloque queda en el
+medio:
 
-**Dar de baja** la saca del alta y del filtro, y la ficha la sigue mostrando.
-**Dar de alta** la vuelve a ofrecer.
+- de 600 a 1023 px la grilla tiene dos columnas, y con el bloque son ocho
+  piezas: cuatro filas completas;
+- desde 1024 px son cuatro columnas: dos filas completas.
 
-**Permisos:** cada acción responde 403 a quien no es administración.
+**Por qué no se hizo sólo con estilos.** Con estilos sólo cambia lo que se ve.
+El lector de pantalla y el Tab seguirían encontrando el bloque en el medio.
+Por eso el bloque cambia de lugar en el documento, según el ancho. Está una
+sola vez en cada ancho.
 
-**Nada para decidir.** Las dos consultas del «Frená y consultá» no se dieron.
-No hay migración, y las marcas se guardan igual que antes.
+Tres supuestos, todos reversibles:
 
-Cuatro supuestos, todos reversibles:
+1. **Al final, el título «¿Te interesa alguno?» pasa a nivel 2.** En la
+   grilla sigue de nivel 3, como las tarjetas. Si quedara en 3, en el índice
+   de títulos del lector de pantalla caería dentro de «Cómo funciona». Se ve
+   igual.
+2. **Separación en el celular:** 24 px entre el principio y el bloque, y
+   48 px debajo del bloque, el margen que antes tenía el principio. No había
+   maqueta para esto.
+3. **Si cambia el ancho con la página abierta** (girar el celular, achicar la
+   ventana), el bloque se muda. Si el foco estaba en «Escribinos», lo
+   conserva.
 
-1. **«De la lista» sale de la lista de las 44.** La lista pasó a
-   `services/marcas.py`, y la siembra la usa de ahí. Una marca de la lista
-   que se corrige sigue siendo «De la lista».
-2. **Unir a una marca dada de baja se rechaza** (400): primero hay que darla
-   de alta.
-3. **Unir mueve también las publicaciones pausadas y las eliminadas,** para
-   que ninguna quede con una marca que no existe. El número que muestra el
-   panel cuenta sólo las no eliminadas.
-4. **Una marca de la lista también se puede corregir, unir y dar de baja.**
+## Caso y negativos de INICIO-CIERRE-CELULAR-1
 
-## Lo que cerré además
+**Caso 240, nuevo, en 390, 599, 600, 768 y 1440:**
 
-- **Configuración podía borrar o renombrar una marca por su ruta genérica**
-  (`/admin/form-options/{id}`), sin mover sus publicaciones. La pantalla no lo
-  ofrecía, pero la API sí. Ahora responde 400 «Esta opción no se edita desde
-  Configuración. Las marcas se corrigen en «Marcas».»
-- **El subtítulo de Configuración tenía poco contraste:** usaba el color de un
-  borde, 3,93 a 1 sobre blanco. Ahora usa el color de texto secundario. Lo
-  encontró la auditoría de contraste al medir «Marcas», que comparte ese
-  estilo. Antes no se medía.
+- en 390 y 599, el bloque está después de «Principio de AgroBoeda» y Inicio
+  no dice nada más después de él. Después de la tarjeta 07 viene el crédito,
+  a menos de 40 px;
+- en 600, 768 y 1440 es la octava pieza de la grilla, en la fila de la
+  tarjeta 07 y a su derecha;
+- en todos los anchos, el título, el texto y «Escribinos» están una sola vez
+  en el documento;
+- lo que se lee va en el orden en que se ve: cada tarjeta, el bloque, el
+  crédito y el principio, debajo de lo anterior o a su derecha en la misma
+  fila;
+- con Tab, desde «Entrar al Mercado»: en el celular, los cinco enlaces del
+  crédito y después «Escribinos», y ahí termina Inicio. En la computadora,
+  primero «Escribinos» y después los enlaces;
+- abierta en 1440 con el foco en «Escribinos», al pasar a 390 el bloque va
+  al final y el foco sigue en «Escribinos». Al volver a 1440, lo mismo.
 
-## Caso y negativos
+**El 232 se ajustó sin cambiar lo que mide.** Buscaba el bloque dentro de la
+sección del ecosistema, y en el celular ya no está ahí. Ahora lo busca en la
+página, comprueba que esté una sola vez, y mide lo mismo que antes: sus
+textos y su botón. **El 233 no cambió** y sigue verde.
 
-**Caso 239, en escritorio y celular, por el panel:**
+`python3 scripts/sabotajes_inicio_cierre_celular_1.py` → «todos dieron el rojo
+esperado» (seis) y «src después: como estaba»:
 
-- una publicación con «Otra marca: Jhon Deer», unida a John Deere, pasa a
-  contar en John Deere: en la suite desde base nueva, de 0 a 1 tractores.
-  «Jhon Deer» sale de la lista del panel, del filtro (en la API y en la
-  pantalla) y del alta;
-- «Agromec» corregida a «AgroMec» se ve así en la ficha y en el filtro, y la
-  publicación conserva la misma marca;
-- dada de baja, sale del alta y del filtro, y la ficha sigue diciendo «Marca:
-  AgroMec». Dada de alta, vuelve con 1.
+| sabotaje | rojo del 240 |
+|---|---|
+| `en-el-medio` (pedido): en el celular el bloque vuelve a la grilla | 13 problemas, sólo en 390 y 599 y al pasar a 390: «390: «¿Te interesa alguno?» no está después de «Principio de AgroBoeda»: es la 8.ª de la grilla», «390: después de la tarjeta 07 viene el cierre, y no el crédito», «el crédito no se ve junto a la tarjeta 07: 316 px» y el Tab en el orden viejo |
+| `dos-veces`: el bloque se dibuja en la grilla y al final | «390: el cierre está más de una vez o falta en el documento: 2 título(s), 2 «Escribinos», 2 texto(s)», y lo mismo en 599 |
+| `en-todos-los-anchos`: el bloque va al final también en la computadora | «1440: «¿Te interesa alguno?» no es la octava de la grilla: está al final de Inicio», y lo mismo en 600 y 768. Nada en 390 ni en 599 |
+| `sin-escuchar`: el ancho se lee al abrir y no se escucha | 1 problema: «al pasar de 1440 a 390, el cierre no fue al final» |
+| `foco-perdido`: al mudarse, el bloque no devuelve el foco | 2 problemas: «al pasar de 1440 a 390 con el foco en «Escribinos», el foco quedó en BODY», y lo mismo de vuelta |
+| `titulo-h3`: al final, el título sigue de nivel 3 | 2 problemas: «390: al final, el cierre es un H3 y en el índice de títulos queda dentro de «Cómo funciona»», y lo mismo en 599 |
 
-**Y por la API:**
+## Agregado de MARCAS-PANEL-1
 
-- quien vende recibe 403 al listar, corregir, dar de baja y unir, y nada
-  cambia;
-- unir dos veces seguidas responde 200 y 404; dos uniones a la vez, 200 y
-  404. En los dos casos la publicación se mueve una sola vez;
-- unir consigo misma da 400, y a una dada de baja, también 400;
-- corregir al nombre de otra marca da 409, con esa otra; corregir a «A», 422;
-- borrar una marca desde Configuración da 400.
+En dos commits aparte: el código en `1eb819d`, y los casos y los negativos en
+`baa2705`.
 
-Las reglas que, rotas, borrarían una marca se prueban sobre marcas que el caso
-crea y retira. En mi primera corrida de negativos, `baja-borra` borró Zoomlion
-de mi base local, porque el caso la usaba. La repuse, cambié el caso y repetí
-los ocho.
+1. **Unir con pausadas y eliminadas.** El 239 crea una marca con tres
+   publicaciones (una activa, una pausada y una eliminada), la une a John
+   Deere y comprueba que las tres quedan con John Deere. La respuesta dice
+   «movidas 2», las que no están eliminadas. **Tu negativo
+   `unir-solo-activas` ahora da rojo:** «API: unir una marca con una
+   publicación activa, una pausada y una eliminada respondió 200 (movidas 2),
+   y la pausada quedó con «quieta-…», la eliminada quedó con «quieta-…»».
+2. **Configuración no renombra una marca.** El 239 pide
+   `PUT /admin/form-options/{id}` sobre una marca y espera 400 con el nombre
+   intacto. **Tu negativo `configuracion-renombra` ahora da rojo:** «API:
+   Configuración renombró una marca por la ruta genérica (HTTP 200)». Lo
+   pruebo antes que el borrado: con el borrado roto, renombrar después daría
+   404 y no diría nada del cambio de nombre.
+3. **«Editar» muestra el nombre de una marca dada de baja.** La causa:
+   «Editar» lee la lista de publicaciones propias (`/products/my`), que
+   traía sólo el valor interno, y la marca ya no venía en la lista del alta.
+   - **Arreglo:** `/products/my` suma `brand_label`, con una sola consulta
+     para todas las publicaciones, y «Editar» lo usa. Si no hay nombre,
+     muestra el valor, como antes.
+   - **Caso:** en el 239, en los dos anchos, con «AgroMec» dada de baja,
+     quien vende abre «Editar» y el selector dice «AgroMec».
+   - **Negativos, los dos en rojo** con «escritorio: dada de baja, «Editar»
+     muestra la marca como «agromec»» y lo mismo en celular:
+     `editar-valor-interno` (la pantalla vuelve a mostrar el valor) y
+     `mis-publicaciones-sin-nombre` (la API deja de mandar el nombre).
+4. **El 195 espera las opciones del tipo.** Las relee hasta que coinciden con
+   la base, por 20 s como máximo, y si no llegan dice qué ofreció. Reproduje
+   la carrera retrasando 3 s la respuesta del catálogo: leídas enseguida dan
+   `["Todos"]`; con la espera, `["Todos","Rastras (1)"]`.
+   - **Otros casos que leían igual:** el 198, el 238 y el 239 leen el filtro
+     de marca apenas aparece. Ahora esperan a que alguna opción diga «(n)».
+     Los demás que leen opciones (el alta y «Editar») leen listas que no
+     dependen de la respuesta del catálogo, y ya esperaban sus opciones.
 
 `python3 scripts/sabotajes_marcas_panel_1.py` → «todos dieron el rojo
-esperado» (ocho), «src y backend después: como estaban», y la base sigue con
-44 marcas:
-
-| sabotaje | rojo del 239 |
-|---|---|
-| `unir-sin-mover` (pedido): unir borra la marca sin mover sus publicaciones | 8 problemas: «escritorio: unida, la publicación quedó con «jhon-deer»», «John Deere cuenta 6 en el filtro y tenía que contar 7», lo mismo en celular y por la API |
-| `unir-sin-rol` (pedido): unir no pide administración | 4 problemas: «API: quien vende pide unir y recibe 200 y no 403», «lo que pidió quien vende cambió algo». Listar, corregir y dar de baja siguen en 403 |
-| `baja-borra`: dar de baja borra la marca | 7 problemas: «dada de baja, la ficha dice «Marca: agromec»», y no hay cómo darla de alta |
-| `corregir-pisa`: corregir no mira las demás | 1 problema: «API: corregir al nombre de John Deere respondió 200» |
-| `consigo-misma` | «API: unir una marca consigo misma respondió 200», y la marca desaparece |
-| `unir-a-dada-de-baja` | «API: unir a una dada de baja respondió 200» |
-| `configuracion-borra`: la ruta genérica borra marcas | 1 problema: «API: Configuración borró una marca por la ruta genérica (HTTP 200)» |
-| `panel-no-recarga`: la pantalla no vuelve a pedir la lista después de unir | 2 problemas: «escritorio: unida, «Jhon Deer» sigue en la lista del panel», y en celular |
-
-**La guía del panel también cae** con `unir-sin-mover`, en escritorio: «Paso
-29. Unir dos marcas: la guía dice “Las publicaciones de la que se va pasan a
-la que queda” y no pasa».
-
-## Las guías
-
-- **Guía del panel:** la sección nueva «9. Marcas», pasos 26 a 29: ver,
-  corregir, dar de baja y de alta, unir. La recorre `guia-admin.mjs`, en los
-  dos anchos, con un tractor propio con «Otra marca». Al final lo une a John
-  Deere, así que la corrida no deja marcas de más.
-- **El panel tiene ocho pestañas,** y la guía lo dice.
-- **El límite de «Antes de empezar»** dejó de decir que las marcas no se
-  corrigen. Ahora dice: «Las marcas nuevas no se aprueban antes de aparecer»,
-  y que se corrigen desde «Marcas».
-- **«No se puede deshacer»** queda en «Lo que el programa no comprueba», con
-  su fuente en el código.
-- **Guía de uso:** sólo cambió el motivo de una frase que no se comprueba.
+esperado» con los doce: los cuatro nuevos y los ocho de antes. Los repetí
+porque el 239 cambió. Siguen en rojo, algunos con más problemas: por
+ejemplo, `unir-sin-mover` pasa de 8 a 9, porque ahora también falla la marca
+de las tres publicaciones. «src y backend después: como estaban», y la base
+sigue con las 44 marcas de la lista.
 
 ## Cómo verificarlo
 
-Con el entorno arriba:
+Con el entorno arriba (API en 8000 y frontend de desarrollo en 5173):
 
 ```bash
-SMOKE_CASOS=239 node scripts/smoke.mjs
-# → 1/1 pasaron; 0 fallaron
+SMOKE_CASOS=239,240 node scripts/smoke.mjs
+# → 2/2 pasaron; 0 fallaron
 
-REINICIAR_API="<tu reinicio>" python3 scripts/sabotajes_marcas_panel_1.py unir-sin-mover unir-sin-rol
+python3 scripts/sabotajes_inicio_cierre_celular_1.py en-el-medio
+# → [ROJO ESPERADO] y «todos dieron el rojo esperado»
+
+REINICIAR_API="<tu reinicio>" python3 scripts/sabotajes_marcas_panel_1.py unir-solo-activas configuracion-renombra
 # → dos [ROJO ESPERADO] y «todos dieron el rojo esperado»
 ```
+
+Los negativos de Inicio son de pantalla y no reinician la API. Los dos tuyos
+de marcas sí: usan `REINICIAR_API`.
 
 ## Puertas
 
 | puerta | resultado |
 |---|---|
-| suite completa desde base nueva, sobre `0e2cab3` | **238/239**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'» |
-| la corrida anterior, sobre `55abb3b` | 237/239: el 131 y el **182**, «7 Tab desde Cerrar llevan a «Marcas» y no a «Configuración»». Contaba siete secciones. Lo pasé a ocho en `0e2cab3` y repetí la suite entera |
+| suite completa desde base nueva, sobre `baa2705` (todo lo entregado) | **239/240**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'». Pasan el 195, el 198, el 232, el 233, el 238, el 239 y el 240 |
+| la corrida anterior, sobre `8fbd0aa` (sólo Inicio) | también 239/240, con el mismo 131 |
+| 232 | el ajustado lo corrí también sobre el código de antes del cambio, y pasó: no depende de dónde esté el bloque, eso lo mide el 240 |
 | tipos, lint, build | verdes: `npm run lint` sin avisos y `npm run build` con `tsc` |
-| `compileall`, `node --check`, parseo de Python | verdes |
-| `alembic check` | `No new upgrade operations detected.` (sin migración) |
-| diff-check con `cr-at-eol` sobre `dc377d9..c27214c` | limpio; ninguna línea cambia sólo por el final |
-| a11y `--todas` | 82 de 82 pantallas (dos nuevas: «Marcas» y su aviso de nombre repetido), «SIN VIOLACIONES BLOQUEANTES, COBERTURA COMPLETA» |
-| contraste | «las 86 mediciones exigidas se hicieron» (cuatro nuevas), «TODO OK, COBERTURA COMPLETA» |
+| diff-check con `cr-at-eol` sobre `4f453a0..baa2705`, fuera de `docs/pm` | limpio; ninguna línea cambia sólo por el final |
+| a11y `--todas` | 82 de 82 pantallas, «SIN VIOLACIONES BLOQUEANTES, COBERTURA COMPLETA» |
+| contraste | «las 86 mediciones exigidas se hicieron», «TODO OK, COBERTURA COMPLETA» |
 | auditoría móvil | 12 de 12 recorridos y 39 pantallas: 0 desbordes, 0 controles tapados, 0 errores de consola y 0 respuestas 4xx/5xx |
 | `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 30 pasos en escritorio y celular» |
 | `guia-usuario.mjs` | «LA GUÍA Y EL SITIO COINCIDEN: 23 pasos en escritorio y celular» |
+| backend | `compileall` verde; sin migración. Un solo cambio de API: `brand_label` en `/products/my`, aditivo |
 
-**Líneas con CR por archivo, contra la base.** En los archivos mezclados, cada
-línea agregada tiene el mismo final que su vecina:
+Las auditorías y las dos guías son de la corrida sobre `baa2705`. Las guías
+no mencionan el bloque de Inicio ni el selector de marca de «Editar», así
+que no cambiaron.
+
+**Líneas con CR por archivo, contra la base:**
 
 | archivo | base | ahora |
 |---|---|---|
-| `admin.py`, `AdminPanel.module.css` | todo CRLF | todo CRLF |
-| `AdminPanel.tsx` | 2228 de 2262 | 2498 de 2532 |
-| `backend/app/seed.py` | 600 de 1479 | 523 de 1402: salieron las 81 de la lista de marcas y entraron 4 |
+| `HomePage.module.css` | todo CRLF (818) | todo CRLF (825) |
+| `HomePage.tsx` | 0 de 296 | 0 de 327 |
+| `Header.tsx` | 0 de 278 | 0 de 254 |
 | `scripts/smoke.mjs` | 4 | 4 (las mismas) |
-| `marcas.py`, la guía, sus scripts, las auditorías y el script de negativos | 0 | 0 |
+| `backend/app/api/products.py` | 931 de 933 | 942 de 944: las 11 agregadas, con CR como sus vecinas |
+| `UserDashboard.tsx` | 4209 de 4538 | 4220 de 4549: las 11 agregadas, con CR como sus vecinas |
+| `src/hooks/useEsMovil.ts` y los dos scripts de negativos | nuevos o en 0 | 0 |
+
+## Lo que cambió además
+
+- **La consulta del ancho de celular pasó a un archivo compartido**
+  (`src/hooks/useEsMovil.ts`). La cabecera ya la tenía para el texto de la
+  búsqueda, e Inicio ahora la usa también. La cabecera hace lo mismo que
+  antes: el 128, que mide ese texto en la computadora («Buscar producto,
+  servicio o ubicación») y en el celular («Buscar»), sigue verde.
 
 ## Riesgos
 
-- **Unir no se puede deshacer.** La confirmación lo dice.
-- **Un enlace guardado con una marca unida o dada de baja** (`?brand=…`)
-  muestra el Mercado vacío, sin esa marca en el filtro. Es lo mismo que pasa
-  hoy con una marca dada de baja.
-- **Una carrera muy angosta.** Si una alta ya validó su marca y se guarda
-  justo después de que administración une esa marca, queda con la marca
-  vieja, y la ficha muestra el valor interno. Para que pase, hay que unir en
-  el mismo instante en que alguien publica con esa marca.
-- **Las marcas nuevas no se aprueban antes de aparecer:** fuera de alcance,
-  como pediste.
+- **Ninguno nuevo de datos:** lo de Inicio es sólo de pantalla, y la API
+  sólo suma un campo de lectura. Nada que ya existía cambia ni sale.
+- **El 195 que te cayó** ahora espera. No lo puedo hacer caer a voluntad sin
+  retrasar la respuesta, y con la respuesta retrasada la espera lo cubre.
+- **Si un navegador no supiera leer el ancho** (`matchMedia`, que tienen
+  todos los actuales), el bloque queda en la grilla, como estaba antes.
