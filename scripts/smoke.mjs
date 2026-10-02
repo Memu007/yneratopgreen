@@ -28951,10 +28951,11 @@ await runCase(174, 'La marca es un dato de la publicación, y sólo donde signif
       await categoriaEnElAlta.selectOption({ label: laQueOfrece.name });
       await esperarA(async () => (await controlDeMarca.count()) === 1,
         `eligiendo «${laQueOfrece.name}», que declara marca, el alta no ofreció el control`, 20_000);
+      // Las marcas, entre «Sin declarar» y «Otra marca» (FILTROS-DE-PUBLICACIONES-1).
       const cuantasOpciones = await controlDeMarca.locator('option').count();
-      assert(cuantasOpciones === opciones.length + 1,
-        `el control ofrece ${cuantasOpciones} opciones y tienen que ser ${opciones.length + 1} `
-        + '(las marcas más «Sin declarar»)');
+      assert(cuantasOpciones === opciones.length + 2,
+        `el control ofrece ${cuantasOpciones} opciones y tienen que ser ${opciones.length + 2} `
+        + '(las marcas más «Sin declarar» y «Otra marca»)');
 
       await categoriaEnElAlta.selectOption({ label: laQueNo.name });
       await esperarA(async () => (await controlDeMarca.count()) === 0,
