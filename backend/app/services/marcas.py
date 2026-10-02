@@ -24,8 +24,9 @@ from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 
+from app.db.base import SessionLocal
 from app.models.form_option import FormOption
 
 MARCA_MINIMO = 2
@@ -36,6 +37,11 @@ MARCA_MAXIMO = 40
 # no la encuentran y la crean. La tabla no tiene un indice unico que lo
 # impida, y agregarlo exigiria tocar las opciones que ya existen.
 CANDADO_DE_MARCAS = 1_010_200_101
+
+# Cuanto espera una marca escrita a que otra suelte el candado. Lo tiene
+# apenas lo que tarda en buscar y crear una fila; si pasa de esto, algo anda
+# mal, y es mejor un error que esperar para siempre.
+ESPERA_DEL_CANDADO = "5s"
 
 
 def _sin_acentos(texto: str) -> str:
@@ -67,7 +73,7 @@ def limpiar_marca(texto: str) -> str:
     return " ".join(texto.split())
 
 
-def marca_escrita(db: Session, nombre: str) -> str:
+def marca_escrita(nombre: str) -> str:
     """El `value` de la marca escrita: la que ya existe, o una nueva.
 
     Si coincide con una de la lista —activa o no— se usa esa y no se crea
@@ -76,13 +82,38 @@ def marca_escrita(db: Session, nombre: str) -> str:
 
     Si es nueva, entra a la lista con el nombre como se escribio, en su lugar
     alfabetico y sin mover a las demas: toma el orden de la que le sigue, y el
-    empate se resuelve por nombre, que es como se ordena la lista. Lo confirma
-    el `commit` de quien llama, junto con la publicacion.
+    empate se resuelve por nombre, que es como se ordena la lista.
+
+    **Se resuelve en una transaccion propia, corta, y se confirma aca.** El
+    candado no puede vivir en la transaccion de la publicacion. Medido: una
+    alta con «Otra marca» que despues fallaba por otro dato lo dejaba tomado
+    hasta cerrar su sesion, y otra alta con «Otra marca» lo esperaba sin
+    soltar el proceso —las rutas son `async` y la base se llama sin `await`—,
+    asi que la sesion de la primera nunca se cerraba: la API entera dejaba de
+    responder. Por eso quien llama la resuelve despues de validar todo lo
+    demas, y una alta rechazada no deja su marca.
     """
     nombre = limpiar_marca(nombre)
     clave = clave_de_marca(nombre)
-    db.execute(text("SELECT pg_advisory_xact_lock(:candado)"), {"candado": CANDADO_DE_MARCAS})
+    db = SessionLocal()
+    try:
+        db.execute(text(f"SET LOCAL lock_timeout = '{ESPERA_DEL_CANDADO}'"))
+        db.execute(text("SELECT pg_advisory_xact_lock(:candado)"), {"candado": CANDADO_DE_MARCAS})
+        valor = _buscar_o_crear(db, nombre, clave)
+        db.commit()
+        return valor
+    except OperationalError:
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo guardar la marca en este momento. Probá de nuevo.",
+        )
+    finally:
+        # Sin `commit`, cerrar deshace la transaccion y suelta el candado.
+        db.close()
 
+
+def _buscar_o_crear(db, nombre: str, clave: str) -> str:
+    """La que coincide, o una nueva; con el candado ya tomado."""
     opciones = db.query(FormOption).filter(FormOption.option_type == "brand").all()
     for opcion in opciones:
         if clave in (clave_de_marca(opcion.label), clave_de_marca(opcion.value)):
@@ -117,7 +148,6 @@ def marca_escrita(db: Session, nombre: str) -> str:
         display_order=orden,
         is_active=True,
     ))
-    db.flush()
     return valor
 
 

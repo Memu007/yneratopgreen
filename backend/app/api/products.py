@@ -96,6 +96,9 @@ def marca_declarada(
     La que no está en la lista se escribe aparte, como «Otra marca» (`otra`),
     y entra a la lista como una más: una que coincide con una existente sin
     importar mayúsculas, acentos ni espacios usa esa (`marcas.marca_escrita`).
+    Una nueva se guarda en el momento, en su propia transacción: por eso se
+    llama después de validar todo lo demás, para que una alta rechazada no
+    deje su marca.
 
     Donde la categoría no ofrece marca, lo que venga se descarta en silencio,
     igual que la condición: guardar un dato que ninguna pantalla muestra es
@@ -109,7 +112,7 @@ def marca_declarada(
             detail="Elegí una marca de la lista o escribí otra, no las dos.",
         )
     if otra:
-        return marcas.marca_escrita(db, otra)
+        return marcas.marca_escrita(otra)
     if not pedida:
         return None
 
@@ -319,13 +322,6 @@ async def create_product(
         product_data.condition if anatomia.usa_condicion(operation_kind) else None
     )
 
-    # La marca la decide la CATEGORÍA, no la anatomía. `activo` incluye
-    # «Tierras y parcelas» y «Bienes y Ganado», y ni un campo ni un ternero
-    # tienen marca: decidirlo por anatomía pondría una lista de marcas de
-    # tractor sobre los dos. Donde la categoría no la ofrece, se descarta si
-    # viene, igual que la condición.
-    brand = marca_declarada(db, category, product_data.brand, product_data.otra_marca)
-
     # El tipo y la potencia los decide el SUBRUBRO, que es donde vive la lista.
     subrubro = subrubro_de(db, product_data.subcategory_id)
     subcategory_type_id = tipo_declarado(db, subrubro, product_data.subcategory_type)
@@ -335,6 +331,13 @@ async def create_product(
     modelo = modelo_declarado(category, product_data.model)
     anio = anio_declarado(category, product_data.year)
     origen = origen_declarado(is_service, product_data.origin)
+
+    # La marca la decide la CATEGORÍA, no la anatomía. `activo` incluye
+    # «Tierras y parcelas» y «Bienes y Ganado», y ni un campo ni un ternero
+    # tienen marca: decidirlo por anatomía pondría una lista de marcas de
+    # tractor sobre los dos. Donde la categoría no la ofrece, se descarta si
+    # viene, igual que la condición. Va última: «Otra marca» puede crear una.
+    brand = marca_declarada(db, category, product_data.brand, product_data.otra_marca)
 
     # Crear producto/servicio
     new_product = Product(
@@ -668,17 +671,13 @@ async def update_product(
     categoria_final = db.query(Category).filter(
         Category.id == update_data.get("category_id", product.category_id)
     ).first()
-    # «Otra marca» no es una columna: se resuelve en la marca y se saca.
+    # «Otra marca» no es una columna: se resuelve en la marca y se saca. La
+    # marca se resuelve al final, después de validar lo demás: «Otra marca»
+    # puede crear una.
     otra_marca = update_data.pop("otra_marca", None)
     if categoria_final is not None:
-        if "brand" in update_data or otra_marca:
-            update_data["brand"] = marca_declarada(
-                db, categoria_final, update_data.get("brand"), otra_marca)
-        elif not getattr(categoria_final, "usa_marca", False):
-            update_data["brand"] = None
-
-        # El modelo y el año, igual: se validan si vienen, y si la publicación
-        # se mueve a una categoría que no los pide, se sueltan.
+        # El modelo y el año se validan si vienen, y si la publicación se
+        # mueve a una categoría que no los pide, se sueltan.
         if "model" in update_data:
             update_data["model"] = modelo_declarado(categoria_final, update_data["model"])
         elif not atributos.usa_modelo_y_anio(categoria_final):
@@ -719,6 +718,13 @@ async def update_product(
         and tipos.usa_potencia(subrubro_final.category.slug, subrubro_final.slug)
     ):
         update_data["power_hp"] = None
+
+    if categoria_final is not None:
+        if "brand" in update_data or otra_marca:
+            update_data["brand"] = marca_declarada(
+                db, categoria_final, update_data.get("brand"), otra_marca)
+        elif not getattr(categoria_final, "usa_marca", False):
+            update_data["brand"] = None
 
     for field, value in update_data.items():
         setattr(product, field, value)
