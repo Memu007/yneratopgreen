@@ -86,7 +86,7 @@ Entregala por separado.
 **Decisión de Emi (02/10).** Lo declaraste en tu informe de FILTROS: una
 marca escrita con «Otra marca» no se puede corregir, unir ni dar de baja
 desde el sitio, y queda en la lista para siempre. Va antes de
-`VENDER-SIN-SESION-1`. Entregala por separado.
+`INICIO-CIERRE-CELULAR-1` y `VENDER-SIN-SESION-1`. Entregala por separado.
 
 ### Qué entra
 
@@ -137,7 +137,40 @@ alguien al publicar.
 
 ---
 
-## Después — VENDER-SIN-SESION-1 (empezala apenas entregues MARCAS-PANEL-1)
+## Después — INICIO-CIERRE-CELULAR-1 (apenas entregues MARCAS-PANEL-1)
+
+**Decisión de Emi (02/10), opción A.** En el celular, después de las siete
+tarjetas aparece «¿Te interesa alguno?», un bloque verde grande, y debajo
+queda suelto el crédito de las fotos. Corta la lectura a mitad de página. En
+la computadora es la octava tarjeta y completa la grilla, así que ahí está
+bien.
+
+### Qué entra
+
+1. **En el celular, «¿Te interesa alguno?» pasa al final de Inicio,**
+   después de «Principio de AgroBoeda», como cierre. Lleva los mismos
+   textos y el mismo botón.
+2. **El crédito de las fotos queda pegado a las tarjetas.**
+3. **En la computadora no cambia nada.** Decí desde qué ancho cambia, y por
+   qué ahí.
+4. **El orden de lectura** (lector de pantalla y tabulación) tiene que
+   coincidir con lo que se ve en cada ancho.
+
+### Aceptación verificable
+
+1. **Caso nuevo:**
+   - en 390, «¿Te interesa alguno?» está después de «Principio de
+     AgroBoeda» y el crédito está inmediatamente después de la tarjeta 07;
+   - en 1440, sigue como octava tarjeta;
+   - en los dos anchos, el bloque aparece una sola vez en el árbol del
+     documento.
+2. **Negativo:** el bloque otra vez en el medio, en el celular, da rojo.
+3. El 232 y el 233 siguen verdes. Suite, a11y, contraste, móvil y las
+   puertas.
+
+---
+
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues INICIO-CIERRE-CELULAR-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.

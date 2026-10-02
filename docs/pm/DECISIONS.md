@@ -10,6 +10,13 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-02 — En el celular, «¿Te interesa alguno?» cierra Inicio
+
+Emi vio en su celular que el bloque «¿Te interesa alguno?» corta la lectura entre los servicios
+y «Cómo funciona», con el crédito de las fotos suelto debajo. Eligió la opción A: en el celular
+pasa al final de Inicio, y en la computadora sigue como octava tarjeta. Es
+`INICIO-CIERRE-CELULAR-1`, después de `MARCAS-PANEL-1`.
+
 ## 2026-10-02 — Las marcas se corrigen, se unen y se dan de baja desde el panel
 
 Con «Otra marca» (`FILTROS-DE-PUBLICACIONES-1`), una marca mal escrita queda en el alta y en el
