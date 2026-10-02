@@ -45,12 +45,31 @@ habilita producción ni dinero real antes del informe final y el retest.
   servicio compartido.
 
 La capacidad para 5.000 visitas mensuales se mide en una prueba de carga
-separada y controlada. No se confunde disponibilidad con pentesting.
+separada y controlada, en Docker local con recursos parecidos a los del plan
+de Railway. No se confunde disponibilidad con pentesting.
+
+## Orden de las pruebas finales (PM, 02/10)
+
+1. **Congelar funciones**, después de probar Mercado Pago.
+2. **Prueba de carga** (local).
+3. **Navegadores reales:** Safari en iPhone y en Mac, Chrome en Android y
+   Firefox. Los guía PM con Emi y la clienta, sobre el sitio publicado y sin
+   pruebas ofensivas. Incluye la hipótesis de la cookie de Mercado Pago.
+4. **Usabilidad** con la clienta y dos o tres personas del rubro.
+5. **QA exploratorio** de un modelo independiente, sobre Docker local.
+6. **Red-team de seguridad** con Astra Alto, sobre Docker local.
+7. **Retest y lanzamiento.**
+
+Los modelos independientes reciben el repositorio y el entorno local, nunca
+credenciales ni acceso a Railway. Sus hallazgos llegan como informe; la Dev
+corrige y PM reproduce.
 
 ## Límites
 
-- Sólo Docker local y el Railway descartable `strong-playfulness`, sobre el SHA
-  previamente autorizado.
+- **Sólo Docker local**, sobre el SHA previamente autorizado. Corrección PM
+  del 02/10: `strong-playfulness` es el proyecto del sitio publicado, no uno
+  descartable, y ninguna reproducción ofensiva ni prueba de carga va contra
+  Railway (regla no negociable del proyecto).
 - No atacar Mercado Pago, GitHub, Railway ni ninguna infraestructura de
   terceros; sus integraciones se prueban mediante flujos y cuentas de prueba.
 - No denegación de servicio, ingeniería social, persistencia, borrado masivo,

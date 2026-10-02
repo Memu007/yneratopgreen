@@ -5,74 +5,27 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre CAMBIAR-CONTRASENA-1 — aceptada en rama
+## Decisión sobre SESIONES-AL-CAMBIAR-1 — aceptada en rama
 
-Sobre `02e82e3` (producto en `f7340f5` y `001507f`). Evidencia en
-`REPRODUCCION-CAMBIAR-CONTRASENA-1-2026-10-01.md`.
+Sobre `6265cc2` (producto en `cc439b9`, `f306af7` y `f0ac6df`). Evidencia en
+`REPRODUCCION-SESIONES-AL-CAMBIAR-1-2026-10-02.md`.
 
-- **El 235:** 1/1.
-- **Negativos:** tus cuatro dan rojo. También dan rojo los tres míos:
-  - el alta del panel con su regla vieja;
-  - un error que borra lo escrito;
-  - el filtro del 422 que mira sólo `password` y no `new_password`.
-- **Suite completa desde base nueva:** 234/235. Sólo cae el 169, de entorno.
+- **Casos:** 130, 235 y 236 en 3/3.
+- **Negativos:** tus once dan rojo. De los míos, dos dan rojo:
+  - la edición del panel que no cierra;
+  - las sesiones firmadas en 0.
+- **El tercero mío quedó verde:** `get_current_user_optional` sin mirar la
+  versión. El código está bien y el riesgo es mínimo; queda como P3 de
+  cobertura.
+- **Migración en modo producción:** sube sobre una copia con datos, deja 23
+  cuentas en 0 sin tocar nada más, y repetirla no cambia nada.
+- **Suite completa desde base nueva:** 235/236. Sólo cae el 169, de entorno.
 - **Auditorías y las dos guías:** verdes.
-- **Tus riesgos:** aceptados.
-- **Sacar la contraseña del 422:** bien visto, y se queda.
+- **Los bordes del choque y de la pestaña en vuelo:** muy bien encontrados.
 
 La publicación a `main` la decide Emi. No integres ni despliegues.
 
-`INICIO-ECOSISTEMA-1` está publicada en `30f9791`.
-
----
-
-## Tarea activa — SESIONES-AL-CAMBIAR-1
-
-**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM. Va antes de `FILTROS-DE-PUBLICACIONES-1`.
-
-### Problema
-
-Cambiar la contraseña no cierra ninguna sesión. Lo midió la Dev en el freno
-`3f9f2e5`:
-
-- el token de renovación dura 30 días;
-- cada renovación emite otro de 30 días.
-
-Una sesión abierta en otro dispositivo no vence nunca. Es justo el caso de
-las dos contraseñas que quedaron en chats: cambiarlas no saca a quien ya
-hubiera entrado.
-
-### Qué entra
-
-1. **Cambiar la propia contraseña** deja sin valor todas las sesiones
-   anteriores de esa cuenta, de acceso y de renovación. La sesión desde la
-   que se cambió sigue abierta, o se reabre sola, sin pedir ingresar de
-   nuevo.
-2. **Restablecerla desde el panel** también invalida las sesiones
-   anteriores de esa cuenta.
-3. **Desactivar una cuenta desde el panel:** decí en el informe si hoy sus
-   sesiones siguen valiendo. Si siguen, que también se invaliden.
-4. **Cómo, lo elegís vos.** Por ejemplo, la marca de cuándo cambió que
-   propusiste. Si necesita migración, aditiva y probada en modo producción.
-
-### Aceptación verificable
-
-1. **Caso nuevo con dos sesiones de la misma cuenta.**
-   - Cambiar la contraseña en una:
-     - la otra recibe 401, tanto con el token de acceso como con el de
-       renovación;
-     - la que cambió sigue funcionando.
-   - Lo mismo al restablecer desde el panel.
-2. **Negativo:** sin la comprobación, la sesión vieja sigue entrando y da
-   rojo.
-3. **Migración:** si hay una, el caso corre sobre una base sin siembra y se
-   prueba en modo producción.
-4. Suite completa desde base nueva y las puertas de siempre.
-
-### Frená y consultá
-
-- Si invalidar obliga a cerrar la sesión de todas las cuentas a la vez, o a
-  cambiar `JWT_SECRET`.
+`CAMBIAR-CONTRASENA-1` está publicada en `c21fb9d`.
 
 ---
 
@@ -129,7 +82,9 @@ Entregala por separado.
 
 ---
 
-## Siguiente — FILTROS-DE-PUBLICACIONES-1 (apenas entregues SESIONES-AL-CAMBIAR-1)
+## Tarea activa — FILTROS-DE-PUBLICACIONES-1
+
+**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
 **Decisión de Emi (01/10), por pedido de la clienta.** Revierte la decisión
 del 25/09 («el filtro de marca muestra las 44»). Va antes de
@@ -253,6 +208,161 @@ Desde `INICIO-ECOSISTEMA-1`, sin sesión no hay ningún botón para publicar:
 ### Frená y consultá
 
 - Si en 390 «Vender» no entra en la cabecera sin cambiar su forma.
+
+---
+
+## Después — PRODUCCION-ANIMAL-1 (apenas entregues VENDER-SIN-SESION-1)
+
+**Decisión de Emi (02/10), por el documento de la clienta**
+(`originales/INDEXACION-CLIENTA-2026-10-02.docx`, punto 1). Entregala por
+separado.
+
+### Problema
+
+«Bienes y Ganado» se lee como vacas, y su única subcategoría es «Bovinos». La
+clienta quiere que la familia abarque cualquier especie. Es la misma familia
+del contrato («animales de cría y comerciales»), más amplia.
+
+### Qué entra
+
+1. **«Bienes y Ganado» pasa a llamarse «Producción animal».** Los enlaces
+   viejos siguen funcionando.
+2. **Subcategorías:** Bovinos, que ya existe, más Equinos, Porcinos, Ovinos,
+   Caprinos, Avicultura, Apicultura y Otras especies.
+3. **«Raza»**, opcional, de texto, al publicar y en «Editar» en esta familia.
+   Se ve en la ficha y filtra con la regla de `FILTROS-DE-PUBLICACIONES-1`:
+   sólo las razas publicadas, sin importar mayúsculas ni acentos.
+4. **Producción:** la siembra no corre ahí, y las categorías no se cargan por
+   migración (decisión del 26/09). Proponé cómo llegan las subcategorías y el
+   nombre nuevo sin duplicar nada. Por ejemplo, agregar por slug las que
+   falten y renombrar sólo si el nombre sigue siendo el viejo. Probalo con un
+   caso sobre una base sin siembra y en modo producción.
+5. **Las guías y los casos** que nombran «Bienes y Ganado».
+
+### Fuera de alcance
+
+- La familia «Producción» (vegetal, forestal, acuícola): espera la reunión.
+- Publicar sin categoría y la clasificación automática: fuera del MVP.
+
+### Aceptación verificable
+
+1. **Caso nuevo:**
+   - el Mercado y el alta dicen «Producción animal», con sus ocho
+     subcategorías;
+   - publicar un lote de Apicultura con raza «Carniola» lo hace aparecer en
+     el filtro;
+   - un enlace viejo lleva a la familia.
+2. **Producción:** sobre una base sin siembra, con la familia ya renombrada a
+   mano, la carga no duplica ni pisa el nombre. Correrla dos veces no cambia
+   nada.
+3. **Negativo:** una subcategoría que falta en producción da rojo.
+4. Suite completa, a11y, contraste, móvil, las dos guías y las puertas.
+
+### Frená y consultá
+
+- Si renombrar rompe la logística («Hacienda en pie»), el estado «nuevo o
+  usado» o la marca de esa familia.
+
+---
+
+## Después — BUSCADOR-SINONIMOS-1 (apenas entregues PRODUCCION-ANIMAL-1)
+
+**Decisión de Emi (02/10).** Es el puente barato al «buscador inteligente» de
+la clienta, sin inteligencia artificial. La clasificación automática queda
+fuera del MVP. Entregala por separado.
+
+### Problema
+
+Hoy el buscador de texto compara letra por letra con `ilike` en el nombre, la
+descripción, la marca y el modelo. «Colmena» no encuentra «colmenas»,
+«tractor» no encuentra «Tractór», y «apicultura» no encuentra un lote de
+colmenas publicado en Apicultura si el texto no lo dice.
+
+### Qué entra
+
+1. **Sin acentos ni mayúsculas**, y **singular y plural** en español.
+2. **El nombre de la categoría y de la subcategoría también se buscan.**
+   «Apicultura» encuentra lo publicado en Apicultura.
+3. **Sinónimos**, en una lista versionada en el código, corta y revisable por
+   la clienta. Por ejemplo:
+   - colmena, abeja y apicultura;
+   - vaca, vacuno, bovino y hacienda;
+   - caballo y equino;
+   - cerdo, chancho y porcino;
+   - oveja y ovino;
+   - cabra y caprino;
+   - gallina, pollo y avicultura;
+   - pulverizadora, fumigadora y mosquito;
+   - cosechadora y trilladora.
+
+   Que la lista diga de dónde sale cada grupo.
+4. **Los filtros y el conteo** siguen saliendo del servidor, igual que hoy.
+
+### Fuera de alcance
+
+- Interpretar frases enteras o clasificar con inteligencia artificial.
+- Corregir errores de tipeo.
+- Ordenar por relevancia: si lo considerás necesario, proponelo.
+
+### Aceptación verificable
+
+1. **Caso nuevo:**
+   - «colmena» encuentra «Colmenas Langstroth» y un lote publicado en
+     Apicultura;
+   - «TRACTOR» y «tractores» encuentran lo mismo que «tractor»;
+   - «fumigadora» encuentra una pulverizadora;
+   - una palabra sin relación no trae nada.
+2. **Negativos:**
+   - sin los sinónimos da rojo;
+   - sin quitar acentos da rojo.
+3. **El tiempo de respuesta** del Mercado con 1000 publicaciones, antes y
+   después, medido en el informe.
+4. Suite completa y las puertas.
+
+### Frená y consultá
+
+- Si hace falta una extensión de PostgreSQL que el servicio de Railway no
+  tenga, como `unaccent`. Decí cómo comprobarlo antes de publicar.
+
+---
+
+## Después — OBSERVABILIDAD-1 (al final de la cola, antes del lanzamiento)
+
+**Decisión de Emi (02/10).** Hoy no hay registro de los errores que ve la
+gente ni de cómo usa el sitio. Entregala por separado.
+
+### Qué entra
+
+1. **Sentry** (plan gratis) en el Frontend y en el Backend.
+   - Sin datos personales: nada de correos, nombres, teléfonos,
+     contraseñas, tokens, cookies, CBU ni datos de pago, ni en el mensaje, ni
+     en la URL, ni en el cuerpo.
+   - Se enciende sólo si existe la variable con la clave. En local y en las
+     pruebas, apagado.
+2. **Microsoft Clarity** (gratis) en el Frontend.
+   - Todo campo escrito, oculto.
+   - El panel de administración, «Mi cuenta» y el pago, sin grabar.
+   - Se enciende con su variable, como Sentry.
+3. **Una línea en la política de privacidad del sitio,** si existe, que diga
+   qué se mide y para qué. Si no existe, decilo y proponé el texto.
+4. **`RAILWAY.md`**: qué variables cargar y dónde. Las claves las carga Emi
+   en Railway; nunca van al repositorio ni al chat.
+
+### Aceptación verificable
+
+1. **Caso nuevo con un Sentry falso local:**
+   - un error del Frontend y otro del Backend llegan;
+   - ninguno lleva un correo, una contraseña ni un token, aunque el error
+     ocurra en un formulario con esos datos.
+2. **Clarity apagado** sin su variable, y sin grabar en el panel, en «Mi
+   cuenta» ni en el pago.
+3. **Negativo:** un evento que lleva el correo de la sesión da rojo.
+4. Suite completa, a11y, contraste, móvil y las puertas.
+
+### Frená y consultá
+
+- Si algún paquete pide una cuenta paga, o carga código de un dominio que la
+  política de seguridad del sitio (CSP) no permite.
 
 ---
 

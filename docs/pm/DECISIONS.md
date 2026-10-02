@@ -10,6 +10,39 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-02 — Monitoreo gratis y orden de las pruebas finales
+
+- **Monitoreo:** Emi crea UptimeRobot (sin código). La Dev suma Sentry y Microsoft Clarity,
+  gratis y sin datos personales, como `OBSERVABILIDAD-1`, al final de la cola y antes del
+  lanzamiento.
+- **Pruebas finales:** se corrige `PLAN-RED-TEAM-CIERRE-MVP.md`. Todo lo ofensivo y la carga
+  van sólo en Docker local. `strong-playfulness` es el sitio publicado, no uno descartable. El
+  orden es carga, navegadores reales, usabilidad, QA exploratorio de un modelo independiente y
+  después el red-team.
+
+Motivo: hoy no se ven los errores de quienes usan el sitio, y Emi pidió que una IA
+independiente lo pruebe a fondo antes de lanzar.
+
+## 2026-10-02 — Producción animal y buscador con sinónimos; la clasificación automática, fuera del MVP
+
+Sobre el documento de la clienta `originales/INDEXACION-CLIENTA-2026-10-02.docx`, Emi eligió:
+
+- **Ahora, sin reunión:**
+  - `PRODUCCION-ANIMAL-1`: «Bienes y Ganado» pasa a «Producción animal», con especies y raza;
+  - `BUSCADOR-SINONIMOS-1`: el buscador ignora acentos, mayúsculas y plurales, busca en la
+    categoría y usa sinónimos.
+
+  Van después de `FILTROS-DE-PUBLICACIONES-1` y `VENDER-SIN-SESION-1`.
+- **Fuera del MVP**, para una etapa posterior que se cotiza aparte:
+  - publicar sin categoría;
+  - clasificación automática e interpretación de frases con inteligencia artificial;
+  - publicaciones de «Compra» y «Disponibilidad».
+- **A la reunión:** la familia «Producción» (vegetal, forestal, acuícola).
+
+Motivo: el contrato pide filtros por categoría y ubicación, y la clasificación automática
+necesita un servicio pago y control humano. Lo que se hace ahora le da a la clienta buena parte
+de lo que busca, sin eso.
+
 ## 2026-10-01 — Los filtros salen de las publicaciones, y se puede escribir otra marca
 
 **Revierte la del 25/09** («el filtro de marca muestra siempre la lista completa»). La

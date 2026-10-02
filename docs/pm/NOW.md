@@ -9,9 +9,9 @@ Actualizado: 2026-10-01.
 - **PM vuelve a esta sesión (01/10, Emi):** la PM de la otra cuenta deja de escribir en el repositorio. Un solo PM escribe `PARA-DEV.md`.
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `c21fb9d`, publicado el 01/10 con autorización de Emi («Te autorizo»), por fast-forward desde `30f9791`. Suma `CAMBIAR-CONTRASENA-1` («Cambiar contraseña» en Mi cuenta, una sola regla de contraseña, el 422 sin la contraseña) y documentos de PM. Sin migraciones. La verificación previa fue sobre el mismo código (`02e82e3`, que difiere sólo en `docs/pm`): suite 234/235 (169 de entorno), siete negativos en rojo, puertas verdes, sin secretos ni archivos prohibidos. **Pendiente: Emi cambia su contraseña de administración y la de `prueba@example.com` desde Mi cuenta.** Hasta `SESIONES-AL-CAMBIAR-1`, cambiarla no cierra las sesiones abiertas.
-- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `CAMBIAR-CONTRASENA-1` está publicada en `c21fb9d`. `SESIONES-AL-CAMBIAR-1` está entregada (`263198d`) y en revisión. `SESIONES-AL-CAMBIAR-1` está asignada.
-- **Última decisión PM:** `CAMBIAR-CONTRASENA-1` **ACEPTADA EN RAMA** (01/10, `02e82e3`). «Cambiar contraseña» en Mi cuenta, una sola regla en la API (6 caracteres a 72 bytes) y ningún 500. Además, el 422 ya no devuelve la contraseña escrita. Caso 235; siete negativos en rojo, tres de PM; suite 234/235 (169 de entorno); puertas verdes. Evidencia en `REPRODUCCION-CAMBIAR-CONTRASENA-1-2026-10-01.md`. Antes: `INICIO-ECOSISTEMA-1`, publicada en `30f9791`.
-- **Tarea activa:** `SESIONES-AL-CAMBIAR-1`: cambiar o restablecer una contraseña cierra las otras sesiones de esa cuenta. En cola: `FILTROS-DE-PUBLICACIONES-1` y `VENDER-SIN-SESION-1`. **En espera de la clienta:** la maqueta v3 de Inicio («Por qué AgroBoeda», a partir de su documento «Propuesta de MVP Marketplace», con la portada más baja de `HERO-COMPACTO-1`), en `maquetas/INICIO-CONCEPTO-V3-2026-10-01.html`.
+- **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `CAMBIAR-CONTRASENA-1` está publicada en `c21fb9d`. `SESIONES-AL-CAMBIAR-1` está aceptada en rama (`6265cc2`, con migración `ba10450712c6`) y **espera la autorización de Emi para publicarse**. `SESIONES-AL-CAMBIAR-1` está asignada.
+- **Última decisión PM:** `SESIONES-AL-CAMBIAR-1` **ACEPTADA EN RAMA** (02/10, `6265cc2`). Cambiar o restablecer la contraseña, o cambiar el estado de la cuenta, cierra todas sus sesiones. La migración aditiva `ba10450712c6` está probada en modo producción. Casos 130, 235 y 236; trece negativos en rojo y un hueco P3; suite 235/236 (169 de entorno); puertas verdes. Evidencia en `REPRODUCCION-SESIONES-AL-CAMBIAR-1-2026-10-02.md`.
+- **Tarea activa:** `FILTROS-DE-PUBLICACIONES-1`. En cola: `VENDER-SIN-SESION-1`, `PRODUCCION-ANIMAL-1`, `BUSCADOR-SINONIMOS-1` y `OBSERVABILIDAD-1`. **En espera de la clienta:** la maqueta v3 de Inicio.
 - **Mercado Pago:** `LINK-ABIERTO-DEVUELTO-1`, que iba antes de la prueba, está publicada (01/10). **Mercado Pago (Emi, 30/09): se prueba en el sitio publicado, con cuentas de prueba.** Los pasos están en `PASOS-MERCADO-PAGO-2026-09-30.md`: etapa 1, preparar (Emi, en Railway y en el panel de Mercado Pago); etapa 2, probar, guiada por PM. Los valores secretos van directo a Railway, nunca al chat. **Hipótesis por confirmar en la prueba:** vincular una cuenta de Mercado Pago necesita una cookie del Backend, y con el sitio y el Backend en dos direcciones de `up.railway.app`, Safari, Brave y Firefox no la mandan. Si se confirma, el lanzamiento real necesita un dominio propio. Emi aprobó el costo del Reconciliador el 29/09.
 - **Corrección de método PM (25/09):** las aceptaciones de la marca no verificaron la carga de datos en producción. Desde ahora, toda pieza que agrega una lista o un catálogo tiene que decir cómo llega a producción, y PM lo comprueba con un caso sobre una base sin siembra.
 - **#9, atributos por rubro: absorbido (decisión de Emi, 25/09).** Tercer nivel de la taxonomía de la clienta como filtro en todos los rubros, potencia de tractores, modelo y año en maquinaria, y origen declarado por quien vende. «Inversores» queda afuera. Va después de `MERCADO-UNICO-1` y antes de las guías de uso.
@@ -20,6 +20,15 @@ Actualizado: 2026-10-01.
   - **«Tecnologizar»** en «Cómo funciona» va «Tecnificar».
   - **Categorías:** «Bienes y Ganado» no va, según ella, pero está en el contrato firmado el 28/07. La hacienda puede ser de cualquier especie. Pide distinguir el tipo de producción, agrícola o pecuaria, y revisar «Origen y Destino» en «Producción». **Lo quiere ver en una reunión.**
   - **Emi (01/10):** las marcas y «Tecnificar» van sin reunión, en `FILTROS-DE-PUBLICACIONES-1`, después de `SESIONES-AL-CAMBIAR-1`. Las categorías y «Origen y Destino» esperan la reunión.
+- **Documento de la clienta «indexación» (02/10, por Emi).** Está en `originales/INDEXACION-CLIENTA-2026-10-02.docx`. Lectura de PM:
+  - **Compatible con lo hecho:** «Producción animal» en lugar de «Bienes y Ganado», con especies. Es la misma familia del contrato, más amplia. También los filtros que salen de lo publicado (`FILTROS-DE-PUBLICACIONES-1`) y el formulario estándar con campos por rubro.
+  - **Fuera del MVP:**
+    - publicar sin elegir categoría;
+    - la clasificación automática y la búsqueda que «interpreta» frases, que piden inteligencia artificial, costo y moderación;
+    - los tipos «Compra» y «Disponibilidad»;
+    - la familia «Producción» con vegetal, forestal y acuícola. El contrato pide filtros por categoría y ubicación.
+  - **Puente barato propuesto:** un buscador de texto que entienda acentos, plurales y sinónimos, por ejemplo que «colmena» encuentre «apicultura».
+  - **Emi (02/10):** van ahora `PRODUCCION-ANIMAL-1` y `BUSCADOR-SINONIMOS-1`. Lo de afuera del MVP se cotiza aparte. «Producción» va a la reunión.
 - **Devolución de la clienta del 30/09, después de la presentación (por Emi):** quedó muy contenta. Pidió:
   - **sacar «Quiénes somos»** (el menú, el pie y la página); con eso también dejan de hacer falta misión y visión (#12) y lo que quedaba de «Nuestro equipo»;
   - **que Inicio muestre el ecosistema y no sólo el mercado:** los servicios que van más allá del Mercado —trazabilidad, noticias del agro, charlas, entre otros—, aunque muchos queden fuera del MVP, para que se entienda el proyecto. Es la decisión #10, que Emi había dejado para más adelante el 27/09;
@@ -58,6 +67,7 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `SESIONES-AL-CAMBIAR-1` | aceptada en rama (`6265cc2`), sin publicar | `REPRODUCCION-SESIONES-AL-CAMBIAR-1-2026-10-02.md` |
 | `CAMBIAR-CONTRASENA-1` | publicada en `c21fb9d` | `REPRODUCCION-CAMBIAR-CONTRASENA-1-2026-10-01.md` |
 | `INICIO-ECOSISTEMA-1` | publicada en `30f9791` | `REPRODUCCION-INICIO-ECOSISTEMA-1-2026-10-01.md` |
 | `PAGO-ORDEN-CERRADA-1` | publicada en `65457cc` | `REPRODUCCION-PAGO-ORDEN-CERRADA-1-2026-09-28.md` |
