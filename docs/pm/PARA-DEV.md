@@ -256,6 +256,121 @@ Desde `INICIO-ECOSISTEMA-1`, sin sesión no hay ningún botón para publicar:
 
 ---
 
+## Después — PRODUCCION-ANIMAL-1 (apenas entregues VENDER-SIN-SESION-1)
+
+**Decisión de Emi (02/10), por el documento de la clienta**
+(`originales/INDEXACION-CLIENTA-2026-10-02.docx`, punto 1). Entregala por
+separado.
+
+### Problema
+
+«Bienes y Ganado» se lee como vacas, y su única subcategoría es «Bovinos». La
+clienta quiere que la familia abarque cualquier especie. Es la misma familia
+del contrato («animales de cría y comerciales»), más amplia.
+
+### Qué entra
+
+1. **«Bienes y Ganado» pasa a llamarse «Producción animal».** Los enlaces
+   viejos siguen funcionando.
+2. **Subcategorías:** Bovinos, que ya existe, más Equinos, Porcinos, Ovinos,
+   Caprinos, Avicultura, Apicultura y Otras especies.
+3. **«Raza»**, opcional, de texto, al publicar y en «Editar» en esta familia.
+   Se ve en la ficha y filtra con la regla de `FILTROS-DE-PUBLICACIONES-1`:
+   sólo las razas publicadas, sin importar mayúsculas ni acentos.
+4. **Producción:** la siembra no corre ahí, y las categorías no se cargan por
+   migración (decisión del 26/09). Proponé cómo llegan las subcategorías y el
+   nombre nuevo sin duplicar nada. Por ejemplo, agregar por slug las que
+   falten y renombrar sólo si el nombre sigue siendo el viejo. Probalo con un
+   caso sobre una base sin siembra y en modo producción.
+5. **Las guías y los casos** que nombran «Bienes y Ganado».
+
+### Fuera de alcance
+
+- La familia «Producción» (vegetal, forestal, acuícola): espera la reunión.
+- Publicar sin categoría y la clasificación automática: fuera del MVP.
+
+### Aceptación verificable
+
+1. **Caso nuevo:**
+   - el Mercado y el alta dicen «Producción animal», con sus ocho
+     subcategorías;
+   - publicar un lote de Apicultura con raza «Carniola» lo hace aparecer en
+     el filtro;
+   - un enlace viejo lleva a la familia.
+2. **Producción:** sobre una base sin siembra, con la familia ya renombrada a
+   mano, la carga no duplica ni pisa el nombre. Correrla dos veces no cambia
+   nada.
+3. **Negativo:** una subcategoría que falta en producción da rojo.
+4. Suite completa, a11y, contraste, móvil, las dos guías y las puertas.
+
+### Frená y consultá
+
+- Si renombrar rompe la logística («Hacienda en pie»), el estado «nuevo o
+  usado» o la marca de esa familia.
+
+---
+
+## Después — BUSCADOR-SINONIMOS-1 (apenas entregues PRODUCCION-ANIMAL-1)
+
+**Decisión de Emi (02/10).** Es el puente barato al «buscador inteligente» de
+la clienta, sin inteligencia artificial. La clasificación automática queda
+fuera del MVP. Entregala por separado.
+
+### Problema
+
+Hoy el buscador de texto compara letra por letra con `ilike` en el nombre, la
+descripción, la marca y el modelo. «Colmena» no encuentra «colmenas»,
+«tractor» no encuentra «Tractór», y «apicultura» no encuentra un lote de
+colmenas publicado en Apicultura si el texto no lo dice.
+
+### Qué entra
+
+1. **Sin acentos ni mayúsculas**, y **singular y plural** en español.
+2. **El nombre de la categoría y de la subcategoría también se buscan.**
+   «Apicultura» encuentra lo publicado en Apicultura.
+3. **Sinónimos**, en una lista versionada en el código, corta y revisable por
+   la clienta. Por ejemplo:
+   - colmena, abeja y apicultura;
+   - vaca, vacuno, bovino y hacienda;
+   - caballo y equino;
+   - cerdo, chancho y porcino;
+   - oveja y ovino;
+   - cabra y caprino;
+   - gallina, pollo y avicultura;
+   - pulverizadora, fumigadora y mosquito;
+   - cosechadora y trilladora.
+
+   Que la lista diga de dónde sale cada grupo.
+4. **Los filtros y el conteo** siguen saliendo del servidor, igual que hoy.
+
+### Fuera de alcance
+
+- Interpretar frases enteras o clasificar con inteligencia artificial.
+- Corregir errores de tipeo.
+- Ordenar por relevancia: si lo considerás necesario, proponelo.
+
+### Aceptación verificable
+
+1. **Caso nuevo:**
+   - «colmena» encuentra «Colmenas Langstroth» y un lote publicado en
+     Apicultura;
+   - «TRACTOR» y «tractores» encuentran lo mismo que «tractor»;
+   - «fumigadora» encuentra una pulverizadora;
+   - una palabra sin relación no trae nada.
+2. **Negativos:**
+   - sin los sinónimos da rojo;
+   - sin quitar acentos da rojo.
+3. **El tiempo de respuesta** del Mercado con 1000 publicaciones, antes y
+   después, medido en el informe.
+4. Suite completa y las puertas.
+
+### Frená y consultá
+
+- Si hace falta una extensión de PostgreSQL que el servicio de Railway no
+  tenga, como `unaccent`. Decí cómo comprobarlo antes de publicar.
+
+---
+
 ## Después (no empezar todavía)
 
 Lo decide la PM. Lo que depende de Emi puede reordenar la cola:

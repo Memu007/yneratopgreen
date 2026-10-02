@@ -211,6 +211,8 @@ o un rediseño nuevo.
 | 53b | **HERO-COMPACTO-1 — en espera** (se une a la sección «Por qué AgroBoeda» de la maqueta v3 cuando la clienta la apruebe) | La portada de Inicio tapa el ecosistema en una notebook (Emi, 01/10: opción A) | Título en tres renglones o menos y portada más baja: en 1440×900 y 1366×768 se ve el comienzo de los servicios. Va después de `SESIONES-AL-CAMBIAR-1` y antes de `VENDER-SIN-SESION-1`. |
 | 53c | **FILTROS-DE-PUBLICACIONES-1 — en cola** | La clienta: los filtros tienen que salir de las publicaciones (01/10) | Sólo opciones con publicaciones, «Otra marca» al publicar, «Tecnificar». Revierte la decisión del 25/09. Va después de `SESIONES-AL-CAMBIAR-1`. |
 | 53 | **VENDER-SIN-SESION-1 — en cola** | Sin sesión no queda ningún botón para publicar (Emi, 01/10: opción B) | «Vender» siempre en la cabecera; sin sesión pide ingresar y abre el formulario. Va después de `CAMBIAR-CONTRASENA-1`. |
+| 54 | **PRODUCCION-ANIMAL-1 — en cola** | La clienta: «ganadería» es restrictivo (02/10) | «Producción animal» con ocho especies y raza; llega a producción sin duplicar. Va después de `VENDER-SIN-SESION-1`. |
+| 55 | **BUSCADOR-SINONIMOS-1 — en cola** | Puente barato al buscador inteligente de la clienta (02/10) | Sin acentos ni plurales, busca en la categoría, sinónimos versionados. La clasificación automática queda fuera del MVP. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y
