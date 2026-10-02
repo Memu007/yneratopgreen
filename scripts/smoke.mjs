@@ -38682,8 +38682,10 @@ await runCase(232, 'Inicio muestra el ecosistema: siete servicios en orden, sól
         const esperado = total === 1 ? '1 publicación disponible' : `${total} publicaciones disponibles`;
         if (!cuenta.includes(esperado)) p(`el Mercado no dice «${esperado}»: «${cuenta}»`);
         if (!(await mercado.getByRole('button', { name: 'Entrar al Mercado' }).count())) p('el Mercado no tiene «Entrar al Mercado»');
-        // La octava cierra el bloque.
-        const cierre = eco.locator('aside');
+        // El cierre: octava de la grilla en la computadora, al final de Inicio
+        // en celular (dónde va exactamente lo mide el 240).
+        const cierre = page.locator('main aside');
+        if ((await cierre.count()) !== 1) p(`el cierre está ${await cierre.count()} veces`);
         const deCierre = plano(await cierre.innerText());
         for (const clave of ['rotulo', 'titulo', 'texto']) {
           if (!deCierre.toLowerCase().includes(POR_ETAPAS[clave].toLowerCase())) p(`el cierre no dice «${POR_ETAPAS[clave]}»: «${deCierre}»`);
@@ -40290,6 +40292,196 @@ await runCase(239, '«Marcas» en el panel corrige, une y da de baja, y el filtr
   }
   assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
   return medidos.join('; ');
+});
+
+// 240. INICIO-CIERRE-CELULAR-1. En celular, «¿Te interesa alguno?» quedaba a
+// mitad de página, después de la séptima tarjeta, con el crédito de las fotos
+// suelto debajo. Pasa al final de Inicio, después del principio, y el crédito
+// queda junto a las tarjetas. En la tableta y en la computadora completa la
+// grilla como octava, como antes. En todos los anchos está una sola vez en el
+// documento, y lo que se lee y se recorre con Tab va en el orden en que se ve.
+const ANCHOS_DEL_CIERRE = [
+  ['390', { width: 390, height: 844 }, true],
+  ['599', { width: 599, height: 900 }, true],
+  ['600', { width: 600, height: 900 }, false],
+  ['768', { width: 768, height: 1024 }, false],
+  ['1440', { width: 1440, height: 900 }, false],
+];
+const LINKS_DEL_CREDITO = CREDITOS.map(([nombre]) => nombre);
+
+// Dónde está el cierre, en el documento y en lo que se ve.
+const dondeEstaElCierre = (page) => page.evaluate(() => {
+  const plano = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+  const main = document.querySelector('main');
+  const titulos = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')]
+    .filter((h) => plano(h.textContent) === '¿Te interesa alguno?');
+  const botones = [...document.querySelectorAll('button')].filter((b) => plano(b.textContent) === 'Escribinos');
+  const textos = [...document.querySelectorAll('p')]
+    .filter((p) => plano(p.textContent) === 'Cada servicio se suma por etapas, después del Mercado.');
+  const cierre = titulos[0]?.closest('aside') || null;
+  const tarjetas = [...main.querySelectorAll('article')];
+  const septima = tarjetas[6];
+  const grilla = septima?.parentElement;
+  const principio = [...main.querySelectorAll('section')].find((s) => {
+    const id = s.getAttribute('aria-labelledby');
+    return id && plano(document.getElementById(id)?.textContent) === 'Principio de AgroBoeda';
+  });
+  const credito = [...main.querySelectorAll('p')].find((p) => plano(p.textContent).startsWith('Fotos de Cumplimiento'));
+  // Lo que sigue a un elemento en el documento, sin contar lo que tiene adentro.
+  const siguiente = (el) => {
+    let n = el;
+    while (n && n !== main && !n.nextElementSibling) n = n.parentElement;
+    return n && n !== main ? n.nextElementSibling : null;
+  };
+  const nombre = (el) => {
+    if (!el) return 'nada';
+    if (el === credito) return 'el crédito';
+    if (cierre && el === cierre) return 'el cierre';
+    return `${el.tagName} «${plano(el.textContent).slice(0, 40)}»`;
+  };
+  // El texto de Inicio que viene después del cierre: tiene que no haber.
+  let despues = null;
+  if (cierre) {
+    const rango = document.createRange();
+    rango.setStartAfter(cierre);
+    rango.setEndAfter(main.lastChild);
+    despues = plano(rango.toString());
+  }
+  const caja = (el) => {
+    if (!el) return null;
+    const c = el.getBoundingClientRect();
+    return {
+      top: Math.round(c.top + window.scrollY), bottom: Math.round(c.bottom + window.scrollY),
+      left: Math.round(c.left), right: Math.round(c.right),
+    };
+  };
+  // Lo que se lee, en el orden del documento, con dónde se ve.
+  const enOrden = [...tarjetas, cierre, credito, principio].filter(Boolean)
+    .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
+    .map((el) => ({ que: el.tagName === 'ARTICLE' ? plano(el.querySelector('h3')?.textContent) : nombre(el), ...caja(el) }));
+  return {
+    titulos: titulos.length, botones: botones.length, textos: textos.length,
+    nivel: titulos[0]?.tagName || null,
+    enLaGrilla: !!cierre && !!grilla && cierre.parentElement === grilla,
+    lugarEnLaGrilla: cierre && grilla ? [...grilla.children].indexOf(cierre) + 1 : 0,
+    despuesDelPrincipio: !!(cierre && principio && !principio.contains(cierre)
+      && (principio.compareDocumentPosition(cierre) & Node.DOCUMENT_POSITION_FOLLOWING)),
+    despues,
+    trasLaSeptima: nombre(siguiente(septima)),
+    septima: caja(septima), cierre: caja(cierre), credito: caja(credito), principio: caja(principio),
+    enOrden,
+  };
+});
+
+// Desde «Entrar al Mercado» de la tarjeta, lo que va tomando el foco con Tab.
+async function recorridoConTab(page, pasos) {
+  const mercado = page.locator('article').filter({ has: page.getByRole('heading', { name: 'Mercado', exact: true }) });
+  await mercado.getByRole('button', { name: 'Entrar al Mercado' }).focus();
+  const visto = [];
+  for (let i = 0; i < pasos; i += 1) {
+    await page.keyboard.press('Tab');
+    visto.push(await page.evaluate(() => {
+      const el = document.activeElement;
+      const texto = String(el?.textContent || '').replace(/\s+/g, ' ').trim();
+      return el?.closest('main') ? texto : `(fuera de Inicio) ${texto}`.trim();
+    }));
+  }
+  return visto;
+}
+
+await runCase(240, 'En celular «¿Te interesa alguno?» cierra Inicio y el crédito queda junto a las tarjetas; en la computadora sigue como octava', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const problemas = [];
+  const medidos = [];
+  try {
+    for (const [ancho, viewport, alFinal] of ANCHOS_DEL_CIERRE) {
+      const { contexto, page, errores } = await abrirInicio(browser, viewport);
+      const p = (texto) => problemas.push(`${ancho}: ${texto}`);
+      try {
+        await page.locator('article').nth(6).waitFor({ timeout: 20_000 });
+        const d = await dondeEstaElCierre(page);
+        if (d.titulos !== 1 || d.botones !== 1 || d.textos !== 1) {
+          p(`el cierre está más de una vez o falta en el documento: ${d.titulos} título(s), ${d.botones} «Escribinos», `
+            + `${d.textos} texto(s)`);
+        }
+        if (alFinal) {
+          if (d.enLaGrilla || !d.despuesDelPrincipio) {
+            p(`«¿Te interesa alguno?» no está después de «Principio de AgroBoeda»: ${d.enLaGrilla ? `es la ${d.lugarEnLaGrilla}.ª de la grilla` : 'no está después'}`);
+          }
+          if (d.despues) p(`después del cierre Inicio todavía dice «${d.despues.slice(0, 80)}»`);
+          if (d.trasLaSeptima !== 'el crédito') p(`después de la tarjeta 07 viene ${d.trasLaSeptima}, y no el crédito`);
+          if (d.cierre && d.principio && d.cierre.top < d.principio.bottom) p('el cierre se ve antes del principio');
+          if (d.credito && d.septima && (d.credito.top < d.septima.bottom || d.credito.top - d.septima.bottom > 40)) {
+            p(`el crédito no se ve junto a la tarjeta 07: ${d.credito.top - d.septima.bottom} px`);
+          }
+          if (d.nivel !== 'H2') p(`al final, el cierre es un ${d.nivel} y en el índice de títulos queda dentro de «Cómo funciona»`);
+        } else {
+          if (!d.enLaGrilla || d.lugarEnLaGrilla !== 8) {
+            p(`«¿Te interesa alguno?» no es la octava de la grilla: ${d.enLaGrilla ? `es la ${d.lugarEnLaGrilla}.ª` : (d.despuesDelPrincipio ? 'está al final de Inicio' : 'está fuera de la grilla')}`);
+          }
+          if (d.trasLaSeptima !== 'el cierre') p(`después de la tarjeta 07 viene ${d.trasLaSeptima}, y no el cierre`);
+          if (d.cierre && d.septima && (d.cierre.top !== d.septima.top || d.cierre.left <= d.septima.left)) {
+            p(`el cierre no se ve en la fila de la tarjeta 07, a su derecha: ${JSON.stringify({ cierre: d.cierre, septima: d.septima })}`);
+          }
+          if (d.nivel !== 'H3') p(`en la grilla, el cierre es un ${d.nivel} y no un H3 como las tarjetas`);
+        }
+        // Lo que se lee va en el orden en que se ve: cada cosa, debajo de la
+        // anterior o en su misma fila, a la derecha.
+        d.enOrden.forEach((b, i) => {
+          if (!i) return;
+          const a = d.enOrden[i - 1];
+          const debajo = b.top >= a.bottom - 1;
+          const alLado = Math.abs(b.top - a.top) <= 1 && b.left >= a.right - 1;
+          if (!debajo && !alLado) p(`se lee «${b.que}» después de «${a.que}», pero se ve antes`);
+        });
+        // Con Tab: el cierre se alcanza donde se ve.
+        const esperado = alFinal ? [...LINKS_DEL_CREDITO, 'Escribinos'] : ['Escribinos', ...LINKS_DEL_CREDITO];
+        const visto = await recorridoConTab(page, esperado.length + 1);
+        if (visto.slice(0, esperado.length).join(' | ') !== esperado.join(' | ')) {
+          p(`con Tab, después de «Entrar al Mercado» viene ${JSON.stringify(visto)}`);
+        }
+        if (!String(visto[esperado.length]).startsWith('(fuera de Inicio)')) {
+          p(`después de ${esperado[esperado.length - 1]} el Tab sigue en Inicio: «${visto[esperado.length]}»`);
+        }
+        const [scroll, visible] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+        if (scroll > visible + 1) p(`la página desborda (${scroll} en ${visible})`);
+        if (errores.length) p(`errores de página: ${errores.join(' | ')}`);
+        medidos.push(`${ancho}: ${alFinal ? 'al final, H2, el crédito tras la 07' : 'octava de la grilla, H3'}`);
+      } finally {
+        await contexto.close();
+      }
+    }
+
+    // Al cambiar de ancho con la página abierta (girar el celular, achicar la
+    // ventana), el cierre se muda, y si tenía el foco lo conserva.
+    const { contexto, page, errores } = await abrirInicio(browser, { width: 1440, height: 900 });
+    try {
+      await page.locator('article').nth(6).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', { name: 'Escribinos', exact: true }).focus();
+      for (const [ancho, viewport, alFinal] of [['de 1440 a 390', { width: 390, height: 844 }, true], ['de 390 a 1440', { width: 1440, height: 900 }, false]]) {
+        await page.setViewportSize(viewport);
+        const llego = await esperarA(async () => {
+          const d = await dondeEstaElCierre(page);
+          return alFinal ? d.despuesDelPrincipio && !d.enLaGrilla : d.enLaGrilla && d.lugarEnLaGrilla === 8;
+        }, ancho, 5_000).then(() => true, () => false);
+        if (!llego) problemas.push(`al pasar ${ancho}, el cierre no fue ${alFinal ? 'al final' : 'a la grilla'}`);
+        const foco = await esperarA(async () => page.evaluate(() => document.activeElement?.textContent.trim() === 'Escribinos'), 'foco', 3_000)
+          .then(() => 'Escribinos', () => page.evaluate(() => `${document.activeElement?.tagName} «${String(document.activeElement?.textContent || '').trim().slice(0, 30)}»`));
+        if (foco !== 'Escribinos') problemas.push(`al pasar ${ancho} con el foco en «Escribinos», el foco quedó en ${foco}`);
+        const d = await dondeEstaElCierre(page);
+        if (d.titulos !== 1 || d.botones !== 1) problemas.push(`al pasar ${ancho}, el cierre está ${d.titulos} vez/veces`);
+      }
+      if (errores.length) problemas.push(`al cambiar de ancho, errores de página: ${errores.join(' | ')}`);
+    } finally {
+      await contexto.close();
+    }
+
+    assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+    return `${medidos.join('; ')}. Una sola vez en el documento; lo que se lee y el Tab van en el orden en que se ve; al `
+      + 'cambiar de ancho el cierre se muda y conserva el foco';
+  } finally {
+    await browser.close();
+  }
 });
 
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
