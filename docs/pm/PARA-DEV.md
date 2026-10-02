@@ -217,7 +217,59 @@ feos y genéricos. Entregala por separado.
 
 ---
 
-## Después — VENDER-SIN-SESION-1 (empezala apenas entregues AVISOS-1)
+## Después — FILTROS-VISUAL-1 (apenas entregues AVISOS-1)
+
+**Decisión de Emi (02/10): aprobó `maquetas/FILTROS-V1-2026-10-02.html`**
+(y `.jpg`). El panel de filtros de hoy, con ocho desplegables iguales, se ve
+genérico. Es un cambio de cómo se ve: qué se filtra y cómo se cuenta no
+cambian. Entregala por separado.
+
+### Qué entra
+
+1. **Computadora**, como la maqueta:
+   - «Todo / Productos / Servicios» como selector de tres partes;
+   - la categoría y la subcategoría, como lista con su cantidad, y lo
+     elegido marcado;
+   - la marca, como lista con su cantidad y un buscador cuando hay más de
+     seis;
+   - la potencia, la condición y el origen, como etiquetas que se tocan;
+   - el año y el precio, con «desde» y «hasta»;
+   - «Dónde», con buscador de provincia o localidad;
+   - los grupos se pliegan.
+2. **Arriba de los resultados**, lo elegido como etiquetas verdes con cruz,
+   más «Limpiar todo». Sacar una saca ese filtro.
+3. **Celular:** una hoja que sube desde abajo, con «Limpiar» y un botón fijo
+   «Ver N publicaciones», con el número de la búsqueda que se va a ver.
+4. **Las barritas por año** son opcionales. Si suman un pedido o una
+   consulta pesada, no van; decilo.
+5. **Sin cambiar las reglas de hoy:** sólo opciones con publicaciones, la
+   elegida en cero a la vista, una marca por vez y la URL que conserva los
+   filtros.
+
+### Aceptación verificable
+
+1. **Los casos de filtros** (173, 175, 195, 198, 199, 200, 237 y los que
+   lean el panel) siguen verdes o se ajustan sin cambiar lo que miden. El
+   informe dice cuáles y por qué.
+2. **Caso nuevo:**
+   - las etiquetas de arriba coinciden con los filtros puestos, y sacar una
+     la saca de la búsqueda y de la URL;
+   - en 390, «Ver N publicaciones» dice el mismo número que muestra la lista
+     al cerrar la hoja.
+3. **Teclado y lector de pantalla:** cada opción se elige con teclado y
+   anuncia su cantidad; la hoja del celular atrapa el foco y lo devuelve al
+   cerrar.
+4. **Capturas** en 1440 y 390, junto a la maqueta.
+5. Suite, a11y, contraste, móvil, las dos guías y las puertas.
+
+### Frená y consultá
+
+- Si algún control de la maqueta obliga a cambiar la API o a hacer más
+  pedidos por cada cambio de filtro.
+
+---
+
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues FILTROS-VISUAL-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.

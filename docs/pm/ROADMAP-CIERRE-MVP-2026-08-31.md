@@ -213,6 +213,7 @@ o un rediseño nuevo.
 | 53d | **MARCAS-PANEL-1 — asignada** | Una marca escrita con «Otra marca» no se puede corregir (Emi, 02/10) | Corregir, unir y dar de baja marcas desde el panel. Va después de `FILTROS-DE-PUBLICACIONES-1`. |
 | 53e | **INICIO-CIERRE-CELULAR-1 — en cola** | En el celular, «¿Te interesa alguno?» corta Inicio a la mitad (Emi, 02/10) | En el celular pasa al final; en la computadora no cambia. Va después de `MARCAS-PANEL-1`. |
 | 53f | **AVISOS-1 — en cola** | Los avisos se ven feos y genéricos (Emi, 02/10) | Píldora verde de la marca, abajo, apilada, con acción; errores que no se van solos. Maqueta `AVISOS-V2`, opción A. |
+| 53g | **FILTROS-VISUAL-1 — en cola** | El panel de filtros se ve genérico (Emi, 02/10) | Opciones a la vista con cantidad, etiquetas de lo elegido, hoja en el celular con «Ver N publicaciones». Maqueta `FILTROS-V1`, aprobada. |
 | 53 | **VENDER-SIN-SESION-1 — en cola** | Sin sesión no queda ningún botón para publicar (Emi, 01/10: opción B) | «Vender» siempre en la cabecera; sin sesión pide ingresar y abre el formulario. Va después de `CAMBIAR-CONTRASENA-1`. |
 | 54 | **PRODUCCION-ANIMAL-1 — en cola** | La clienta: «ganadería» es restrictivo (02/10) | «Producción animal» con ocho especies y raza; llega a producción sin duplicar. Va después de `VENDER-SIN-SESION-1`. |
 | 55 | **BUSCADOR-SINONIMOS-1 — en cola** | Puente barato al buscador inteligente de la clienta (02/10) | Sin acentos ni plurales, busca en la categoría, sinónimos versionados. La clasificación automática queda fuera del MVP. |
