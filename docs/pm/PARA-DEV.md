@@ -24,9 +24,7 @@ Sobre `ee8e90e` (producto en `24296c5`). Evidencia en
 - **Cerrar la ruta genérica de Configuración sin que te lo pidieran:**
   excelente. Lo mismo el contraste del subtítulo.
 
-La publicación a `main` la decide Emi. No integres ni despliegues.
-
-`FILTROS-DE-PUBLICACIONES-1` está publicada en `dc377d9`.
+**Publicada en `main` (`4085a9a`, 02/10)** con autorización de Emi. No integres ni despliegues por tu cuenta.
 
 ---
 
