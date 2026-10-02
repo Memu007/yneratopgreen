@@ -34085,6 +34085,17 @@ await runCase(194, 'El tipo y la potencia se declaran al publicar, se validan, s
   return medidos.join('; ');
 });
 
+// Las opciones de un filtro del Mercado, cuando ya llegaron sus cantidades.
+// El selector aparece antes que la respuesta del catálogo, y leído enseguida
+// ofrecía sólo la primera («Todos», «Todas las marcas»). Se espera a que alguna opción diga «(n)»; si en 20 s
+// ninguna lo dice, se devuelve lo que hay y el caso dice qué vio.
+async function opcionesConCantidades(selector) {
+  const leer = async () => (await selector.locator('option').allInnerTexts()).map((t) => t.trim());
+  await esperarA(async () => (await leer()).some((t) => /\(\d+\)$/.test(t)), 'las cantidades del filtro', 20_000)
+    .catch(() => {});
+  return leer();
+}
+
 // 195. El filtro de tipo y el de potencia: en el servidor, sin nulos, en la
 //      URL y el historial, y desde la página 1.
 //
@@ -34221,11 +34232,15 @@ await runCase(195, 'Filtrar por tipo y por potencia cuenta en el servidor, deja 
       WHERE t.subcategory_id = ${sqlLiteral(preparacion.id)} AND t.is_active
       GROUP BY t.id, t.name, t.display_order ORDER BY t.display_order, t.name`)
       .map(([nombre, cuantas]) => `${nombre} (${cuantas})`);
-    const ofrecidas = (await page.locator('#catalog-subtype option').allInnerTexts()).map((o) => o.trim());
-    if (JSON.stringify(ofrecidas) !== JSON.stringify(['Todos', ...tiposConPublicaciones])) {
-      problemas.push(`pantalla: el filtro de tipo ofrece ${JSON.stringify(ofrecidas)} y en la base hay `
-        + `${JSON.stringify(tiposConPublicaciones)}`);
-    }
+    // Las opciones llegan con las cantidades, un momento después de que
+    // aparece el selector: leídas enseguida, a veces era sólo «Todos». Se
+    // espera a que estén, y si no llegan se dice qué ofreció.
+    let ofrecidas = [];
+    await esperarA(async () => {
+      ofrecidas = (await page.locator('#catalog-subtype option').allInnerTexts()).map((o) => o.trim());
+      return JSON.stringify(ofrecidas) === JSON.stringify(['Todos', ...tiposConPublicaciones]);
+    }, 'las opciones del tipo', 20_000).catch(() => problemas.push(`pantalla: el filtro de tipo ofrece `
+      + `${JSON.stringify(ofrecidas)} y en la base hay ${JSON.stringify(tiposConPublicaciones)}`));
     await page.locator('#catalog-subtype').selectOption('arados');
     await esperarA(async () => barra().get('subtype') === 'arados', 'elegir «Arados» no llegó a la barra', 20_000);
     if (barra().get('page')) problemas.push(`pantalla: elegir un tipo dejó la página ${barra().get('page')}`);
@@ -34635,7 +34650,7 @@ await runCase(198, 'Con una categoría que usa marca, el filtro ofrece sólo las
         await abrirLosFiltros();
         try {
           await control.waitFor({ state: 'visible', timeout: 20_000 });
-          return (await control.locator('option').allInnerTexts()).map((t) => t.trim());
+          return await opcionesConCantidades(control);
         } catch {
           problemas.push(`${donde}: ${momento} no se ve el filtro de marca`);
           return null;
@@ -39802,7 +39817,7 @@ await runCase(238, '«Otra marca» al publicar y al editar: la nueva aparece en 
         await page.goto(`${FRONTEND_URL}/?section=marketplace&category=${encodeURIComponent(tractores.categoria)}`
           + `&subcategory=${encodeURIComponent(tractores.nombre)}`, { waitUntil: 'domcontentloaded' });
         await page.locator('#catalog-brand').waitFor({ state: 'visible', timeout: 25_000 });
-        return (await page.locator('#catalog-brand option').allInnerTexts()).map((t) => t.trim());
+        return opcionesConCantidades(page.locator('#catalog-brand'));
       };
       if (!(await textosDelFiltro()).includes('Agromec (1)')) problemas.push('pantalla: el filtro no ofrece «Agromec (1)»');
       const filaDeLaMarca = async (id) => {
@@ -40035,6 +40050,10 @@ await runCase(239, '«Marcas» en el panel corrige, une y da de baja, y el filtr
   const admin = (await apiRequest('/auth/login', {
     method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
   })).data;
+  // La sesión de quien vende en el navegador, para abrir «Editar».
+  const deQuienVende = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'vendedor@ejemplo.com', password: 'vendedor123' },
+  })).data;
   const tractores = subrubroDe('maquinaria-agricola', 'tractores');
   const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
   const clave = (texto) => texto.normalize('NFKD').replace(/[^\x00-\x7f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -40119,7 +40138,7 @@ await runCase(239, '«Marcas» en el panel corrige, une y da de baja, y el filtr
           if ((await plegador.count()) > 0 && (await plegador.isVisible())
             && (await plegador.getAttribute('aria-expanded')) !== 'true') await plegador.click();
           await mercado.locator('#catalog-brand').waitFor({ state: 'visible', timeout: 20_000 });
-          const textos = (await mercado.locator('#catalog-brand option').allInnerTexts()).map((t) => t.trim());
+          const textos = await opcionesConCantidades(mercado.locator('#catalog-brand'));
           await mercado.close();
           return textos;
         };
@@ -40131,6 +40150,28 @@ await runCase(239, '«Marcas» en el panel corrige, une y da de baja, y el filtr
             .map((f) => [f.querySelector('dt')?.textContent?.trim(), f.querySelector('dd')?.textContent?.trim()])));
           await ficha.close();
           return filas.Marca;
+        };
+        // Lo que muestra el selector de marca de «Editar», en la cuenta de quien
+        // vende y en este ancho.
+        const marcaEnEditar = async (nombre) => {
+          const suya = await browser.newContext({ viewport: { width: medida.width, height: medida.height } });
+          await suya.addInitScript(({ a, r }) => {
+            window.localStorage.setItem('access_token', a);
+            window.localStorage.setItem('refresh_token', r);
+          }, { a: deQuienVende.access_token, r: deQuienVende.refresh_token });
+          const cuenta = await suya.newPage();
+          try {
+            await cuenta.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+            await cuenta.getByRole('button', { name: /publicaciones/i }).first().click();
+            const tarjeta = cuenta.locator('[class*="_productCard_"]').filter({ hasText: nombre }).first();
+            await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+            await tarjeta.getByRole('button', { name: /editar/i }).first().click();
+            await cuenta.locator('#edit-nombre').waitFor({ state: 'visible', timeout: 20_000 });
+            await cuenta.waitForFunction(() => (document.querySelector('#edit-marca')?.options.length ?? 0) > 2, null, { timeout: 15_000 });
+            return await cuenta.locator('#edit-marca').evaluate((s) => s.options[s.selectedIndex]?.textContent.trim());
+          } finally {
+            await suya.close();
+          }
         };
 
         // --- A. La lista ------------------------------------------------------
@@ -40189,6 +40230,10 @@ await runCase(239, '«Marcas» en el panel corrige, une y da de baja, y el filtr
         if ((await delFiltro()).some((m) => m.label === 'AgroMec')) problemas.push(`${donde}: dada de baja, sigue en el filtro de la API`);
         if ((await filtroEnPantalla()).some((t) => t.startsWith('AgroMec'))) problemas.push(`${donde}: dada de baja, sigue en el filtro de la pantalla`);
         if ((await marcaEnLaFicha(agro)) !== 'AgroMec') problemas.push(`${donde}: dada de baja, la ficha dice «Marca: ${await marcaEnLaFicha(agro)}»`);
+        // Ya no está en la lista del alta, y «Editar» la sigue mostrando con su
+        // nombre, no con su valor interno.
+        const enEditar = await marcaEnEditar(`${MARCADOR} ${donde} Agromec`);
+        if (enEditar !== 'AgroMec') problemas.push(`${donde}: dada de baja, «Editar» muestra la marca como «${enEditar}»`);
 
         await fila('AgroMec').getByRole('button', { name: 'Dar de alta AgroMec' }).click();
         await confirmar('Dar de alta la marca', 'Dar de alta');
@@ -40204,7 +40249,7 @@ await runCase(239, '«Marcas» en el panel corrige, une y da de baja, y el filtr
           .map(([, valor]) => valor));
         medidos.push(`${donde}: unir «Jhon Deer» a John Deere la pasa de ${jdAntes} a ${jdAntes + 1} en el filtro, y «Jhon `
           + 'Deer» sale de la lista, el filtro y el alta; «AgroMec» se ve en la ficha y en el filtro; dada de baja sale '
-          + 'del alta y del filtro, la ficha la sigue mostrando, y dada de alta vuelve');
+          + 'del alta y del filtro, la ficha y «Editar» la siguen mostrando con su nombre, y dada de alta vuelve');
       } catch (error) {
         problemas.push(`${donde}: no se pudo seguir: ${error.message.split('\n')[0]}`);
         querySql(`UPDATE products SET status = 'DELETED' WHERE id IN (${creadas.map(sqlLiteral).join(',')})`);
@@ -40251,6 +40296,24 @@ await runCase(239, '«Marcas» en el panel corrige, une y da de baja, y el filtr
       problemas.push(`API: dos uniones a la vez respondieron ${JSON.stringify(estados)} y la publicación quedó «${marcaDe(aLaVez)}»`);
     }
 
+    // --- F2. Unir mueve también las pausadas y las eliminadas ---------------
+    // Si moviera sólo las activas, una pausada quedaría con una marca que ya no
+    // existe, y al reactivarla no aparecería en el filtro.
+    const quieta = `Quieta ${sello}`;
+    const activa = await publicar('quieta activa', { otra_marca: quieta });
+    const pausada = await publicar('quieta pausada', { otra_marca: quieta });
+    const eliminada = await publicar('quieta eliminada', { otra_marca: quieta });
+    querySql(`UPDATE products SET status = 'PAUSED' WHERE id = ${sqlLiteral(pausada)}`);
+    querySql(`UPDATE products SET status = 'DELETED' WHERE id = ${sqlLiteral(eliminada)}`);
+    const [quietaId] = laMarca(quieta);
+    const deLasTres = await pedirComo(admin.access_token, `/admin/brands/${quietaId}/merge`, 'POST', { destino_id: jdId });
+    const quedaron = [['la activa', activa], ['la pausada', pausada], ['la eliminada', eliminada]]
+      .filter(([, id]) => marcaDe(id) !== 'john-deere').map(([que, id]) => `${que} quedó con «${marcaDe(id)}»`);
+    if (deLasTres.status !== 200 || deLasTres.datos?.movidas !== 2 || quedaron.length) {
+      problemas.push(`API: unir una marca con una publicación activa, una pausada y una eliminada respondió `
+        + `${deLasTres.status} (movidas ${deLasTres.datos?.movidas})${quedaron.length ? `, y ${quedaron.join(', ')}` : ''}`);
+    }
+
     // --- G. Consigo misma, a una dada de baja, a un nombre que ya existe ------
     // Sobre una marca descartable y no sobre John Deere: si la regla faltara,
     // estos pedidos la borrarían de la base.
@@ -40273,15 +40336,22 @@ await runCase(239, '«Marcas» en el panel corrige, une y da de baja, y el filtr
     }
     const corta = await pedirComo(admin.access_token, `/admin/brands/${solaId}`, 'PATCH', { label: 'A' });
     if (corta.status !== 422) problemas.push(`API: corregir a «A» respondió ${corta.status}`);
+    // Renombrar antes que borrar: con el borrado roto, renombrar daría 404 y
+    // no diría nada del cambio de nombre.
+    const renombrada = await pedirComo(admin.access_token, `/admin/form-options/${solaId}`, 'PUT', { label: `Renombrada ${sello}` });
+    if (renombrada.status !== 400 || laMarca(`Sola ${sello}`)?.[2] !== `Sola ${sello}`) {
+      problemas.push(`API: Configuración renombró una marca por la ruta genérica (HTTP ${renombrada.status})`);
+    }
     const generica = await pedirComo(admin.access_token, `/admin/form-options/${solaId}`, 'DELETE');
     if (generica.status !== 400 || !existe(solaId)) {
       problemas.push(`API: Configuración borró una marca por la ruta genérica (HTTP ${generica.status})`);
     }
     medidos.push('quien vende recibe 403 al listar, corregir, dar de baja y unir, y no cambia nada; unir dos veces '
       + `seguidas responde ${primera.status} y ${segunda.status}, y dos a la vez ${JSON.stringify(estados)}, con la `
-      + `publicación movida una sola vez; unir consigo misma, ${misma.status}; a una dada de baja, 400; corregir al `
+      + `publicación movida una sola vez; unir mueve la activa, la pausada y la eliminada (movidas `
+      + `${deLasTres.datos?.movidas}); unir consigo misma, ${misma.status}; a una dada de baja, 400; corregir al `
       + `nombre de otra, ${aOtra.status} con esa otra; a «A», ${corta.status}; borrar una marca desde Configuración, `
-      + `${generica.status}`);
+      + `${generica.status}, y renombrarla, ${renombrada.status}`);
   } finally {
     await browser.close();
     if (creadas.length) {

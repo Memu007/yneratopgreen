@@ -26,6 +26,19 @@ Y los demás:
   panel-no-recarga      La pantalla no vuelve a pedir la lista después de
                         unir: la que se fue sigue a la vista.
 
+Del agregado que pidió la PM con INICIO-CIERRE-CELULAR-1 (los dos primeros
+son sus negativos, que antes sobrevivían):
+
+  unir-solo-activas     Unir mueve sólo las publicaciones activas: la pausada
+                        y la eliminada quedan con una marca que no existe.
+  configuracion-renombra
+                        Configuración renombra una marca por la ruta genérica.
+  editar-valor-interno  «Editar» muestra una marca dada de baja con su valor
+                        interno («agromec») y no con su nombre.
+  mis-publicaciones-sin-nombre
+                        La lista de publicaciones propias no trae el nombre de
+                        la marca, y «Editar» cae en el valor interno.
+
 Los del backend reinician la API antes y después con REINICIAR_API (por
 omisión, `./scripts/entorno_nativo.sh --reiniciar-api`). Los de pantalla
 esperan a que el servidor de desarrollo sirva el archivo roto, y después el
@@ -49,7 +62,9 @@ RAIZ = Path(__file__).resolve().parent.parent
 MARCAS = RAIZ / "backend/app/services/marcas.py"
 ADMIN = RAIZ / "backend/app/api/admin.py"
 PANEL = RAIZ / "src/components/AdminPanel/AdminPanel.tsx"
-DEL_FRONTEND = {PANEL}
+DASHBOARD = RAIZ / "src/components/UserDashboard/UserDashboard.tsx"
+PRODUCTOS = RAIZ / "backend/app/api/products.py"
+DEL_FRONTEND = {PANEL, DASHBOARD}
 REINICIAR_API = os.environ.get("REINICIAR_API", "./scripts/entorno_nativo.sh --reiniciar-api")
 CASO = 239
 
@@ -116,7 +131,7 @@ SABOTAJES = {
           "    \n"
           "    label = option.label\n")],
         ["API: Configuración borró una marca por la ruta genérica (HTTP 200)"],
-        ["quien vende pide", "unir dos veces", "consigo misma", *PANTALLA],
+        ["quien vende pide", "unir dos veces", "consigo misma", "renombró", *PANTALLA],
     ),
     "panel-no-recarga": (
         PANEL,
@@ -128,6 +143,40 @@ SABOTAJES = {
         ["escritorio: unida, «Jhon Deer» sigue en la lista del panel",
          "celular: unida, «Jhon Deer» sigue en la lista del panel"],
         ["la publicación quedó", "quien vende pide", "API:"],
+    ),
+    # Del agregado de INICIO-CIERRE-CELULAR-1, por la revisión de la PM.
+    "unir-solo-activas": (
+        MARCAS,
+        [("        db.query(Product).filter(Product.brand == origen.value).update(\n",
+          "        db.query(Product).filter(Product.brand == origen.value,\n"
+          "                                 Product.status == ProductStatus.ACTIVE).update(\n")],
+        ["la pausada quedó con «quieta-", "la eliminada quedó con «quieta-"],
+        ["la activa quedó", "quien vende pide", *PANTALLA],
+    ),
+    "configuracion-renombra": (
+        ADMIN,
+        [("    solo_las_de_configuracion(option)\n"
+          "    \n"
+          "    # El valor interno es la llave",
+          "    \n"
+          "    # El valor interno es la llave")],
+        ["API: Configuración renombró una marca por la ruta genérica (HTTP 200)"],
+        ["borró una marca", "quien vende pide", *PANTALLA],
+    ),
+    "editar-valor-interno": (
+        DASHBOARD,
+        [("                          {nombreDeLaMarcaGuardada(editingProduct.id, editingProduct.marca)}\n",
+          "                          {editingProduct.marca}\n")],
+        ["escritorio: dada de baja, «Editar» muestra la marca como «agromec»",
+         "celular: dada de baja, «Editar» muestra la marca como «agromec»"],
+        ["API:", "unida,", "corregida,", "la ficha dice"],
+    ),
+    "mis-publicaciones-sin-nombre": (
+        PRODUCTOS,
+        [('            "brand_label": nombres_de_marca.get(product.brand) if product.brand else None,\n', "")],
+        ["escritorio: dada de baja, «Editar» muestra la marca como «agromec»",
+         "celular: dada de baja, «Editar» muestra la marca como «agromec»"],
+        ["API:", "unida,", "corregida,", "la ficha dice"],
     ),
 }
 
