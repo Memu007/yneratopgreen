@@ -540,87 +540,10 @@ def create_seed_data():
                 ("programar", "A programar"),
                 ("temporada", "Solo en temporada"),
             ],
-            # Marcas de maquinaria. La lista vino del buscador que armo la
-            # clienta y la curo la PM, en dos pasos.
-            #
-            # Primero se retiro «Jhon Deere», que es «John Deere» mal escrito y
-            # estaba junto a el: dos etiquetas para el mismo tractor parten los
-            # resultados en dos.
-            #
-            # Despues se decidieron los cuatro pares, y NO en bloque:
-            #
-            #   Deutz / Deutz-Fahr   quedan los dos: en el usado argentino «Deutz»
-            #                        es Deutz Argentina y «Deutz-Fahr» la moderna.
-            #   Case / Case IH       quedan los dos: Case IH existe desde la
-            #                        fusion de 1985, y se distinguen desde la chapa.
-            #   Fiat / Fiat Someca / Someca  queda «fiat» sola: Someca era el brazo
-            #                        frances de Fiat y la maquina que esta en el
-            #                        campo es un Fiat. Tres etiquetas para una
-            #                        familia es «Jhon Deere» bien escrito.
-            #   Chery / Chery Bylion queda «chery» a secas: Bylion es la linea
-            #                        de tractores de Chery, no otro fabricante, y
-            #                        en el mercado se la nombra «Chery». La PM
-            #                        habia elegido la etiqueta larga y Emi la
-            #                        corrigio: el conocimiento del mercado es suyo.
-            #
-            # Se decidio AHORA y no despues a proposito: `products.brand` esta
-            # vacia y sin desplegar, asi que cambiar la lista no deja ninguna
-            # publicacion con una marca que ya no se ofrece. Desactivar desde el
-            # panel mas adelante SI la dejaria, porque la semilla solo inserta lo
-            # que falta y la validacion corre solo al escribir.
-            #
-            # El valor es un slug y la etiqueta es el nombre: el slug es lo que
-            # va a viajar el dia que esto sea un filtro.
-            #
-            # En produccion la siembra no corre: ahi las trae la migracion
-            # `01ff14043124`, con una copia congelada de esta lista. Cambiar la
-            # lista despues tambien pide una migracion.
-            "brand": [
-                ("agrinar", "Agrinar"),
-                ("antonio-carraro", "Antonio Carraro"),
-                ("apache", "Apache"),
-                ("belarus", "Belarus"),
-                ("bronco", "Bronco"),
-                ("case", "Case"),
-                ("case-ih", "Case IH"),
-                ("chery", "Chery"),
-                ("claas", "Claas"),
-                ("deutz", "Deutz"),
-                ("deutz-fahr", "Deutz-Fahr"),
-                ("dongfeng", "Dongfeng"),
-                ("eisen", "Eisen"),
-                ("farmtrac", "Farmtrac"),
-                ("ferrari", "Ferrari"),
-                ("fiat", "Fiat"),
-                ("foton", "Foton"),
-                ("grosspal", "Grosspal"),
-                ("hanomag", "Hanomag"),
-                ("husqvarna", "Husqvarna"),
-                ("jinma", "Jinma"),
-                ("john-deere", "John Deere"),
-                ("kioti", "Kioti"),
-                ("kubota", "Kubota"),
-                ("lamborghini-trattori", "Lamborghini Trattori"),
-                ("landini", "Landini"),
-                ("lovol", "Lovol"),
-                ("mahindra", "Mahindra"),
-                ("massey-ferguson", "Massey Ferguson"),
-                ("mccormick", "McCormick"),
-                ("new-holland", "New Holland"),
-                ("pasquali", "Pasquali"),
-                ("pauny", "Pauny"),
-                ("roland-h", "Roland H"),
-                ("same", "SAME"),
-                ("shibaura", "Shibaura"),
-                ("sonalika", "Sonalika"),
-                ("universal", "Universal"),
-                ("valpadana", "Valpadana"),
-                ("valtra", "Valtra"),
-                ("yanmar", "Yanmar"),
-                ("yard-machines", "Yard Machines"),
-                ("zanello", "Zanello"),
-                ("zoomlion", "Zoomlion"),
-            ],
+            # Marcas de maquinaria: la lista curada vive en `services/marcas.py`,
+            # que es tambien lo que el panel usa para decir si una marca se
+            # cargo de la lista o la escribio alguien al publicar.
+            "brand": list(marcas.MARCAS_DE_LA_LISTA),
             "response_time": [
                 ("inmediato", "Inmediato"),
                 ("24hs", "Dentro de 24hs"),

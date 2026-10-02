@@ -1237,7 +1237,9 @@
 
 .configHeader p {
   margin: 0;
-  color: var(--tg-color-border-control);
+  /* Era el color de un borde (--tg-color-border-control): 3,9 a 1 sobre
+     blanco, por debajo del mínimo para texto. */
+  color: var(--tg-color-text-secondary);
   font-size: 0.85rem;
 }
 
@@ -1648,4 +1650,147 @@
   border: 1px solid var(--tg-color-brand);
   border-radius: var(--tg-radius-lg);
   font-size: 0.85rem;
+}
+
+/* Marcas: corregir, unir y dar de baja. Cada fila dice el nombre, cuantas
+   publicaciones la usan y de donde vino; las acciones abren su formulario
+   debajo, en la misma fila. En celular los datos y las acciones ocupan cada
+   uno su renglon. */
+.marcas {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.marca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 16px;
+  background: var(--tg-color-canvas);
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-sm);
+}
+
+.marcaDeBaja {
+  background: var(--tg-color-surface);
+  border-style: dashed;
+}
+
+.marcaDatos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+.marcaNombre {
+  font-weight: 600;
+  color: var(--tg-color-text);
+  overflow-wrap: anywhere;
+}
+
+.marcaDato {
+  color: var(--tg-color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.marcaAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.marcaBoton {
+  min-height: var(--tg-control-min);
+  padding: 0 14px;
+  border: 1px solid var(--tg-color-border-control);
+  border-radius: var(--tg-radius-sm);
+  background: var(--tg-color-canvas);
+  color: var(--tg-color-text);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.marcaBoton:hover:not(:disabled) {
+  border-color: var(--tg-color-brand);
+}
+
+.marcaBoton:focus-visible {
+  outline: 2px solid var(--tg-color-focus);
+  outline-offset: 2px;
+}
+
+.marcaBoton:disabled {
+  background: var(--tg-color-disabled-bg);
+  color: var(--tg-color-disabled-text);
+  cursor: not-allowed;
+}
+
+.marcaBotonBaja {
+  color: var(--tg-color-error);
+}
+
+.marcaEdicion {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--tg-color-border);
+}
+
+.marcaCampo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 220px;
+  min-width: 0;
+  color: var(--tg-color-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.marcaCampo input,
+.marcaCampo select {
+  min-height: var(--tg-control-min);
+  padding: 0 10px;
+  border: 1px solid var(--tg-color-border-control);
+  border-radius: var(--tg-radius-sm);
+  background: var(--tg-color-canvas);
+  color: var(--tg-color-text);
+  font: inherit;
+  font-weight: 400;
+  max-width: 100%;
+}
+
+.marcaAviso {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--tg-color-text);
+  background: var(--tg-color-warning-bg);
+  border-radius: var(--tg-radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .marcaDatos,
+  .marcaAcciones {
+    flex-basis: 100%;
+  }
+
+  .marcaAcciones .marcaBoton {
+    flex: 1 1 auto;
+  }
 }

@@ -15,6 +15,8 @@ from app.models.order import Order, OrderStatus
 from app.core.dependencies import cerrar_las_sesiones, get_current_user
 from app.core.security import hash_password
 from app.schemas.auth import ClaveNueva, UserResponse
+from app.schemas.products import OtraMarca
+from app.services import marcas
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -954,6 +956,20 @@ class FormOptionResponse(BaseModel):
 VALID_OPTION_TYPES = ['province', 'unit', 'pricing_type', 'availability', 'response_time']
 
 
+def solo_las_de_configuracion(option: FormOption) -> None:
+    """Editar y borrar por acá, sólo las listas de Configuración.
+
+    Las marcas tienen su sección, «Marcas», que cuida lo que estas rutas no:
+    borrar una marca por acá dejaría a sus publicaciones apuntando a una que
+    ya no existe, y renombrarla podría repetir el nombre de otra.
+    """
+    if option.option_type not in VALID_OPTION_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Esta opción no se edita desde Configuración. Las marcas se corrigen en «Marcas».",
+        )
+
+
 @router.get("/form-options/types")
 def get_option_types(
     admin: User = Depends(require_admin)
@@ -1051,6 +1067,7 @@ def update_form_option(
     option = db.query(FormOption).filter(FormOption.id == option_id).first()
     if not option:
         raise HTTPException(status_code=404, detail="Opción no encontrada")
+    solo_las_de_configuracion(option)
     
     # El valor interno es la llave con la que ya quedaron guardadas las
     # publicaciones: `unit`, `pricing_type`, `availability` y `response_time`
@@ -1097,9 +1114,86 @@ def delete_form_option(
     option = db.query(FormOption).filter(FormOption.id == option_id).first()
     if not option:
         raise HTTPException(status_code=404, detail="Opción no encontrada")
+    solo_las_de_configuracion(option)
     
     label = option.label
     db.delete(option)
     db.commit()
     
     return {"message": f"Opción '{label}' eliminada correctamente"}
+
+
+# ==================== MARCAS ====================
+#
+# Corregir, unir y dar de baja las marcas (decisión de Emi, 02/10). Lo que
+# hacen está en `services/marcas.py`, con el mismo candado que «Otra marca»:
+# unir mientras alguien publica con esa marca no puede dejar a la publicación
+# apuntando a una que ya no existe.
+
+class MarcaDelPanel(BaseModel):
+    id: str
+    value: str
+    label: str
+    is_active: bool
+    # Sin contar las eliminadas.
+    publicaciones: int
+    # Si se cargó de la lista de la siembra; si no, la escribió alguien al
+    # publicar, con «Otra marca».
+    de_la_lista: bool
+
+
+class CambioDeMarca(BaseModel):
+    # El nombre corregido sigue la misma regla que «Otra marca».
+    label: Optional[OtraMarca] = None
+    is_active: Optional[bool] = None
+
+
+class UnirMarcas(BaseModel):
+    destino_id: str = Field(..., min_length=1, max_length=64)
+
+
+class MarcasUnidas(BaseModel):
+    movidas: int
+    destino: MarcaDelPanel
+
+
+@router.get("/brands", response_model=List[MarcaDelPanel])
+def listar_marcas(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Todas las marcas, también las dadas de baja, en el orden del alta."""
+    return marcas.listar_para_el_panel(db)
+
+
+@router.patch("/brands/{marca_id}", response_model=MarcaDelPanel)
+def cambiar_marca(
+    marca_id: str,
+    cambio: CambioDeMarca,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Corregir el nombre, o dar de baja y de alta.
+
+    Si el nombre corregido es el de otra marca, responde 409 con esa otra, para
+    que el panel ofrezca unirlas.
+    """
+    if cambio.label is None and cambio.is_active is None:
+        raise HTTPException(status_code=400, detail="No hay nada que cambiar.")
+    resultado = None
+    if cambio.label is not None:
+        resultado = marcas.corregir_nombre(db, marca_id, cambio.label)
+    if cambio.is_active is not None:
+        resultado = marcas.cambiar_estado(db, marca_id, cambio.is_active)
+    return resultado
+
+
+@router.post("/brands/{marca_id}/merge", response_model=MarcasUnidas)
+def unir_marcas(
+    marca_id: str,
+    pedido: UnirMarcas,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Las publicaciones de esta marca pasan a `destino_id`, y ésta desaparece."""
+    return marcas.unir(db, marca_id, pedido.destino_id)

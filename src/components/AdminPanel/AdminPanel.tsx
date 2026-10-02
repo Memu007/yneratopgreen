@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styles from './AdminPanel.module.css';
 import { useToast } from '../../hooks/useToast';
-import { apiGet, apiPost, apiPut, apiPatch, apiDelete, apiBlob } from '../../utils/api';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete, apiBlob, ErrorDeLaApi } from '../../utils/api';
 import { ProductImage } from '../ProductImage/ProductImage';
 import {
   ETIQUETA_DE_ESTADO,
@@ -55,7 +55,21 @@ const TIPOS_RETIRADOS = ['province'];
 
 type AdminTab =
   | 'dashboard' | 'users' | 'products' | 'orders' | 'categories' | 'config'
-  | 'documentacion';
+  | 'documentacion' | 'marcas';
+
+/** Una marca como la muestra «Marcas»: `/admin/brands`. */
+interface MarcaDelPanel {
+  id: string;
+  value: string;
+  label: string;
+  is_active: boolean;
+  /** Sin contar las publicaciones eliminadas. */
+  publicaciones: number;
+  /** Si se cargó de la lista; si no, alguien la escribió con «Otra marca». */
+  de_la_lista: boolean;
+}
+
+const publicacionesDe = (cuantas: number) => (cuantas === 1 ? '1 publicación' : `${cuantas} publicaciones`);
 
 // Las claves son las que devuelve `/admin/dashboard`. Antes esta interfaz
 // pedía `total_sellers` y `total_customers`, que el servidor nunca mandó: la
@@ -274,7 +288,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   // pantalla mostraba la tabla vacía o los datos de la consulta anterior, y un
   // 500 se leía igual que «no hay resultados». Acá el fallo es un estado más,
   // por sección, y mientras está puesto NO se dibujan filas: se dibuja el aviso.
-  type SeccionAuditada = 'dashboard' | 'usuarios' | 'productos' | 'ordenes' | 'documentacion';
+  type SeccionAuditada = 'dashboard' | 'usuarios' | 'productos' | 'ordenes' | 'documentacion' | 'marcas';
   const [fallos, setFallos] = useState<Partial<Record<SeccionAuditada, string>>>({});
   const limpiarFallo = useCallback((seccion: SeccionAuditada) => {
     setFallos((previos) => {
@@ -434,6 +448,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       setLoading(false);
     }
   }, [docFiltro, limpiarFallo, anotarFallo]);
+
+  // --- Marcas ---------------------------------------------------------------
+  //
+  // Corregir, unir y dar de baja las marcas (decisión de Emi, 02/10). Las que
+  // alguien escribió con «Otra marca» llegan solas a la lista y al filtro;
+  // acá se corrigen.
+  const [marcas, setMarcas] = useState<MarcaDelPanel[]>([]);
+  // La que se está corrigiendo o uniendo: una por vez.
+  const [corrigiendo, setCorrigiendo] = useState<{ marca: MarcaDelPanel; nombre: string } | null>(null);
+  // El nombre corregido es el de otra marca: se ofrece unirlas.
+  const [coincide, setCoincide] = useState<{ marca: MarcaDelPanel; otra: MarcaDelPanel } | null>(null);
+  const [errorDelNombre, setErrorDelNombre] = useState('');
+  const [uniendo, setUniendo] = useState<{ marca: MarcaDelPanel; destinoId: string } | null>(null);
+
+  const loadMarcas = useCallback(async () => {
+    setLoading(true);
+    limpiarFallo('marcas');
+    try {
+      setMarcas(await apiGet<MarcaDelPanel[]>('/admin/brands'));
+    } catch (error) {
+      console.error('Error cargando marcas:', error);
+      setMarcas([]);
+      anotarFallo('marcas', 'las marcas');
+    } finally {
+      setLoading(false);
+    }
+  }, [limpiarFallo, anotarFallo]);
+
+  const dejarDeEditarMarcas = () => {
+    setCorrigiendo(null);
+    setCoincide(null);
+    setErrorDelNombre('');
+    setUniendo(null);
+  };
 
   const verConstancia = async (fila: DocumentacionEnCola) => {
     try {
@@ -642,9 +690,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     if (activeTab === 'categories') loadCategories();
     if (activeTab === 'config') loadFormOptions();
     if (activeTab === 'documentacion') loadDocumentacion();
+    if (activeTab === 'marcas') loadMarcas();
   }, [activeTab, userRoleFilter, categoryFilter, selectedOptionType, docFiltro,
       loadUsers, loadProducts, loadOrders, loadCategories, loadFormOptions,
-      loadDocumentacion]);
+      loadDocumentacion, loadMarcas]);
 
   const handleCreateOption = async () => {
     if (!newOption.value.trim() || !newOption.label.trim()) {
@@ -1023,6 +1072,91 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     });
   };
 
+  const guardarNombreDeMarca = async () => {
+    if (!corrigiendo) return;
+    setErrorDelNombre('');
+    setCoincide(null);
+    try {
+      await apiPatch(`/admin/brands/${corrigiendo.marca.id}`, { label: corrigiendo.nombre });
+      showToast(`La marca ahora se llama «${corrigiendo.nombre.trim().replace(/\s+/g, ' ')}».`, 'success');
+      setCorrigiendo(null);
+      loadMarcas();
+    } catch (error) {
+      const otra = error instanceof ErrorDeLaApi && error.estado === 409
+        ? (error.detalle as { otra?: MarcaDelPanel } | undefined)?.otra
+        : undefined;
+      if (otra) {
+        setCoincide({ marca: corrigiendo.marca, otra });
+      } else {
+        setErrorDelNombre(error instanceof Error ? error.message : 'No se pudo corregir el nombre.');
+      }
+    }
+  };
+
+  const pedirUnirMarcas = (origen: MarcaDelPanel, destino: MarcaDelPanel) => setConfirmacion({
+    titulo: 'Unir marcas',
+    detalle: (
+      <>
+        <strong>{origen.label}</strong> se une a <strong>{destino.label}</strong>.{' '}
+        {origen.publicaciones === 0 && 'No tiene publicaciones.'}
+        {origen.publicaciones === 1 && `Su publicación pasa a ${destino.label}.`}
+        {origen.publicaciones > 1 && `Sus ${origen.publicaciones} publicaciones pasan a ${destino.label}.`}{' '}
+        «{origen.label}» deja de ofrecerse al publicar y en el filtro del Mercado. No se puede
+        deshacer.
+      </>
+    ),
+    textoConfirmar: `Unir con ${destino.label}`,
+    destructiva: true,
+    hacer: async () => {
+      try {
+        const { movidas } = await apiPost<{ movidas: number }>(
+          `/admin/brands/${origen.id}/merge`, { destino_id: destino.id });
+        showToast(`«${origen.label}» se unió a «${destino.label}»: `
+          + `${movidas === 1 ? 'pasó 1 publicación' : `pasaron ${movidas} publicaciones`}.`, 'success');
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'No se pudieron unir las marcas.', 'error');
+      } finally {
+        // Unida o no, la lista se vuelve a pedir: si otra persona ya la había
+        // unido, lo que se ve tiene que dejar de ofrecerla.
+        dejarDeEditarMarcas();
+        loadMarcas();
+      }
+    },
+  });
+
+  const pedirEstadoDeMarca = (marca: MarcaDelPanel) => {
+    const baja = marca.is_active;
+    setConfirmacion({
+      titulo: baja ? 'Dar de baja la marca' : 'Dar de alta la marca',
+      detalle: baja ? (
+        <>
+          <strong>{marca.label}</strong> deja de ofrecerse al publicar y en el filtro del Mercado.{' '}
+          {marca.publicaciones === 0 && 'No tiene publicaciones.'}
+          {marca.publicaciones === 1 && 'Su publicación la sigue mostrando en su página.'}
+          {marca.publicaciones > 1 && `Sus ${marca.publicaciones} publicaciones la siguen mostrando en su página.`}{' '}
+          Se puede volver a dar de alta.
+        </>
+      ) : (
+        <>
+          <strong>{marca.label}</strong> vuelve a ofrecerse al publicar y en el filtro del Mercado.
+        </>
+      ),
+      textoConfirmar: baja ? 'Dar de baja' : 'Dar de alta',
+      destructiva: baja,
+      hacer: async () => {
+        try {
+          await apiPatch(`/admin/brands/${marca.id}`, { is_active: !baja });
+          showToast(baja ? `«${marca.label}» quedó dada de baja.` : `«${marca.label}» quedó dada de alta.`, 'success');
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : 'No se pudo cambiar la marca.', 'error');
+        } finally {
+          dejarDeEditarMarcas();
+          loadMarcas();
+        }
+      },
+    });
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
@@ -1149,6 +1283,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             onClick={() => setActiveTab('documentacion')}
           >
             Documentación
+          </button>
+          <button
+            className={`${styles.tab} ${activeTab === 'marcas' ? styles.active : ''}`}
+            onClick={() => setActiveTab('marcas')}
+          >
+            Marcas
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'config' ? styles.active : ''}`}
@@ -2058,6 +2198,136 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       )}
 
       {/* CONFIGURACIÓN - Opciones de Formulario */}
+      {activeTab === 'marcas' && (
+        <div className={styles.configSection}>
+          <div className={styles.configHeader}>
+            <h2>Marcas</h2>
+            <p>
+              Las que se ofrecen al publicar maquinaria y en el filtro del Mercado. Las que
+              alguien escribió con «Otra marca» llegan solas, y acá se corrigen.
+            </p>
+          </div>
+          {bloqueAuditado('marcas', loadMarcas, 'No hay marcas cargadas.', marcas.length > 0, (
+            <>
+              <p className={styles.resultCount}>
+                {marcas.length} marcas · {marcas.filter((m) => !m.de_la_lista).length} escritas al publicar
+              </p>
+              <ul className={styles.marcas}>
+                {marcas.map((marca) => (
+                  <li key={marca.id} className={`${styles.marca} ${marca.is_active ? '' : styles.marcaDeBaja}`}>
+                    <div className={styles.marcaDatos}>
+                      <span className={styles.marcaNombre}>{marca.label}</span>
+                      <span className={styles.marcaDato}>{publicacionesDe(marca.publicaciones)}</span>
+                      <span className={styles.marcaDato}>
+                        {marca.de_la_lista ? 'De la lista' : 'Escrita al publicar'}
+                      </span>
+                      {!marca.is_active && <span className={styles.inactiveTag}>Dada de baja</span>}
+                    </div>
+                    <div className={styles.marcaAcciones}>
+                      <button
+                        type="button"
+                        className={styles.marcaBoton}
+                        aria-label={`Corregir el nombre de ${marca.label}`}
+                        onClick={() => {
+                          dejarDeEditarMarcas();
+                          setCorrigiendo({ marca, nombre: marca.label });
+                        }}
+                      >
+                        Corregir
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.marcaBoton}
+                        aria-label={`Unir ${marca.label} con otra marca`}
+                        onClick={() => {
+                          dejarDeEditarMarcas();
+                          setUniendo({ marca, destinoId: '' });
+                        }}
+                      >
+                        Unir
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.marcaBoton} ${marca.is_active ? styles.marcaBotonBaja : ''}`}
+                        aria-label={`${marca.is_active ? 'Dar de baja' : 'Dar de alta'} ${marca.label}`}
+                        onClick={() => pedirEstadoDeMarca(marca)}
+                      >
+                        {marca.is_active ? 'Dar de baja' : 'Dar de alta'}
+                      </button>
+                    </div>
+
+                    {corrigiendo?.marca.id === marca.id && (
+                      <form
+                        className={styles.marcaEdicion}
+                        onSubmit={(e) => { e.preventDefault(); guardarNombreDeMarca(); }}
+                      >
+                        <label className={styles.marcaCampo}>
+                          Nombre corregido
+                          <input
+                            type="text"
+                            value={corrigiendo.nombre}
+                            maxLength={40}
+                            onChange={(e) => setCorrigiendo({ ...corrigiendo, nombre: e.target.value })}
+                          />
+                        </label>
+                        <button type="submit" className={styles.marcaBoton}>Guardar nombre</button>
+                        <button type="button" className={styles.marcaBoton} onClick={dejarDeEditarMarcas}>
+                          Cancelar
+                        </button>
+                        {errorDelNombre && <p role="alert" className={styles.marcaAviso}>{errorDelNombre}</p>}
+                        {coincide && (
+                          <div role="alert" className={styles.marcaAviso}>
+                            Ya existe la marca «{coincide.otra.label}», con{' '}
+                            {publicacionesDe(coincide.otra.publicaciones)}.{' '}
+                            <button
+                              type="button"
+                              className={styles.marcaBoton}
+                              onClick={() => pedirUnirMarcas(coincide.marca, coincide.otra)}
+                            >
+                              Unir con {coincide.otra.label}
+                            </button>
+                          </div>
+                        )}
+                      </form>
+                    )}
+
+                    {uniendo?.marca.id === marca.id && (
+                      <form
+                        className={styles.marcaEdicion}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const destino = marcas.find((m) => m.id === uniendo.destinoId);
+                          if (destino) pedirUnirMarcas(marca, destino);
+                        }}
+                      >
+                        <label className={styles.marcaCampo}>
+                          Unir con
+                          <select
+                            value={uniendo.destinoId}
+                            onChange={(e) => setUniendo({ ...uniendo, destinoId: e.target.value })}
+                          >
+                            <option value="">Elegí la marca que queda</option>
+                            {marcas.filter((m) => m.id !== marca.id && m.is_active).map((m) => (
+                              <option key={m.id} value={m.id}>{m.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <button type="submit" className={styles.marcaBoton} disabled={!uniendo.destinoId}>
+                          Unir marcas
+                        </button>
+                        <button type="button" className={styles.marcaBoton} onClick={dejarDeEditarMarcas}>
+                          Cancelar
+                        </button>
+                      </form>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ))}
+        </div>
+      )}
+
       {activeTab === 'config' && (
         <div className={styles.configSection}>
           <div className={styles.configHeader}>
