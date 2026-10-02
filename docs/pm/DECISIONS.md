@@ -10,6 +10,17 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-02 — Tarjetas, publicación, ingreso, carrito y Mi cuenta: aprobadas
+
+Emi aprobó («Dale») `maquetas/MERCADO-FICHA-V1-2026-10-02.html` y
+`maquetas/CUENTA-V1-2026-10-02.html`. Son dos tareas de cómo se ve, sin funciones nuevas:
+`MERCADO-FICHA-VISUAL-1` (tarjetas y página de la publicación) y `CUENTA-VISUAL-1` (ingresar,
+carrito como panel lateral y Mi cuenta con menú). Van después de `BUSCADOR-SINONIMOS-1` y antes
+de `OBSERVABILIDAD-1`. Sólo muestran datos que ya existen.
+
+Motivo: son las partes que más se ven y las más genéricas. Si la cola se atrasa para el
+congelamiento del ~27/10, `CUENTA-VISUAL-1` es la primera que pasa a después del lanzamiento.
+
 ## 2026-10-02 — Avisos: la píldora verde de la marca
 
 Emi rechazó la v1 de los avisos por genérica y eligió la opción A de

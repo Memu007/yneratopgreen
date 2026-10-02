@@ -434,6 +434,146 @@ colmenas publicado en Apicultura si el texto no lo dice.
 
 ---
 
+## Después — MERCADO-FICHA-VISUAL-1 (apenas entregues BUSCADOR-SINONIMOS-1)
+
+**Decisión de Emi (02/10): aprobó `maquetas/MERCADO-FICHA-V1-2026-10-02.html`**
+(y `.jpg`). Las tarjetas del Mercado y la página de una publicación se ven
+genéricas: dos botones pesados por tarjeta, uno «Ingresar para continuar», y
+rótulos internos como «ACTIVO DE ALTO VALOR». Es un cambio de cómo se ve:
+qué se publica, qué se compra y quién ve qué no cambian. Entregala por
+separado.
+
+### Qué entra
+
+1. **Tarjeta del Mercado**, como la maqueta:
+   - la tarjeta entera lleva a la publicación, con un solo enlace accesible
+     (no un enlace por cada parte);
+   - salen «Ingresar para continuar» y «Ver detalle»: el ingreso se pide
+     recién al comprar, como hoy en la publicación;
+   - salen los rótulos internos («Activo de alto valor», «Insumo
+     estandarizado» y los que haya). En su lugar, la ruta en palabras de
+     quien compra: «Maquinaria agrícola · Tractores»;
+   - la condición («Nuevo», «Usado», «Servicio») sobre la foto;
+   - una línea con los datos clave que la publicación tenga (marca, año,
+     potencia, presentación o cobertura), la ubicación, el precio con su
+     unidad y quién vende con su calificación.
+2. **Página de una publicación**, como la maqueta:
+   - galería con miniaturas cuando hay más de una foto;
+   - los datos clave como fichas cortas arriba, y «Datos declarados» completo
+     abajo, con «declarado por quien vende»;
+   - una sola acción principal («Agregar al carrito» o la que corresponda
+     hoy), con la cantidad;
+   - quién vende, con su calificación y «Ver perfil», que abre lo que hoy
+     abre;
+   - la nota «Pagás directo a quien vende, por Mercado Pago o transferencia.
+     AgroBoeda no recibe ni guarda tu dinero.»;
+   - el crédito de la foto ilustrativa queda chico: «Foto ilustrativa · ver
+     créditos».
+3. **Celular:** la barra de abajo fija con el precio y la acción principal.
+4. **Sólo datos que ya existen.** La maqueta muestra ejemplos. Si un dato de
+   la maqueta no existe hoy (por ejemplo, «Documentación revisada» o
+   «Responde en 24 h»), no se muestra ni se inventa.
+
+### Fuera de alcance
+
+- Cambiar la API, el carrito, la compra o qué datos de quien vende se ven.
+  El teléfono sigue sin aparecer.
+- Botones nuevos, como «Consultar a quien vende»: no existe y no entra.
+- Las pantallas de ingreso, carrito y Mi cuenta: son `CUENTA-VISUAL-1`.
+
+### Aceptación verificable
+
+1. **Los casos que leen tarjetas y publicaciones** siguen verdes o se ajustan
+   sin cambiar lo que miden. El informe dice cuáles y por qué.
+2. **Caso nuevo, en 1440 y 390:**
+   - tocar cualquier parte de la tarjeta abre esa publicación;
+   - ninguna tarjeta dice «Ingresar para continuar», «Ver detalle» ni un
+     rótulo interno;
+   - la ruta de la tarjeta coincide con la categoría y la subcategoría de la
+     publicación;
+   - sin sesión, la acción principal lleva al ingreso, y al volver se puede
+     seguir;
+   - en 390, el precio de la barra fija es el de la publicación.
+3. **Teclado y lector de pantalla:** cada tarjeta es una sola parada de Tab
+   y anuncia título, precio y ubicación; la galería se recorre con teclado.
+4. **Capturas** en 1440 y 390, junto a la maqueta.
+5. Suite, a11y, contraste, móvil, las dos guías y las puertas.
+
+### Frená y consultá
+
+- Si algún dato de la maqueta obliga a cambiar la API o a hacer un pedido
+  más por tarjeta.
+
+---
+
+## Después — CUENTA-VISUAL-1 (apenas entregues MERCADO-FICHA-VISUAL-1)
+
+**Decisión de Emi (02/10): aprobó `maquetas/CUENTA-V1-2026-10-02.html`**
+(y `.jpg`). Ingresar, el carrito y Mi cuenta son ventanas blancas y cajas
+apiladas con encabezados de colores, y Mercado Pago usa un azul que no
+aparece en ningún otro lado. Es un cambio de cómo se ve: ninguna función
+nueva. Entregala por separado.
+
+### Qué entra
+
+1. **Ingresar y Creá tu cuenta:**
+   - en computadora, la foto de la marca al lado del formulario; en celular,
+     sin foto;
+   - campos más amplios, con el foco bien marcado y «Mostrar» la contraseña;
+   - «Creá tu cuenta» en lugar de «Registrate acá». No dice «gratis».
+2. **Carrito como panel lateral** que entra desde la derecha:
+   - los productos agrupados por quien vende, con «Pedido 1 de 2»;
+   - la cantidad se cambia con − y +, con los mismos límites de hoy;
+   - el total abajo y la nota «Se arma un pedido por cada vendedor. Le
+     pagás directo a cada uno.»;
+   - en celular, ocupa la pantalla entera.
+3. **Mi cuenta:**
+   - un menú a la izquierda en lugar de pestañas: Mi perfil, Notificaciones,
+     Mis compras, Mis ventas, Mis publicaciones, Cobros, Documentación y
+     Seguridad, según lo que cada rol tiene hoy;
+   - «Hola, <nombre>» y cuatro cifras arriba (publicaciones, ventas,
+     compras, reputación), sólo con datos que ya trae la pantalla;
+   - secciones blancas con bordes suaves;
+   - Mercado Pago con los colores del sitio, sin el azul;
+   - el CBU enmascarado en la vista, completo al editar;
+   - «Seguridad» (cambiar contraseña) y «Documentación» tienen su propio
+     lugar en el menú, no al fondo de «Mi perfil»;
+   - en celular, el menú es una fila deslizable arriba.
+
+### Fuera de alcance
+
+- Cambiar la API, las reglas de la compra, las de la contraseña o qué ve
+  cada rol.
+- Funciones nuevas en Mi cuenta.
+- El texto «gratis» o cualquier promesa sobre suscripciones.
+
+### Aceptación verificable
+
+1. **Los casos de ingreso, registro, carrito, compra, Mi cuenta, Mercado
+   Pago, contraseña y sesiones** siguen verdes o se ajustan sin cambiar lo
+   que miden. El informe dice cuáles y por qué.
+2. **Caso nuevo, en 1440 y 390:**
+   - con productos de dos vendedores, el panel muestra dos grupos, el total
+     es la suma y «Continuar con la compra» arma dos pedidos, como hoy;
+   - cambiar una cantidad con − y + respeta el máximo disponible y el mínimo
+     de 1;
+   - cada opción del menú de Mi cuenta abre su sección, y la URL o el
+     estado la conserva al recargar si hoy la conserva;
+   - el CBU no se ve completo fuera de «Editar»;
+   - ninguna pantalla dice «gratis».
+3. **Teclado y lector de pantalla:** el panel del carrito atrapa el foco,
+   cierra con Escape y lo devuelve; el menú de Mi cuenta marca la sección
+   actual.
+4. **Capturas** en 1440 y 390, junto a la maqueta.
+5. Suite, a11y, contraste, móvil, las dos guías y las puertas.
+
+### Frená y consultá
+
+- Si las cuatro cifras de arriba necesitan un pedido nuevo a la API.
+- Si el panel lateral cambia cómo se arma o se paga un pedido.
+
+---
+
 ## Después — OBSERVABILIDAD-1 (al final de la cola, antes del lanzamiento)
 
 **Decisión de Emi (02/10).** Hoy no hay registro de los errores que ve la
