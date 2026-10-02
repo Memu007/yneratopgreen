@@ -1,0 +1,222 @@
+<!doctype html>
+<!--
+  Maqueta de Ingresar, Carrito y Mi cuenta, versión 1 (PM, 02/10/2026). Emi:
+  «Mi cuenta» y lo demás se ven genéricos. Misma paleta y fuentes que Inicio.
+  No suma funciones: reordena y viste lo que ya existe. Datos de ejemplo.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Maqueta de cuenta, ingreso y carrito</title>
+<style>
+@font-face { font-family: 'Inter Tight'; src: url('../../../public/fuentes/InterTight.woff2') format('woff2-variations'); font-weight: 100 900; }
+@font-face { font-family: 'Inter'; src: url('../../../public/fuentes/Inter.woff2') format('woff2-variations'); font-weight: 100 900; }
+:root { --display: 'Inter Tight', 'Inter', system-ui, sans-serif; --ui: 'Inter', system-ui, sans-serif;
+  --canvas: #f7f6f2; --surface: #fff; --subtle: #edf0ec; --muted: #f0efe9; --text: #1e2420; --text-2: #4c544b; --steel: #5a6b60;
+  --brand: #1e4a34; --brand-dark: #143526; --signal: #c49a43; --accent: #8a671c; --border: #d8dad2; --control: #79837a; --ok: #1f6b4f; --ok-bg: #e7f3ed; --warn-bg: #f6edd6; --warn: #79520f; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--ui); background: #e9e8e2; color: var(--text); padding: 32px 36px 44px; -webkit-font-smoothing: antialiased; }
+h1 { font: 800 30px/1.1 var(--display); letter-spacing: -.02em; }
+.bajada { margin-top: 8px; color: var(--text-2); font-size: 15px; max-width: 1100px; line-height: 1.5; }
+.etiqueta { font: 700 12px/1 var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 28px 0 12px; display: flex; gap: 10px; align-items: center; }
+.etiqueta::before { content: ""; width: 14px; height: 3px; background: var(--signal); }
+.fila { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.campo { margin-top: 14px; }
+.campo label { display: block; font: 600 13px var(--ui); margin-bottom: 6px; }
+.campo .in { height: 46px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); display: flex; align-items: center; padding: 0 14px; color: var(--control); font-size: 14.5px; justify-content: space-between; }
+.campo .in.foco { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(30,74,52,.14); color: var(--text); }
+.cta { background: var(--brand); color: #fff; text-align: center; font: 650 15.5px var(--ui); padding: 14px; border-radius: 12px; }
+.link { color: var(--brand); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ingresar: dividido */
+.ingreso { display: grid; grid-template-columns: 1fr 1fr; height: 560px; border-radius: 16px; overflow: hidden; background: var(--surface); box-shadow: 0 24px 60px rgba(20,30,25,.22); }
+.ingreso .img { position: relative; background: url('../../../public/media/comercial/home-cosecha-hero-1200.webp') center/cover; }
+.ingreso .img::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,53,38,.1), rgba(20,53,38,.85)); }
+.ingreso .img p { position: absolute; left: 26px; right: 26px; bottom: 26px; z-index: 1; color: #fff; font: 750 24px/1.15 var(--display); letter-spacing: -.015em; }
+.ingreso .img p small { display: block; font: 400 14px/1.45 var(--ui); color: rgba(255,255,255,.85); margin-top: 8px; }
+.ingreso .form { padding: 36px 34px; display: flex; flex-direction: column; }
+.ingreso .form .logo { font: 750 18px var(--display); color: var(--brand); }
+.ingreso h2 { font: 800 28px var(--display); letter-spacing: -.02em; margin: 22px 0 4px; }
+.ingreso .sub { color: var(--text-2); font-size: 14px; }
+.ingreso .cta { margin-top: 20px; }
+.ingreso .aux { margin-top: 14px; font-size: 13px; color: var(--text-2); }
+.ingreso .pie { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--muted); font-size: 14px; color: var(--text-2); text-align: center; }
+
+/* carrito: panel lateral */
+.pantalla { position: relative; height: 560px; background: #1e2420; border-radius: 6px; overflow: hidden; }
+.pantalla .fondo { position: absolute; inset: 0; background: var(--canvas); opacity: .5; }
+.cajon { position: absolute; top: 0; right: 0; bottom: 0; width: 430px; background: var(--surface); display: flex; flex-direction: column; box-shadow: -20px 0 40px rgba(0,0,0,.2); }
+.cajon-cab { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px; border-bottom: 1px solid var(--border); }
+.cajon-cab h2 { font: 800 22px var(--display); }
+.cajon-cab h2 small { font: 500 14px var(--ui); color: var(--steel); }
+.x { width: 32px; height: 32px; border-radius: 50%; background: var(--muted); display: grid; place-items: center; color: var(--text-2); }
+.cajon-cuerpo { flex: 1; padding: 6px 22px; overflow: hidden; }
+.grupo { padding: 14px 0; border-bottom: 1px solid var(--muted); }
+.grupo-cab { display: flex; justify-content: space-between; font: 600 12px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--steel); margin-bottom: 10px; }
+.item { display: grid; grid-template-columns: 64px 1fr auto; gap: 12px; align-items: center; margin-bottom: 10px; }
+.item .mini { width: 64px; height: 48px; border-radius: 8px; background-size: cover; background-position: center; }
+.item b { display: block; font-size: 14px; font-weight: 600; }
+.item span { font-size: 12.5px; color: var(--text-2); }
+.paso { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; margin-top: 6px; }
+.paso i { font-style: normal; width: 26px; height: 26px; display: grid; place-items: center; font-size: 13px; }
+.paso i.n { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.item .monto { font: 700 14.5px var(--ui); font-variant-numeric: tabular-nums; }
+.cajon-pie { border-top: 1px solid var(--border); padding: 16px 22px 22px; }
+.total { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.total b { font: 800 24px var(--display); }
+.nota { font-size: 12.5px; color: var(--text-2); margin-bottom: 14px; }
+
+/* mi cuenta */
+.cuenta { display: grid; grid-template-columns: 240px 1fr; background: var(--canvas); border: 1px solid #cfcfc6; min-height: 760px; }
+.lateral { background: var(--surface); border-right: 1px solid var(--border); padding: 24px 14px; }
+.yo { display: flex; gap: 12px; align-items: center; padding: 0 8px 18px; border-bottom: 1px solid var(--muted); margin-bottom: 10px; }
+.avatar { width: 46px; height: 46px; border-radius: 50%; background: var(--brand); color: #fff !important; display: grid; place-items: center; font: 700 18px var(--display); flex: none; }
+.yo b { display: block; font-size: 15px; }
+.yo span { font-size: 12.5px; color: var(--steel); }
+.menu div { display: flex; justify-content: space-between; padding: 10px 10px; border-radius: 8px; font-size: 14px; color: var(--text-2); }
+.menu div.si { background: var(--ok-bg); color: var(--brand); font-weight: 650; box-shadow: inset 3px 0 0 var(--brand); }
+.menu .n { background: var(--signal); color: #1e2420; font: 700 11px var(--ui); padding: 2px 7px; border-radius: 999px; }
+.menu hr { border: 0; border-top: 1px solid var(--muted); margin: 8px 0; }
+.principal { padding: 28px 32px; }
+.principal h2 { font: 800 28px var(--display); letter-spacing: -.02em; }
+.principal .sub { color: var(--text-2); font-size: 14.5px; margin-top: 4px; }
+.cifras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 20px; }
+.cifra { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.cifra small { font: 600 11px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--steel); }
+.cifra b { display: block; font: 800 26px var(--display); margin-top: 4px; }
+.cifra span { font-size: 12.5px; color: var(--text-2); }
+.seccion { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; margin-top: 18px; }
+.seccion-cab { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.seccion-cab h3 { font: 750 18px var(--display); }
+.boton2 { font: 600 13.5px var(--ui); padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+.datos { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; margin-top: 8px; }
+.dato { padding: 11px 0; border-bottom: 1px solid var(--muted); }
+.dato small { display: block; font-size: 12px; color: var(--steel); }
+.dato b { font: 550 14.5px var(--ui); }
+.estado { display: inline-flex; gap: 7px; align-items: center; font: 650 12.5px var(--ui); padding: 5px 10px; border-radius: 999px; }
+.estado.no { background: var(--warn-bg); color: var(--warn); }
+.estado.si { background: var(--ok-bg); color: var(--ok); }
+.cobro { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; margin-top: 10px; }
+.cobro p { font-size: 14px; color: var(--text-2); line-height: 1.5; }
+.privado { font-size: 12.5px; color: var(--steel); margin-top: 10px; }
+
+.notas { margin-top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; font-size: 14px; line-height: 1.55; color: var(--text-2); max-width: 1300px; }
+.notas h3 { font: 750 18px var(--display); color: var(--text); margin-bottom: 6px; }
+.notas li { margin: 0 0 7px 18px; }
+.notas b { color: var(--text); }
+</style>
+</head>
+<body>
+<h1>Ingresar, carrito y Mi cuenta</h1>
+<p class="bajada">Hoy son ventanas blancas y cajas apiladas con encabezados de colores, y Mercado Pago en un azul que no aparece en ningún otro lado. La propuesta usa el mismo lenguaje que Inicio: la foto de la marca al ingresar, el carrito como panel lateral agrupado por quien vende, y Mi cuenta con un menú a la izquierda y secciones limpias.</p>
+
+<div class="fila">
+  <div>
+    <div class="etiqueta">Ingresar · computadora</div>
+    <div class="ingreso">
+      <div class="img"><p>Producción, mercado y tecnología en una misma ruta.<small>Ingresá para comprar, vender y seguir tus pedidos.</small></p></div>
+      <div class="form">
+        <div class="logo">AgroBoeda</div>
+        <h2>Ingresá</h2>
+        <div class="sub">Con el correo y la contraseña de tu cuenta.</div>
+        <div class="campo"><label>Correo</label><div class="in foco">maria@campo.com.ar</div></div>
+        <div class="campo"><label>Contraseña</label><div class="in">•••••••• <span class="link" style="font-size:13px">Mostrar</span></div></div>
+        <div class="cta">Ingresar</div>
+        <div class="aux">¿Olvidaste tu contraseña? <span class="link">Escribinos</span></div>
+        <div class="pie">¿Todavía no tenés cuenta? <span class="link">Creá tu cuenta</span></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="etiqueta">Carrito · panel lateral</div>
+    <div class="pantalla">
+      <div class="fondo"></div>
+      <div class="cajon">
+        <div class="cajon-cab"><h2>Tu carrito <small>· 3 productos</small></h2><span class="x">×</span></div>
+        <div class="cajon-cuerpo">
+          <div class="grupo">
+            <div class="grupo-cab"><span>Vende Juan Vendedor</span><span>Pedido 1 de 2</span></div>
+            <div class="item"><span class="mini" style="background-image:url('../../../public/catalogo/semillas-soja-rr-intacta.webp')"></span><div><b>Semillas de soja RR Intacta</b><span>$ 78.000 por bolsa</span><br><span class="paso"><i>−</i><i class="n">10</i><i>+</i></span></div><span class="monto">$ 780.000</span></div>
+            <div class="item"><span class="mini" style="background-image:url('../../../public/catalogo/fertilizante-triple-15.webp')"></span><div><b>Fertilizante triple 15</b><span>$ 41.500 por bolsa</span><br><span class="paso"><i>−</i><i class="n">4</i><i>+</i></span></div><span class="monto">$ 166.000</span></div>
+          </div>
+          <div class="grupo" style="border-bottom:0">
+            <div class="grupo-cab"><span>Vende Agro Sur</span><span>Pedido 2 de 2</span></div>
+            <div class="item"><span class="mini" style="background-image:url('../../../public/catalogo/kit-filtros-correas-cosechadora.webp')"></span><div><b>Kit de filtros y correas</b><span>$ 540.000 por kit</span><br><span class="paso"><i>−</i><i class="n">1</i><i>+</i></span></div><span class="monto">$ 540.000</span></div>
+          </div>
+        </div>
+        <div class="cajon-pie">
+          <div class="total"><span>Total</span><b>$ 1.486.000</b></div>
+          <div class="nota">Se arma un pedido por cada vendedor. Le pagás directo a cada uno.</div>
+          <div class="cta">Continuar con la compra</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="etiqueta">Mi cuenta · computadora</div>
+<div class="cuenta">
+  <aside class="lateral">
+    <div class="yo"><span class="avatar">J</span><div><b>Juan Vendedor</b><span>Vende y compra</span></div></div>
+    <div class="menu">
+      <div class="si">Mi perfil</div>
+      <div>Notificaciones <span class="n">3</span></div>
+      <hr>
+      <div>Mis compras</div>
+      <div>Mis ventas <span class="n">1</span></div>
+      <div>Mis publicaciones</div>
+      <hr>
+      <div>Cobros</div>
+      <div>Documentación</div>
+      <div>Seguridad</div>
+    </div>
+  </aside>
+  <section class="principal">
+    <h2>Hola, Juan</h2>
+    <div class="sub">Tu perfil, tus cobros y la seguridad de tu cuenta.</div>
+    <div class="cifras">
+      <div class="cifra"><small>Publicaciones</small><b>16</b><span>14 activas</span></div>
+      <div class="cifra"><small>Ventas</small><b>12</b><span>1 por confirmar</span></div>
+      <div class="cifra"><small>Compras</small><b>3</b><span>Ninguna en curso</span></div>
+      <div class="cifra"><small>Reputación</small><b>★ 4,8</b><span>12 calificaciones</span></div>
+    </div>
+    <div class="seccion">
+      <div class="seccion-cab"><h3>Datos de tu perfil</h3><span class="boton2">Editar</span></div>
+      <div class="datos">
+        <div class="dato"><small>Nombre</small><b>Juan Vendedor</b></div>
+        <div class="dato"><small>Correo</small><b>vendedor@ejemplo.com</b></div>
+        <div class="dato"><small>Teléfono</small><b>+54 11 1234-5678</b></div>
+        <div class="dato"><small>Ubicación</small><b>Córdoba, Córdoba</b></div>
+        <div class="dato"><small>CBU para transferencias</small><b>0000 0090 •••• 0024</b></div>
+        <div class="dato"><small>Alias</small><b>demo.topgreen.juanv</b></div>
+      </div>
+      <div class="privado">🔒 Tus datos de contacto sólo los ve quien te compra, después de confirmar la compra.</div>
+    </div>
+    <div class="seccion">
+      <div class="seccion-cab"><h3>Cobros con Mercado Pago</h3><span class="estado no">● Sin vincular</span></div>
+      <div class="cobro"><p>Vinculá tu cuenta para cobrar tus ventas directo en Mercado Pago. AgroBoeda no recibe ni retiene ese dinero. Las transferencias siguen funcionando igual.</p><span class="cta" style="padding:12px 18px">Vincular Mercado Pago</span></div>
+    </div>
+  </section>
+</div>
+
+<div class="notas">
+  <div>
+    <h3>Qué cambia</h3>
+    <ul>
+      <li><b>Ingresar:</b> la foto de la marca al lado del formulario, campos más amplios con el foco marcado, y «Creá tu cuenta» en lugar de «Registrate acá» (sin prometer «gratis»: las suscripciones son de la Fase 6).</li>
+      <li><b>Carrito:</b> un panel que entra desde la derecha, sin tapar la página. Los productos van agrupados por quien vende, porque así se arman los pedidos, con la cantidad editable y el total abajo.</li>
+      <li><b>Mi cuenta:</b> un menú a la izquierda en lugar de pestañas, un saludo, cuatro cifras arriba y secciones blancas con bordes suaves. Mercado Pago deja el azul y usa los colores del sitio.</li>
+      <li><b>Seguridad</b> (cambiar contraseña) y <b>Documentación</b> pasan a tener su propio lugar en el menú, en vez de ir al fondo de «Mi perfil».</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Lo que no cambia</h3>
+    <ul>
+      <li>Ninguna función nueva: es la misma información, ordenada y vestida de otra forma.</li>
+      <li>El pago sigue siendo directo a cada vendedor, y el contacto se comparte al confirmar la compra.</li>
+      <li>En el celular: el menú de Mi cuenta va como una fila deslizable arriba, el carrito ocupa la pantalla entera y el ingreso no muestra la foto.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!doctype html>
+<!--
+  Maqueta de las tarjetas del Mercado y de la página de una publicación,
+  versión 1 (PM, 02/10/2026). Emi pidió darle «un boost estético» a todo lo
+  que se ve genérico. Usa las fotos de public/catalogo y los colores de la
+  maqueta de Inicio. Los datos son de ejemplo. Propuesta para Emi, no producto.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Maqueta de tarjetas y publicación</title>
+<style>
+@font-face { font-family: 'Inter Tight'; src: url('../../../public/fuentes/InterTight.woff2') format('woff2-variations'); font-weight: 100 900; }
+@font-face { font-family: 'Inter'; src: url('../../../public/fuentes/Inter.woff2') format('woff2-variations'); font-weight: 100 900; }
+:root { --display: 'Inter Tight', 'Inter', system-ui, sans-serif; --ui: 'Inter', system-ui, sans-serif;
+  --canvas: #f7f6f2; --surface: #fff; --subtle: #edf0ec; --muted: #f0efe9; --text: #1e2420; --text-2: #4c544b; --steel: #5a6b60;
+  --brand: #1e4a34; --brand-dark: #143526; --signal: #c49a43; --accent: #8a671c; --border: #d8dad2; --control: #79837a; --ok: #1f6b4f; --ok-bg: #e7f3ed; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--ui); background: #e9e8e2; color: var(--text); padding: 32px 36px 44px; -webkit-font-smoothing: antialiased; }
+h1 { font: 800 30px/1.1 var(--display); letter-spacing: -.02em; }
+.bajada { margin-top: 8px; color: var(--text-2); font-size: 15px; max-width: 1100px; line-height: 1.5; }
+.etiqueta { font: 700 12px/1 var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 28px 0 12px; display: flex; gap: 10px; align-items: center; }
+.etiqueta::before { content: ""; width: 14px; height: 3px; background: var(--signal); }
+.marco { background: var(--canvas); border: 1px solid #cfcfc6; padding: 26px; }
+
+/* tarjetas */
+.tarjetas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+.tj { background: var(--surface); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 0 var(--border), 0 0 0 1px var(--border); }
+.tj .foto { position: relative; aspect-ratio: 4/3; overflow: hidden; }
+.tj .foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.badge { position: absolute; left: 10px; top: 10px; background: rgba(255,255,255,.94); color: var(--text); font: 650 11.5px var(--ui); padding: 5px 9px; border-radius: 999px; }
+.badge.serv { background: var(--brand); color: #fff; }
+.tj .cuerpo { padding: 14px 16px 16px; }
+.ruta { font: 600 11.5px var(--ui); color: var(--steel); letter-spacing: .02em; }
+.tj h3 { font: 700 16.5px/1.3 var(--display); letter-spacing: -.01em; margin: 5px 0 6px; }
+.specs { font-size: 13px; color: var(--text-2); }
+.donde { font-size: 13px; color: var(--text-2); margin-top: 8px; display: flex; gap: 5px; align-items: center; }
+.precio { margin-top: 12px; display: flex; align-items: baseline; gap: 6px; }
+.precio b { font: 800 21px var(--display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.precio span { font-size: 12.5px; color: var(--steel); }
+.precio b.cot { font-size: 17px; color: var(--brand); }
+.vende { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--muted); font-size: 12.5px; color: var(--text-2); display: flex; justify-content: space-between; }
+.vende b { color: var(--text); font-weight: 600; }
+
+/* ficha */
+.ficha { background: var(--canvas); border: 1px solid #cfcfc6; }
+.miga { padding: 18px 40px 0; font-size: 13px; color: var(--steel); }
+.miga b { color: var(--text); font-weight: 600; }
+.ficha-grilla { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 36px; padding: 18px 40px 40px; }
+.galeria .grande { border-radius: 14px; overflow: hidden; aspect-ratio: 4/3; }
+.galeria .grande img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.miniaturas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 10px; }
+.miniaturas div { aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; opacity: .7; }
+.miniaturas div.si { opacity: 1; box-shadow: 0 0 0 2px var(--brand); }
+.miniaturas img { width: 100%; height: 100%; object-fit: cover; }
+.credito { font-size: 11.5px; color: var(--control); margin-top: 8px; }
+.compra { position: relative; }
+.compra .ruta { font-size: 12px; }
+.compra h2 { font: 800 34px/1.08 var(--display); letter-spacing: -.022em; margin: 8px 0 10px; }
+.compra .donde { font-size: 14px; }
+.compra .precio b { font-size: 34px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.chip { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.chip small { display: block; font: 600 10.5px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--steel); }
+.chip b { font: 650 14.5px var(--ui); }
+.acciones { display: grid; gap: 10px; margin-top: 22px; }
+.cta { background: var(--brand); color: #fff; text-align: center; font: 650 16px var(--ui); padding: 15px; border-radius: 12px; }
+.cta2 { background: var(--surface); border: 1px solid var(--border); text-align: center; font: 600 15px var(--ui); padding: 13px; border-radius: 12px; }
+.cantidad { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text-2); }
+.paso { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.paso span { width: 38px; height: 38px; display: grid; place-items: center; font: 600 16px var(--ui); }
+.paso span.n { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.vendedor { display: flex; gap: 12px; align-items: center; margin-top: 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font: 700 17px var(--display); flex: none; }
+.vendedor b { display: block; font-size: 14.5px; }
+.vendedor span { font-size: 12.5px; color: var(--text-2); }
+.vendedor em { margin-left: auto; font-style: normal; font: 600 13px var(--ui); color: var(--brand); }
+.confianza { margin-top: 14px; display: flex; gap: 10px; font-size: 13px; color: var(--text-2); line-height: 1.45; background: var(--ok-bg); border-radius: 10px; padding: 12px 14px; }
+.confianza i { font-style: normal; color: var(--ok); font-weight: 700; }
+.abajo { padding: 0 40px 40px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 36px; }
+.abajo h4 { font: 750 20px var(--display); margin-bottom: 10px; }
+.abajo p { font-size: 15px; line-height: 1.65; color: var(--text-2); }
+.tabla { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.tabla div { display: flex; justify-content: space-between; padding: 11px 16px; font-size: 14px; border-top: 1px solid var(--muted); }
+.tabla div:first-child { border-top: 0; }
+.tabla span { color: var(--steel); }
+.tabla small { color: var(--control); font-size: 12px; }
+
+/* celular */
+.fila-cel { display: grid; grid-template-columns: 390px 390px 1fr; gap: 24px; align-items: start; }
+.cel { width: 390px; background: var(--canvas); border: 1px solid #cfcfc6; position: relative; overflow: hidden; }
+.cel .tj { margin: 14px; }
+.cel-ficha { height: 844px; }
+.cel-ficha .foto { aspect-ratio: 4/3; position: relative; }
+.cel-ficha .foto img { width: 100%; height: 100%; object-fit: cover; }
+.puntos { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; }
+.puntos i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.55); }
+.puntos i.si { background: #fff; }
+.cel-ficha .cont { padding: 16px; }
+.cel-ficha h2 { font: 800 25px/1.1 var(--display); letter-spacing: -.02em; margin: 6px 0 8px; }
+.barra { position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 12px 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 -6px 18px rgba(0,0,0,.06); }
+.barra .p b { display: block; font: 800 20px var(--display); }
+.barra .p span { font-size: 12px; color: var(--steel); }
+.barra .cta { flex: 1; padding: 14px; font-size: 15px; }
+.notas { font-size: 14px; line-height: 1.55; color: var(--text-2); }
+.notas h3 { font: 750 18px var(--display); color: var(--text); margin-bottom: 6px; }
+.notas li { margin: 0 0 7px 18px; }
+.notas b { color: var(--text); }
+</style>
+</head>
+<body>
+<h1>Tarjetas del Mercado y página de una publicación</h1>
+<p class="bajada">Las tarjetas de hoy tienen dos botones pesados, uno de ellos «Ingresar para continuar», y rótulos internos como «ACTIVO DE ALTO VALOR». La propuesta deja que la foto y el precio hagan el trabajo: toda la tarjeta lleva a la publicación, y la ruta dice en palabras de quien compra dónde está. La página de cada publicación pasa a tener galería, los datos clave a la vista, quién vende y una nota de confianza verdadera.</p>
+
+<div class="etiqueta">Tarjetas del Mercado · computadora</div>
+<div class="marco">
+  <div class="tarjetas">
+    <div class="tj"><div class="foto"><img src="../../../public/catalogo/tractor-pauny-280a-doble-traccion.webp"><span class="badge">Usado</span></div><div class="cuerpo"><div class="ruta">Maquinaria agrícola · Tractores</div><h3>Tractor Pauny 280A doble tracción</h3><div class="specs">Pauny · 2018 · 280 HP</div><div class="donde">📍 Pergamino, Buenos Aires</div><div class="precio"><b>$ 98.500.000</b><span>por unidad</span></div><div class="vende"><b>Juan Vendedor</b><span>★ 4,8 (12)</span></div></div></div>
+    <div class="tj"><div class="foto"><img src="../../../public/catalogo/cosechadora-john-deere-9750.webp"><span class="badge">Usado</span></div><div class="cuerpo"><div class="ruta">Maquinaria agrícola · Cosecha</div><h3>Cosechadora John Deere 9750 STS</h3><div class="specs">John Deere · 2012</div><div class="donde">📍 Venado Tuerto, Santa Fe</div><div class="precio"><b>$ 145.000.000</b><span>por unidad</span></div><div class="vende"><b>Agro Sur</b><span>Sin calificaciones</span></div></div></div>
+    <div class="tj"><div class="foto"><img src="../../../public/catalogo/semillas-soja-rr-intacta.webp"><span class="badge">Nuevo</span></div><div class="cuerpo"><div class="ruta">Insumos agrícolas · Semillas</div><h3>Semillas de soja RR Intacta</h3><div class="specs">Bolsa de 40 kg · 120 disponibles</div><div class="donde">📍 Rafaela, Santa Fe</div><div class="precio"><b>$ 78.000</b><span>por bolsa</span></div><div class="vende"><b>Semillera del Centro</b><span>★ 5,0 (3)</span></div></div></div>
+    <div class="tj"><div class="foto"><img src="../../../public/catalogo/servicio-siembra-gps.webp"><span class="badge serv">Servicio</span></div><div class="cuerpo"><div class="ruta">Contratistas · Siembra</div><h3>Siembra con GPS y dosis variable</h3><div class="specs">Cobertura: Córdoba y Santa Fe</div><div class="donde">📍 Marcos Juárez, Córdoba</div><div class="precio"><b class="cot">A cotizar</b><span>por hectárea</span></div><div class="vende"><b>Contratista Ruiz</b><span>Responde en 24 h</span></div></div></div>
+  </div>
+</div>
+
+<div class="etiqueta">Página de una publicación · computadora</div>
+<div class="ficha">
+  <div class="miga">Mercado / Maquinaria agrícola / <b>Tractores</b></div>
+  <div class="ficha-grilla">
+    <div class="galeria">
+      <div class="grande"><img src="../../../public/catalogo/tractor-pauny-280a-doble-traccion.webp"></div>
+      <div class="miniaturas"><div class="si"><img src="../../../public/catalogo/tractor-pauny-280a-doble-traccion.webp"></div><div><img src="../../../public/catalogo/rastra-discos-24-platos.webp"></div><div><img src="../../../public/catalogo/servicio-siembra-gps.webp"></div><div><img src="../../../public/catalogo/reparacion-hidraulica-maquinaria-agricola.webp"></div><div><img src="../../../public/catalogo/mantenimiento-preventivo-cosechadoras.webp"></div></div>
+      <div class="credito">Foto ilustrativa · ver créditos</div>
+    </div>
+    <div class="compra">
+      <div class="ruta">Maquinaria agrícola · Tractores</div>
+      <h2>Tractor Pauny 280A doble tracción</h2>
+      <div class="donde">📍 Pergamino, Buenos Aires · Usado</div>
+      <div class="precio" style="margin-top:16px"><b>$ 98.500.000</b><span>por unidad</span></div>
+      <div class="chips">
+        <div class="chip"><small>Marca</small><b>Pauny</b></div>
+        <div class="chip"><small>Modelo</small><b>280A</b></div>
+        <div class="chip"><small>Año</small><b>2018</b></div>
+        <div class="chip"><small>Potencia</small><b>280 HP</b></div>
+        <div class="chip"><small>Origen</small><b>Dueño directo</b></div>
+      </div>
+      <div class="acciones">
+        <div class="cantidad">Cantidad <span class="paso"><span>−</span><span class="n">1</span><span>+</span></span> 1 disponible</div>
+        <div class="cta">Agregar al carrito</div>
+      </div>
+      <div class="vendedor"><span class="avatar">J</span><div><b>Juan Vendedor</b><span>★ 4,8 · 12 ventas · Documentación revisada</span></div><em>Ver perfil</em></div>
+      <div class="confianza"><i>✓</i><span>Pagás directo a quien vende, por Mercado Pago o transferencia. AgroBoeda no recibe ni guarda tu dinero.</span></div>
+    </div>
+  </div>
+  <div class="abajo">
+    <div><h4>Descripción</h4><p>Tractor en muy buen estado, con mantenimiento al día en concesionario. Cubiertas al 70 %, toma de fuerza y tres puntos funcionando. Se entrega con manuales.</p><p style="margin-top:12px;font-size:13px">Lo informa quien vende. AgroBoeda no inspecciona las publicaciones.</p></div>
+    <div><h4>Datos declarados</h4><div class="tabla"><div><span>Marca</span><b>Pauny</b></div><div><span>Modelo</span><b>280A</b></div><div><span>Año</span><b>2018</b></div><div><span>Potencia</span><b>280 HP</b></div><div><span>Condición</span><b>Usado</b></div><div><span>Origen</span><b>Dueño directo <small>declarado por quien vende</small></b></div></div></div>
+  </div>
+</div>
+
+<div class="etiqueta">Celular · tarjeta y publicación</div>
+<div class="fila-cel">
+  <div class="cel">
+    <div class="tj"><div class="foto"><img src="../../../public/catalogo/tractor-pauny-280a-doble-traccion.webp"><span class="badge">Usado</span></div><div class="cuerpo"><div class="ruta">Maquinaria agrícola · Tractores</div><h3>Tractor Pauny 280A doble tracción</h3><div class="specs">Pauny · 2018 · 280 HP</div><div class="donde">📍 Pergamino, Buenos Aires</div><div class="precio"><b>$ 98.500.000</b><span>por unidad</span></div><div class="vende"><b>Juan Vendedor</b><span>★ 4,8 (12)</span></div></div></div>
+    <div class="tj"><div class="foto"><img src="../../../public/catalogo/servicio-siembra-gps.webp"><span class="badge serv">Servicio</span></div><div class="cuerpo"><div class="ruta">Contratistas · Siembra</div><h3>Siembra con GPS y dosis variable</h3><div class="precio"><b class="cot">A cotizar</b><span>por hectárea</span></div></div></div>
+  </div>
+  <div class="cel cel-ficha">
+    <div class="foto"><img src="../../../public/catalogo/tractor-pauny-280a-doble-traccion.webp"><div class="puntos"><i class="si"></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="cont">
+      <div class="ruta">Maquinaria agrícola · Tractores</div>
+      <h2>Tractor Pauny 280A doble tracción</h2>
+      <div class="donde">📍 Pergamino, Buenos Aires · Usado</div>
+      <div class="chips"><div class="chip"><small>Marca</small><b>Pauny</b></div><div class="chip"><small>Año</small><b>2018</b></div><div class="chip"><small>Potencia</small><b>280 HP</b></div></div>
+      <div class="vendedor"><span class="avatar">J</span><div><b>Juan Vendedor</b><span>★ 4,8 · 12 ventas</span></div></div>
+      <div class="confianza"><i>✓</i><span>Pagás directo a quien vende. AgroBoeda no recibe tu dinero.</span></div>
+    </div>
+    <div class="barra"><div class="p"><b>$ 98.500.000</b><span>por unidad</span></div><span class="cta">Agregar al carrito</span></div>
+  </div>
+  <div class="notas">
+    <h3>Qué cambia</h3>
+    <ul>
+      <li><b>La tarjeta entera lleva a la publicación.</b> Salen «Ingresar para continuar» y «Ver detalle»: el ingreso se pide recién al comprar.</li>
+      <li><b>Salen los rótulos internos</b> («Activo de alto valor», «Insumo estandarizado»). En su lugar, la ruta en palabras de quien compra: «Maquinaria agrícola · Tractores».</li>
+      <li><b>La condición sobre la foto</b> y los datos clave en una línea: marca, año, potencia.</li>
+      <li><b>En la página de la publicación:</b> galería con miniaturas, los datos clave como fichas, una sola acción principal y quién vende con su reputación.</li>
+      <li><b>La nota de confianza</b> dice algo verdadero que diferencia a AgroBoeda: el dinero va directo a quien vende.</li>
+      <li><b>El crédito de la foto</b>, que hoy ocupa dos renglones técnicos, pasa a «ver créditos».</li>
+      <li><b>En el celular</b>, el precio y el botón quedan fijos abajo.</li>
+    </ul>
+    <p style="margin-top:10px">Las estrellas y las ventas sólo se muestran si existen. Los nombres, los precios y las fotos son de ejemplo. No se agrega ninguna función: «Consultar» no existe hoy, y el contacto se sigue compartiendo al confirmar la compra.</p>
+  </div>
+</div>
+</body>
+</html>
