@@ -31253,7 +31253,7 @@ print(json.dumps(salida))
 // con el dedo y con el teclado, y el detalle de una orden, que tiene que
 // devolver el panel como estaba.
 // ---------------------------------------------------------------------------
-await runCase(182, 'El panel de administración entra en un celular: siete secciones a la vista y alcanzables', async () => {
+await runCase(182, 'El panel de administración entra en un celular: todas las secciones a la vista y alcanzables', async () => {
   const medidos = [];
   const MINIMO = 44;
   // Cada sección con algo que sólo ella muestra: activarla tiene que traerlo.
@@ -31264,6 +31264,8 @@ await runCase(182, 'El panel de administración entra en un celular: siete secci
     ['Órdenes', (d) => d.getByRole('combobox', { name: 'Filtrar órdenes por estado' })],
     ['Categorías', (d) => d.getByRole('heading', { name: 'Gestión de Categorías y Subcategorías' })],
     ['Documentación', (d) => d.getByRole('combobox', { name: 'Filtrar documentación por estado' })],
+    // Desde MARCAS-PANEL-1 son ocho.
+    ['Marcas', (d) => d.getByRole('heading', { name: 'Marcas', exact: true })],
     ['Configuración', (d) => d.getByRole('heading', { name: 'Configuración de Formularios' })],
   ];
 
@@ -31431,7 +31433,7 @@ await runCase(182, 'El panel de administración entra en un celular: siete secci
           `${medida}: el detalle movió la lista de ${JSON.stringify(antes)} a ${JSON.stringify(despues)}`);
 
         assert(errores.length === 0, `${medida}: errores de consola: ${errores.slice(0, 3).join(' | ')}`);
-        medidos.push(`${medida}: 7/7 a la vista, secciones de ${Math.min(...geometria.pestanas.map((p) => p.alto))} px `
+        medidos.push(`${medida}: ${SECCIONES.length}/${SECCIONES.length} a la vista, secciones de ${Math.min(...geometria.pestanas.map((p) => p.alto))} px `
           + `de alto como mínimo, Cerrar ${geometria.cerrar.join('×')}`);
       } finally {
         await contexto.close();
