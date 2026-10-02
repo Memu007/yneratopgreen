@@ -161,7 +161,63 @@ Su prototipo está en `originales/BUSCADOR-AGROMARKET-CLIENTA-2026-10-01.html`.
 
 ---
 
-## Después — VENDER-SIN-SESION-1 (empezala apenas entregues FILTROS-DE-PUBLICACIONES-1)
+## Siguiente — MARCAS-PANEL-1 (apenas PM cierre FILTROS-DE-PUBLICACIONES-1)
+
+**Decisión de Emi (02/10).** Lo declaraste en tu informe de FILTROS: una
+marca escrita con «Otra marca» no se puede corregir, unir ni dar de baja
+desde el sitio, y queda en la lista para siempre. Va antes de
+`VENDER-SIN-SESION-1`. Entregala por separado.
+
+### Qué entra
+
+En el panel de administración, una sección «Marcas» con la lista completa:
+nombre, cuántas publicaciones la usan y si se cargó de la lista o la escribió
+alguien al publicar.
+
+1. **Corregir el nombre** de una marca: «jhon deer» pasa a «John Deere». Si el
+   nombre corregido coincide con otra que ya existe, ofrece unirlas.
+2. **Unir dos marcas:** las publicaciones de la que se va pasan a la que
+   queda, y la que se va desaparece del filtro y del alta. Pide confirmar y
+   dice cuántas publicaciones se mueven.
+3. **Dar de baja** una marca: sale del alta y del filtro. Las publicaciones
+   que la tienen la siguen mostrando en su ficha, como hoy con una marca
+   dada de baja. Se puede volver a dar de alta.
+4. **La guía del panel** suma el paso, y `guia-admin.mjs` lo comprueba. Sale
+   de «Lo que el programa no comprueba» la frase de que no se puede
+   corregir.
+
+### Fuera de alcance
+
+- Aprobar las marcas nuevas antes de que aparezcan.
+- Marcas por categoría.
+
+### Aceptación verificable
+
+1. **Caso nuevo, en escritorio y celular:**
+   - una publicación con «Otra marca: Jhon Deer», unida a John Deere, pasa
+     a contar en John Deere, y «Jhon Deer» deja de estar en el filtro y en
+     el alta;
+   - corregir el nombre de «Agromec» a «AgroMec» se ve en la ficha y en el
+     filtro;
+   - dar de baja la saca del alta y del filtro, y la ficha la sigue
+     mostrando.
+2. **Permisos:** quien no es administración recibe 403 en cada acción,
+   llamada directo a la API.
+3. **Unir dos veces seguidas,** o unir una marca consigo misma, no rompe
+   nada.
+4. **Negativos:**
+   - unir sin mover las publicaciones da rojo;
+   - una acción sin control de rol da rojo.
+5. Suite completa, a11y, contraste, móvil, las dos guías y las puertas.
+
+### Frená y consultá
+
+- Si unir obliga a cambiar cómo se guardan las marcas, o necesita una
+  migración que no sea aditiva.
+
+---
+
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues MARCAS-PANEL-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.

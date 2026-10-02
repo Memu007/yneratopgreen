@@ -10,6 +10,15 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-02 — Las marcas se corrigen, se unen y se dan de baja desde el panel
+
+Con «Otra marca» (`FILTROS-DE-PUBLICACIONES-1`), una marca mal escrita queda en el alta y en el
+filtro para siempre. Emi eligió sumar al panel corregir, unir y dar de baja marcas, como
+`MARCAS-PANEL-1`, antes de `VENDER-SIN-SESION-1` y del lanzamiento.
+
+Motivo: lo que escribe cualquiera llega a la lista de todos, y la administración necesita una
+forma de ordenarlo.
+
 ## 2026-10-02 — Monitoreo gratis y orden de las pruebas finales
 
 - **Monitoreo:** Emi crea UptimeRobot (sin código). La Dev suma Sentry y Microsoft Clarity,
