@@ -170,7 +170,54 @@ bien.
 
 ---
 
-## Después — VENDER-SIN-SESION-1 (empezala apenas entregues INICIO-CIERRE-CELULAR-1)
+## Después — AVISOS-1 (apenas entregues INICIO-CIERRE-CELULAR-1)
+
+**Decisión de Emi (02/10): opción A de `maquetas/AVISOS-V2-2026-10-02.html`**
+(y `.jpg`), la «píldora verde de la marca». Los avisos de hoy le parecen
+feos y genéricos. Entregala por separado.
+
+### Qué entra
+
+1. **El aviso de la maqueta, opción A:**
+   - fondo verde de la marca, texto blanco y esquinas redondeadas;
+   - ícono redondo cereal con tilde, o rojo con «!» si es un error;
+   - una segunda línea opcional, más tenue.
+2. **Abajo al centro**, en la computadora y en el celular. Nunca tapa la
+   cabecera.
+3. **Entra desde abajo** con un rebote corto y sale bajando. Con
+   `prefers-reduced-motion`, sin animación.
+4. **Varios a la vez se apilan con profundidad:** los de atrás, más chicos y
+   asomando. Con el mouse encima se despliegan.
+5. **En el celular se cierran deslizando.** También tienen un botón para
+   cerrar, que se puede usar con teclado.
+6. **Tiempos:** lo que salió bien se va a los 4 s, y se pausa con el mouse o
+   el foco encima. Un error se queda hasta cerrarlo, con `role="alert"`; lo
+   demás, `role="status"`.
+7. **Una acción opcional** («Ver carrito», «Deshacer», «Reintentar»). Sumala
+   donde ya exista lo que hace: por ejemplo, «Ver carrito» al agregar. No
+   inventes acciones que el producto no tiene. Decí en el informe dónde la
+   pusiste.
+8. **Sin rótulo en mayúsculas** («ÉXITO», «ERROR»).
+9. **Una librería** como Sonner, si la usás, va por npm, con licencia libre
+   y sin cargar nada de afuera (CSP). Si no, a mano. Lo elegís vos.
+
+### Aceptación verificable
+
+1. **Caso nuevo, en 1440 y 390:**
+   - el aviso aparece abajo y no se superpone con la cabecera;
+   - el de éxito se va a los 4 s y el de error se queda;
+   - tres seguidos quedan apilados, sin superponer el texto;
+   - se cierra con el botón y con teclado.
+2. **Negativo:** el error que se va solo a los 4 s da rojo.
+3. **Los casos que leen avisos** siguen verdes o se ajustan, y el informe
+   dice cuáles.
+4. **Capturas** de éxito, error y pila, en los dos anchos.
+5. Suite, a11y (contraste del texto sobre el verde incluido), móvil y las
+   puertas.
+
+---
+
+## Después — VENDER-SIN-SESION-1 (empezala apenas entregues AVISOS-1)
 
 **Decisión de Emi (01/10), opción B:** «Vender» se ve siempre en la cabecera.
 Entregala por separado.
