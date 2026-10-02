@@ -213,6 +213,7 @@ o un rediseño nuevo.
 | 53 | **VENDER-SIN-SESION-1 — en cola** | Sin sesión no queda ningún botón para publicar (Emi, 01/10: opción B) | «Vender» siempre en la cabecera; sin sesión pide ingresar y abre el formulario. Va después de `CAMBIAR-CONTRASENA-1`. |
 | 54 | **PRODUCCION-ANIMAL-1 — en cola** | La clienta: «ganadería» es restrictivo (02/10) | «Producción animal» con ocho especies y raza; llega a producción sin duplicar. Va después de `VENDER-SIN-SESION-1`. |
 | 55 | **BUSCADOR-SINONIMOS-1 — en cola** | Puente barato al buscador inteligente de la clienta (02/10) | Sin acentos ni plurales, busca en la categoría, sinónimos versionados. La clasificación automática queda fuera del MVP. |
+| 56 | **OBSERVABILIDAD-1 — en cola** | No se ven los errores ni el uso del sitio (Emi, 02/10) | Sentry y Clarity gratis, sin datos personales, encendidos sólo con su variable. Antes del lanzamiento. Emi crea UptimeRobot. |
 
 Cinco mil visitas mensuales no justifican reescribir la arquitectura. Esta
 puerta cierra primero paginación, consultas y recorridos medidos; capacidad y

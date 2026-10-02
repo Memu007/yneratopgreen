@@ -10,6 +10,19 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-02 — Monitoreo gratis y orden de las pruebas finales
+
+- **Monitoreo:** Emi crea UptimeRobot (sin código). La Dev suma Sentry y Microsoft Clarity,
+  gratis y sin datos personales, como `OBSERVABILIDAD-1`, al final de la cola y antes del
+  lanzamiento.
+- **Pruebas finales:** se corrige `PLAN-RED-TEAM-CIERRE-MVP.md`. Todo lo ofensivo y la carga
+  van sólo en Docker local. `strong-playfulness` es el sitio publicado, no uno descartable. El
+  orden es carga, navegadores reales, usabilidad, QA exploratorio de un modelo independiente y
+  después el red-team.
+
+Motivo: hoy no se ven los errores de quienes usan el sitio, y Emi pidió que una IA
+independiente lo pruebe a fondo antes de lanzar.
+
 ## 2026-10-02 — Producción animal y buscador con sinónimos; la clasificación automática, fuera del MVP
 
 Sobre el documento de la clienta `originales/INDEXACION-CLIENTA-2026-10-02.docx`, Emi eligió:

@@ -371,6 +371,46 @@ colmenas publicado en Apicultura si el texto no lo dice.
 
 ---
 
+## Después — OBSERVABILIDAD-1 (al final de la cola, antes del lanzamiento)
+
+**Decisión de Emi (02/10).** Hoy no hay registro de los errores que ve la
+gente ni de cómo usa el sitio. Entregala por separado.
+
+### Qué entra
+
+1. **Sentry** (plan gratis) en el Frontend y en el Backend.
+   - Sin datos personales: nada de correos, nombres, teléfonos,
+     contraseñas, tokens, cookies, CBU ni datos de pago, ni en el mensaje, ni
+     en la URL, ni en el cuerpo.
+   - Se enciende sólo si existe la variable con la clave. En local y en las
+     pruebas, apagado.
+2. **Microsoft Clarity** (gratis) en el Frontend.
+   - Todo campo escrito, oculto.
+   - El panel de administración, «Mi cuenta» y el pago, sin grabar.
+   - Se enciende con su variable, como Sentry.
+3. **Una línea en la política de privacidad del sitio,** si existe, que diga
+   qué se mide y para qué. Si no existe, decilo y proponé el texto.
+4. **`RAILWAY.md`**: qué variables cargar y dónde. Las claves las carga Emi
+   en Railway; nunca van al repositorio ni al chat.
+
+### Aceptación verificable
+
+1. **Caso nuevo con un Sentry falso local:**
+   - un error del Frontend y otro del Backend llegan;
+   - ninguno lleva un correo, una contraseña ni un token, aunque el error
+     ocurra en un formulario con esos datos.
+2. **Clarity apagado** sin su variable, y sin grabar en el panel, en «Mi
+   cuenta» ni en el pago.
+3. **Negativo:** un evento que lleva el correo de la sesión da rojo.
+4. Suite completa, a11y, contraste, móvil y las puertas.
+
+### Frená y consultá
+
+- Si algún paquete pide una cuenta paga, o carga código de un dominio que la
+  política de seguridad del sitio (CSP) no permite.
+
+---
+
 ## Después (no empezar todavía)
 
 Lo decide la PM. Lo que depende de Emi puede reordenar la cola:
