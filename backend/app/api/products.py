@@ -859,6 +859,16 @@ async def get_my_products(
         Product.status != ProductStatus.DELETED  # Excluir productos eliminados
     ).order_by(Product.created_at.desc()).all()
     
+    # El nombre de cada marca, con una sola consulta: «Editar» muestra
+    # «AgroMec» y no «agromec» aunque la marca esté dada de baja y ya no
+    # venga en la lista del alta.
+    valores = {p.brand for p in products if p.brand}
+    nombres_de_marca = dict(
+        db.query(FormOption.value, FormOption.label).filter(
+            FormOption.option_type == "brand", FormOption.value.in_(valores),
+        ).all()
+    ) if valores else {}
+
     # Construir respuesta con los datos necesarios
     result = []
     for product in products:
@@ -892,6 +902,7 @@ async def get_my_products(
             "operation_kind": product.operation_kind,
             "condition": product.condition,
             "brand": product.brand,
+            "brand_label": nombres_de_marca.get(product.brand) if product.brand else None,
             "subcategory_type": {
                 "value": product.subcategory_type.slug,
                 "label": product.subcategory_type.name,

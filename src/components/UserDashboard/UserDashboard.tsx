@@ -316,6 +316,8 @@ interface BackendProduct {
   origin?: string | null;
   /** La marca, por el `value` de la lista, o nada. */
   brand?: string | null;
+  /** Su nombre, aunque esté dada de baja y ya no venga en la lista. */
+  brand_label?: string | null;
   // Campos de servicio
   pricing_type?: string;
   availability?: string;
@@ -657,6 +659,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   const [categories, setCategories] = useState<CategoryFromBackend[]>([]);
   // Las marcas que ofrece el alta: la edición ofrece la misma lista.
   const [marcas, setMarcas] = useState<{ value: string; label: string }[]>([]);
+  // El nombre de la marca que la publicación tiene guardada, para cuando ya
+  // no está en la lista porque la dieron de baja. Sin nombre, el valor.
+  const nombreDeLaMarcaGuardada = (productId: string, marca: string) => {
+    const guardada = backendProducts.find(p => p.id === productId);
+    return (guardada?.brand === marca && guardada.brand_label) || marca;
+  };
 
   // Preparar o recuperar el link de pago de una orden propia.
   //
@@ -4011,10 +4019,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                         <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
                       ))}
                       {/* La que tiene y ya no está en la lista se sigue viendo:
-                          si no, el selector diría «Sin declarar» sin serlo. */}
+                          si no, el selector diría «Sin declarar» sin serlo. Con
+                          su nombre, «AgroMec», y no con su valor, «agromec». */}
                       {editingProduct.marca && editingProduct.marca !== OTRA_MARCA
                         && !marcas.some(opcion => opcion.value === editingProduct.marca) && (
-                        <option value={editingProduct.marca}>{editingProduct.marca}</option>
+                        <option value={editingProduct.marca}>
+                          {nombreDeLaMarcaGuardada(editingProduct.id, editingProduct.marca)}
+                        </option>
                       )}
                       <option value={OTRA_MARCA}>Otra marca</option>
                     </select>
