@@ -565,8 +565,9 @@ mirarlas.
   se escribe en Mercado Pago. El programa comprueba que el botón lleve a
   autorizar en Mercado Pago, no lo que pasa allá.
 - Paso 15: “Si es nueva, se suma a la lista y al filtro «Marca».” El programa
-  no crea marcas: una marca nueva queda en la lista para siempre, y no hay
-  cómo sacarla desde el sitio. Lo comprueba el caso 238 de `scripts/smoke.mjs`.
+  no crea marcas: cada corrida dejaría una en la lista hasta que la
+  administración la una o la dé de baja desde su panel. Lo comprueba el caso
+  238 de `scripts/smoke.mjs`.
 - Paso 18: “Cancelar no devuelve dinero: si ya cobraste, la devolución la
   arreglás directamente con quien compró” pasa fuera de AgroBoeda.
 - Paso 19: “no certifica tu identidad” es un límite de lo que significa el

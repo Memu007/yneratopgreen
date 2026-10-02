@@ -41,10 +41,9 @@ plataforma y no se cambian desde el panel.
 - **Tu propia cuenta no se toca desde el panel.** No podés desactivarte ni
   quitarte el acceso de administración: lo tiene que hacer otra persona
   administradora.
-- **Las marcas no se administran desde este panel.** Las marcas que se
-  ofrecen al publicar maquinaria no están entre las listas de
-  «Configuración». Quien publica puede sumar una que no está en la lista, y
-  desde el panel no se puede corregir, unir ni dar de baja.
+- **Las marcas nuevas no se aprueban antes de aparecer.** Quien publica
+  puede sumar una que no está en la lista, y se ofrece enseguida. Desde la
+  pestaña «Marcas» se corrige, se une a otra o se da de baja después.
 
 ## Cuentas de prueba
 
@@ -62,14 +61,14 @@ antes de poner la plataforma en producción.**
 
 1. En la cabecera, tocá «Ingresar» y entrá con una cuenta de administración.
 2. En la cabecera aparece el botón «Admin». Tocalo.
-3. Se abre el «Panel de Administración», con siete pestañas: «Dashboard»,
-   «Usuarios», «Productos», «Órdenes», «Categorías», «Documentación» y
-   «Configuración».
+3. Se abre el «Panel de Administración», con ocho pestañas: «Dashboard»,
+   «Usuarios», «Productos», «Órdenes», «Categorías», «Documentación»,
+   «Marcas» y «Configuración».
 4. Para cerrarlo, tocá la cruz «×» de arriba a la derecha, o apretá la tecla
    Escape.
 
 El botón «Admin» sólo aparece para cuentas de administración. En el celular
-es igual: las siete pestañas entran en la pantalla.
+es igual: las ocho pestañas entran en la pantalla.
 
 ![El panel abierto en el escritorio](guia-panel-admin/entrar-escritorio.png)
 ![El panel abierto en el celular](guia-panel-admin/entrar-celular.png)
@@ -434,7 +433,7 @@ las opciones de los servicios.
 Abrí la pestaña «Configuración». Se ve «Configuración de Formularios» y
 cuatro listas: «Unidades», «Tipos de Cobro», «Disponibilidad» y «Tiempo de
 Respuesta». Al lado del botón dice cuántas opciones tiene la lista, como
-«… opciones».
+«… opciones». Las marcas no están acá: tienen su pestaña, «Marcas».
 
 ![Las listas de los formularios](guia-panel-admin/config-escritorio.png)
 
@@ -473,9 +472,59 @@ cambian.». Confirmá y aparece «Opción eliminada».
 
 ---
 
-## 9. Si una lista no carga
+## 9. Marcas
 
-### Paso 26. Volver a pedirla
+Acá se corrigen las marcas que se ofrecen al publicar maquinaria y en el
+filtro del Mercado. Las que alguien escribe con «Otra marca» al publicar
+llegan solas, a veces mal escritas.
+
+### Paso 26. Ver las marcas
+<!-- recorrido: marcas-ver -->
+
+Abrí la pestaña «Marcas». Cada marca dice cuántas publicaciones la usan,
+como «… publicaciones», sin contar las eliminadas, y de dónde vino: «De la
+lista», si se cargó con el sitio, o «Escrita al publicar», si alguien la
+escribió con «Otra marca».
+
+### Paso 27. Corregir el nombre
+<!-- recorrido: marcas-corregir -->
+
+1. Tocá «Corregir» en la marca.
+2. Escribí el nombre en «Nombre corregido», de 2 a 40 caracteres.
+3. Tocá «Guardar nombre», o «Cancelar».
+
+El nombre nuevo se ve enseguida en el filtro del Mercado y en la página de
+cada publicación que la usa.
+
+Si el nombre ya es el de otra marca, aunque cambien las mayúsculas, los
+acentos o los espacios, el panel no la pisa: avisa que esa marca ya existe,
+con cuántas publicaciones, y ofrece «Unir con …», que es el paso 29.
+
+### Paso 28. Dar de baja y de alta
+<!-- recorrido: marcas-baja -->
+
+Tocá «Dar de baja». El panel pregunta «Dar de baja la marca»; confirmá con
+«Dar de baja». La marca deja de ofrecerse al publicar y en el filtro del
+Mercado, y las publicaciones que la tienen la siguen mostrando en su página.
+En la lista dice «Dada de baja», y «Dar de alta» la vuelve a ofrecer.
+
+### Paso 29. Unir dos marcas
+<!-- recorrido: marcas-unir -->
+
+1. Tocá «Unir» en la marca que se va.
+2. En «Unir con», elegí la marca que queda.
+3. Tocá «Unir marcas». El panel pregunta «Unir marcas» y dice cuántas
+   publicaciones pasan.
+4. Confirmá con «Unir con …».
+
+Las publicaciones de la que se va pasan a la que queda, y la que se va deja
+de ofrecerse al publicar y en el filtro del Mercado. No se puede deshacer.
+
+---
+
+## 10. Si una lista no carga
+
+### Paso 30. Volver a pedirla
 <!-- recorrido: sin-conexion -->
 
 Si se corta la conexión o el servidor no responde, el panel no muestra una
@@ -528,8 +577,9 @@ mirar su fuente.
   elegirlo” y “el transportista no recibe el contacto de quien compra”. Es
   una decisión (`DECISIONS.md`, 05/08/2026) y la comprueban los casos 52 y 54
   del smoke.
-- Antes de empezar: “Quien publica puede sumar una que no está en la lista”
-  pasa en el sitio, no en el panel. Lo comprueba el caso 238 de
+- Antes de empezar: “Las marcas nuevas no se aprueban antes de aparecer.” y
+  “Quien publica puede sumar una que no está en la lista, y se ofrece
+  enseguida.” pasan en el sitio, no en el panel. Lo comprueba el caso 238 de
   `scripts/smoke.mjs`.
 - Antes de empezar: “Todavía no existen.”, “El panel no tiene cómo activar
   una suscripción” y “el acceso a contactos por plan no está definido para
@@ -554,6 +604,9 @@ mirar su fuente.
   del código: el formulario de publicar lee esas listas
   (`src/components/AddProduct/AddProductModal.tsx`). Que una unidad nueva
   aparezca al publicar sí se comprueba, en el paso 23.
+- Paso 29: “No se puede deshacer.” Sale del código: unir borra la marca que
+  se va, y no queda guardado qué publicaciones eran suyas
+  (`backend/app/services/marcas.py`).
 - Paso 24: “es el que quedó guardado en las publicaciones”, y Paso 25: “Las
   publicaciones que ya la eligieron no cambian.” Sale del código: la
   publicación guarda la opción como texto, no como referencia a la lista

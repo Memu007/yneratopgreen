@@ -99,6 +99,8 @@ export const SUPERFICIES = [
   { id: 'administración: productos' },
   { id: 'administración: órdenes' },
   { id: 'administración: documentación' },
+  { id: 'administración: marcas' },
+  { id: 'administración: marcas, con un nombre que ya existe' },
 ];
 
 /** Las superficies que una puerta tiene que medir, en orden de recorrido. */

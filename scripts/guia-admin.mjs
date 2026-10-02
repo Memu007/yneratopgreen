@@ -37,7 +37,7 @@ import { chromium } from 'playwright';
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { queryRows } from './lib/sql.mjs';
+import { queryRows, sqlLiteral } from './lib/sql.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const API = process.env.SMOKE_API_URL || 'http://localhost:8000/api';
@@ -357,11 +357,11 @@ const RECORRIDOS = {
     const panel = await abrirElPanel(page);
     await v.captura('entrar', page);
     const pestanas = panel.locator('[class*="_tabs_"] button');
-    await v.afirma('con siete pestañas', async () => {
+    await v.afirma('con ocho pestañas', async () => {
       const cuantas = await pestanas.count();
-      exigir(cuantas === 7, `el panel tiene ${cuantas} pestañas`);
+      exigir(cuantas === 8, `el panel tiene ${cuantas} pestañas`);
     });
-    await v.afirma('En el celular es igual: las siete pestañas entran en la pantalla.', async () => {
+    await v.afirma('En el celular es igual: las ocho pestañas entran en la pantalla.', async () => {
       const fuera = await pestanas.evaluateAll((botones, ancho) => botones
         .filter((b) => b.getBoundingClientRect().left < 0 || b.getBoundingClientRect().right > ancho + 0.5)
         .map((b) => b.textContent.trim()), c.viewport.width);
@@ -1286,11 +1286,7 @@ const RECORRIDOS = {
     const panel = await pestana(page, 'Configuración');
     await panel.getByRole('heading', { name: /Configuración de Formularios/ }).waitFor({ timeout: 15_000 });
     const LISTAS = { 'Tipos de Cobro': 'pricing_type', Disponibilidad: 'availability', 'Tiempo de Respuesta': 'response_time', Unidades: 'unit' };
-    await v.afirma({
-      paso: 'cuatro listas',
-      limites: ['Las marcas no se administran desde este panel.', 'no están entre las listas de «Configuración»',
-        'desde el panel no se puede corregir, unir ni dar de baja'],
-    }, async () => {
+    await v.afirma(['cuatro listas', 'Las marcas no están acá: tienen su pestaña, «Marcas».'], async () => {
       const botones = panel.locator('[class*="_configTabs_"] button');
       await botones.first().waitFor({ timeout: 10_000 });
       const listas = (await botones.allInnerTexts()).map((t) => t.trim()).sort();
@@ -1381,6 +1377,179 @@ const RECORRIDOS = {
   },
 };
 
+// --- Marcas --------------------------------------------------------------------
+
+// La fila de una marca en «Marcas», por su nombre exacto.
+const filaDeMarca = (panel, nombre) => panel.locator('[class*="_marcas_"] > li')
+  .filter({ has: panel.page().locator('[class*="_marcaNombre_"]', { hasText: new RegExp(`^${nombre}$`) }) });
+
+const marcasDelAlta = async () => ((await pedir('/catalog/form-options')).data.brand || []).map((o) => o.label);
+
+// Lo que ofrece el filtro de marca del Mercado con Tractores, en la pantalla.
+async function marcasDelFiltro(c) {
+  const mercado = await c.contexto.newPage();
+  try {
+    const { maquinaria, tractores } = c.marcaEscrita;
+    const [[categoria, subrubro]] = queryRows(`SELECT c.name, s.name FROM categories c JOIN subcategories s
+      ON s.category_id = c.id WHERE c.id = ${sqlLiteral(maquinaria)} AND s.id = ${sqlLiteral(tractores)}`);
+    await mercado.goto(`${WEB}/?section=marketplace&category=${encodeURIComponent(categoria)}`
+      + `&subcategory=${encodeURIComponent(subrubro)}`, { waitUntil: 'domcontentloaded' });
+    await mercado.locator('article[class*="card"]').first().waitFor({ timeout: 20_000 });
+    const plegador = mercado.getByRole('button', { name: /^Filtros/ });
+    if ((await plegador.count()) > 0 && (await plegador.isVisible())
+      && (await plegador.getAttribute('aria-expanded')) !== 'true') await plegador.click();
+    await mercado.locator('#catalog-brand').waitFor({ timeout: 15_000 });
+    return (await mercado.locator('#catalog-brand option').allInnerTexts()).map((t) => t.trim());
+  } finally {
+    await mercado.close();
+  }
+}
+
+async function marcaEnLaFicha(c) {
+  const ficha = await c.contexto.newPage();
+  try {
+    await ficha.goto(`${WEB}/?section=product&id=${c.marcaEscrita.publicacion}`, { waitUntil: 'domcontentloaded' });
+    await ficha.locator('main dl[class*="_datos_"]').waitFor({ timeout: 20_000 });
+    return Object.fromEntries(await ficha.locator('main dl[class*="_datos_"] > div').evaluateAll((filas) => filas
+      .map((f) => [f.querySelector('dt')?.textContent?.trim(), f.querySelector('dd')?.textContent?.trim()]))).Marca;
+  } finally {
+    await ficha.close();
+  }
+}
+
+Object.assign(RECORRIDOS, {
+  async 'marcas-ver'(c, v) {
+    const { page } = c;
+    const panel = await pestana(page, 'Marcas');
+    await panel.locator('[class*="_marcas_"] > li').first().waitFor({ timeout: 15_000 });
+    await v.mirar(page);
+    const escrita = filaDeMarca(panel, c.marcaEscrita.nombre);
+    await v.afirma({ seccion: 'llegan solas' }, async () => {
+      await escrita.waitFor({ timeout: 10_000 }).catch(() => {
+        throw new Falla(`la marca escrita al publicar, «${c.marcaEscrita.nombre}», no está en la lista`);
+      });
+    });
+    await v.afirma(['Cada marca dice cuántas publicaciones la usan', 'sin contar las eliminadas'], async () => {
+      for (const [nombre, valor] of [['John Deere', 'john-deere'], [c.marcaEscrita.nombre, null]]) {
+        const texto = await filaDeMarca(panel, nombre).innerText();
+        const cuantas = contar(`SELECT count(*) FROM products WHERE status <> 'DELETED' AND brand = ${valor
+          ? sqlLiteral(valor) : `(SELECT value FROM form_options WHERE option_type = 'brand' AND label = ${sqlLiteral(nombre)})`}`);
+        const dicho = cuantas === 1 ? '1 publicación' : `${cuantas} publicaciones`;
+        exigir(texto.includes(dicho), `«${nombre}» dice «${texto.replace(/\s+/g, ' ')}» y tiene ${dicho}`);
+      }
+    });
+    await v.afirma(['«De la lista», si se cargó con el sitio', '«Escrita al publicar», si alguien la escribió con «Otra marca»'], async () => {
+      exigir(/De la lista/.test(await filaDeMarca(panel, 'John Deere').innerText()), 'John Deere no dice «De la lista»');
+      exigir(/Escrita al publicar/.test(await escrita.innerText()), `«${c.marcaEscrita.nombre}» no dice «Escrita al publicar»`);
+    });
+  },
+
+  async 'marcas-corregir'(c, v) {
+    const { page } = c;
+    const panel = await pestana(page, 'Marcas');
+    const actual = c.marcaEscrita.nombre;
+    await filaDeMarca(panel, actual).getByRole('button', { name: `Corregir el nombre de ${actual}` }).click();
+    const campo = panel.getByLabel('Nombre corregido');
+    await v.afirma('de 2 a 40 caracteres', async () => {
+      exigir(await campo.getAttribute('maxlength') === '40', `«Nombre corregido» deja escribir ${await campo.getAttribute('maxlength')}`);
+      const [[id]] = queryRows(`SELECT id FROM form_options WHERE option_type = 'brand' AND label = ${sqlLiteral(actual)}`);
+      const r = await pedir(`/admin/brands/${id}`, { method: 'PATCH', token: c.admin.access_token, body: { label: 'J' } });
+      exigir(r.status === 422, `un nombre de 1 carácter respondió HTTP ${r.status}`);
+    });
+    await campo.fill('john  deere');
+    await panel.getByRole('button', { name: 'Guardar nombre' }).click();
+    await v.afirma(['el panel no la pisa', 'avisa que esa marca ya existe, con cuántas publicaciones, y ofrece «Unir con …»'], async () => {
+      await panel.getByRole('button', { name: 'Unir con John Deere' }).waitFor({ timeout: 10_000 }).catch(() => {
+        throw new Falla('con el nombre de John Deere, el panel no ofrece «Unir con John Deere»');
+      });
+      const aviso = (await panel.getByRole('alert').first().innerText()).replace(/\s+/g, ' ');
+      const deJohnDeere = contar("SELECT count(*) FROM products WHERE status <> 'DELETED' AND brand = 'john-deere'");
+      exigir(aviso.includes('Ya existe la marca «John Deere»') && aviso.includes(`${deJohnDeere} publicaci`),
+        `el aviso dice «${aviso}» y John Deere tiene ${deJohnDeere}`);
+      exigir(contar(`SELECT count(*) FROM form_options WHERE option_type = 'brand' AND label = ${sqlLiteral(actual)}`) === 1,
+        'con el nombre de otra marca, el panel la pisó');
+    });
+    await v.mirar(page);
+    await panel.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    const corregido = actual.replace('Jhon Deer', 'Jhon Deere');
+    await filaDeMarca(panel, actual).getByRole('button', { name: `Corregir el nombre de ${actual}` }).click();
+    await panel.getByLabel('Nombre corregido').fill(corregido);
+    await panel.getByRole('button', { name: 'Guardar nombre' }).click();
+    await filaDeMarca(panel, corregido).waitFor({ timeout: 10_000 }).catch(() => {
+      throw new Falla(`corregida, la lista no dice «${corregido}»`);
+    });
+    c.marcaEscrita.nombre = corregido;
+    await v.mirar(page);
+    await v.afirma('El nombre nuevo se ve enseguida en el filtro del Mercado y en la página de cada publicación que la usa.', async () => {
+      const filtro = await marcasDelFiltro(c);
+      exigir(filtro.includes(`${corregido} (1)`), `el filtro ofrece ${JSON.stringify(filtro)}`);
+      const enLaFicha = await marcaEnLaFicha(c);
+      exigir(enLaFicha === corregido, `la página de la publicación dice «Marca: ${enLaFicha}»`);
+    });
+  },
+
+  async 'marcas-baja'(c, v) {
+    const { page } = c;
+    const nombre = c.marcaEscrita.nombre;
+    const panel = await pestana(page, 'Marcas');
+    await filaDeMarca(panel, nombre).getByRole('button', { name: `Dar de baja ${nombre}` }).click();
+    await confirmar(page, 'Dar de baja la marca', 'Dar de baja', v);
+    await v.afirma('En la lista dice «Dada de baja»', async () => {
+      await c.esperarA(async () => /Dada de baja/.test(await filaDeMarca(panel, nombre).innerText()),
+        'dada de baja, la fila no lo dice');
+    });
+    await v.mirar(page);
+    await v.afirma('La marca deja de ofrecerse al publicar y en el filtro del Mercado', async () => {
+      exigir(!(await marcasDelAlta()).includes(nombre), 'dada de baja, el alta la sigue ofreciendo');
+      const filtro = await marcasDelFiltro(c);
+      exigir(!filtro.some((t) => t.startsWith(nombre)), `dada de baja, el filtro ofrece ${JSON.stringify(filtro)}`);
+    });
+    await v.afirma('las publicaciones que la tienen la siguen mostrando en su página', async () => {
+      const enLaFicha = await marcaEnLaFicha(c);
+      exigir(enLaFicha === nombre, `dada de baja, la página de la publicación dice «Marca: ${enLaFicha}»`);
+    });
+    await filaDeMarca(panel, nombre).getByRole('button', { name: `Dar de alta ${nombre}` }).click();
+    await confirmar(page, 'Dar de alta la marca', 'Dar de alta', v);
+    await v.afirma('«Dar de alta» la vuelve a ofrecer', async () => {
+      await c.esperarA(async () => (await marcasDelAlta()).includes(nombre), 'dada de alta, el alta no la ofrece');
+    });
+  },
+
+  async 'marcas-unir'(c, v) {
+    const { page } = c;
+    const nombre = c.marcaEscrita.nombre;
+    const panel = await pestana(page, 'Marcas');
+    const fila = filaDeMarca(panel, nombre);
+    await fila.getByRole('button', { name: `Unir ${nombre} con otra marca` }).click();
+    await v.mirar(page);
+    await fila.locator('select').selectOption({ label: 'John Deere' });
+    await fila.getByRole('button', { name: 'Unir marcas' }).click();
+    const capa = page.getByRole('dialog', { name: 'Unir marcas' });
+    await capa.waitFor({ timeout: 10_000 });
+    await v.afirma('dice cuántas publicaciones pasan', async () => {
+      const texto = (await capa.innerText()).replace(/\s+/g, ' ');
+      exigir(texto.includes('Su publicación pasa a John Deere.'), `la confirmación dice «${texto}»`);
+    });
+    const [[valor]] = queryRows(`SELECT value, 'fin' FROM form_options WHERE option_type = 'brand' AND label = ${sqlLiteral(nombre)}`);
+    await confirmar(page, 'Unir marcas', 'Unir con John Deere', v);
+    await fila.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {
+      throw new Falla(`unida, «${nombre}» sigue en la lista`);
+    });
+    await v.mirar(page);
+    await v.afirma('Las publicaciones de la que se va pasan a la que queda', async () => {
+      const [[marca]] = queryRows(`SELECT brand, 'fin' FROM products WHERE id = ${sqlLiteral(c.marcaEscrita.publicacion)}`);
+      exigir(marca === 'john-deere', `unida, la publicación quedó con «${marca}»`);
+      exigir(contar(`SELECT count(*) FROM products WHERE brand = ${sqlLiteral(valor)}`) === 0,
+        `unida, quedan publicaciones con «${valor}»`);
+    });
+    await v.afirma('la que se va deja de ofrecerse al publicar y en el filtro del Mercado', async () => {
+      exigir(!(await marcasDelAlta()).includes(nombre), 'unida, el alta la sigue ofreciendo');
+      const filtro = await marcasDelFiltro(c);
+      exigir(!filtro.some((t) => t.startsWith(nombre)), `unida, el filtro ofrece ${JSON.stringify(filtro)}`);
+    });
+  },
+});
+
 RECORRIDOS['sin-conexion'] = async (c, v) => {
   const { page } = c;
   // Con un filtro puesto, la lista de usuarios deja de contestar.
@@ -1457,6 +1626,7 @@ const PESTANAS = {
   Órdenes: 'Órdenes',
   Categorías: 'Categorías',
   Documentación: 'Documentación de vendedores',
+  Marcas: 'Marcas',
   Configuración: 'Configuración: las listas de los formularios',
 };
 
@@ -1554,6 +1724,22 @@ async function prepararLaCorrida(browser, ancho) {
   };
   const producto = await publicar(`Guía producto ${sello}`);
   const productoDocumentado = await publicar(`Guía documentada ${sello}`);
+  // Un tractor con una marca escrita con «Otra marca», mal escrita a
+  // propósito: es lo que «Marcas» viene a corregir. El último paso la une a
+  // John Deere, así que la corrida no deja ninguna marca de más.
+  const [[tractores, maquinaria]] = queryRows(`SELECT s.id, c.id FROM subcategories s
+    JOIN categories c ON c.id = s.category_id WHERE c.slug = 'maquinaria-agricola' AND s.slug = 'tractores'`);
+  const nombreDeLaMarca = `Jhon Deer ${sello}`;
+  const conMarca = await pedir('/products', {
+    method: 'POST', token: vendedora.access_token,
+    body: {
+      name: `Guía tractor ${sello}`, description: 'Publicación de la guía del panel de administración.',
+      category_id: maquinaria, subcategory_id: tractores, price: 1000, stock: 1, unit: 'unidad',
+      locality_id: pergamino.id, publication_type: 'producto', operation_kind: 'activo',
+      otra_marca: nombreDeLaMarca,
+    },
+  });
+  if (conMarca.status >= 400) throw new Error(`no se pudo publicar el tractor de la guía: HTTP ${conMarca.status}`);
   // Una orden propia, por transferencia: la base demo limpia no trae ninguna y
   // el paso de «Órdenes» tiene que tener qué mirar.
   // Para cobrar por transferencia hace falta un alias; éste es inventado.
@@ -1603,6 +1789,7 @@ async function prepararLaCorrida(browser, ancho) {
       direccion: 'Ruta 8 km 220, Pergamino, Buenos Aires, CP 2700',
     },
     categoriaConPublicaciones: conPublicaciones[0],
+    marcaEscrita: { nombre: nombreDeLaMarca, publicacion: conMarca.data.id, maquinaria, tractores },
     nueva: { email: `guia.nueva.${sello}@example.com`, nombre: `Nueva Guía ${sello}`, clave: 'GuiaNueva1' },
     categoria: { nombre: `Guía categoría ${sello}`, sub: `Guía subcategoría ${sello}` },
     opcion: { valor: `guia_${sello.replace(/\W/g, '_')}`, etiqueta: `Guía unidad ${sello}` },

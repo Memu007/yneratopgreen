@@ -448,6 +448,18 @@ async function administracion(page, medida) {
       .getByRole('button', { name: new RegExp(pestania, 'i') }).first().click();
     await revisar(page, ruta, medida, pestaniaActiva(page, pestania));
   }
+
+  // Marcas, y su formulario de corrección con el aviso de que el nombre ya
+  // es de otra marca: corregir «John Deere» a «case» responde 409 y no cambia
+  // nada.
+  await page.locator('[class*="_tabs_"]').first().getByRole('button', { name: 'Marcas', exact: true }).click();
+  await revisar(page, 'administración: marcas', medida, page.locator('[class*="_marcas_"] li').first());
+  await page.getByRole('button', { name: 'Corregir el nombre de John Deere' }).click();
+  await page.getByLabel('Nombre corregido').fill('case');
+  await page.getByRole('button', { name: 'Guardar nombre' }).click();
+  await revisar(page, 'administración: marcas, con un nombre que ya existe', medida,
+    page.getByRole('button', { name: 'Unir con Case' }));
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
 }
 
 /* --- ejecución ----------------------------------------------------------- */

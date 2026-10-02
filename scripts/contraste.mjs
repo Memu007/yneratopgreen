@@ -657,6 +657,17 @@ for (const medida of MEDIDAS) {
         || page.locator('[class*="_tabs_"] button[class*="_active_"]')
           .filter({ hasText: new RegExp(pestania, 'i') }));
     }
+
+    // Marcas, y su formulario de corrección con el aviso de que el nombre ya
+    // es de otra marca: corregir «John Deere» a «case» responde 409 y no
+    // cambia nada.
+    await page.locator('[class*="_tabs_"]').first().getByRole('button', { name: 'Marcas', exact: true }).click();
+    await revisar(page, `${medida.n} administración: marcas`, page.locator('[class*="_marcas_"] li').first());
+    await page.getByRole('button', { name: 'Corregir el nombre de John Deere' }).click();
+    await page.getByLabel('Nombre corregido').fill('case');
+    await page.getByRole('button', { name: 'Guardar nombre' }).click();
+    await revisar(page, `${medida.n} administración: marcas, con un nombre que ya existe`,
+      page.getByRole('button', { name: 'Unir con Case' }));
     await ctx.close();
   }
 }

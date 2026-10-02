@@ -40015,6 +40015,281 @@ print(json.dumps(sorted(set(valores))))
   return medidos.join('; ');
 });
 
+// 239. «Marcas» en el panel: corregir, unir y dar de baja.
+//
+// MARCAS-PANEL-1 (Emi, 02/10): una marca escrita con «Otra marca» se corrige
+// desde el panel. Unir mueve las publicaciones a la que queda y la que se va
+// desaparece del filtro y del alta; corregir se ve en la ficha y en el filtro;
+// dar de baja la saca del alta y del filtro y la ficha la sigue mostrando.
+// Todo pide administración.
+await runCase(239, '«Marcas» en el panel corrige, une y da de baja, y el filtro, el alta y la ficha lo siguen', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  const MARCADOR = `Marcas239 ${sello}`;
+  const vendedor = await ingresarVendedor('vendedor@ejemplo.com', 'vendedor123');
+  const admin = (await apiRequest('/auth/login', {
+    method: 'POST', body: { email: 'admin@topgreen.com', password: 'admin123' },
+  })).data;
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const localidad = localidadDelPadron('Pergamino', 'Buenos Aires');
+  const clave = (texto) => texto.normalize('NFKD').replace(/[^\x00-\x7f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const todasLasMarcas = () => queryRows(`
+    SELECT f.id, f.value, f.label, f.is_active::text,
+      (SELECT COUNT(*) FROM products p WHERE p.brand = f.value AND p.status = 'ACTIVE')::text
+    FROM form_options f WHERE f.option_type = 'brand'`);
+  const laMarca = (texto) => todasLasMarcas().find(([, , label]) => clave(label) === clave(texto));
+  const existe = (id) => todasLasMarcas().some(([otra]) => otra === id);
+  const retirar = (valores) => {
+    if (valores.length) {
+      querySql(`DELETE FROM form_options WHERE option_type = 'brand' AND value IN (${valores.map(sqlLiteral).join(',')})`);
+    }
+  };
+  // Lo que dejó una corrida cortada, sin publicaciones vivas.
+  retirar(todasLasMarcas()
+    .filter(([, , label, , vivas]) => ['jhondeer', 'agromec'].includes(clave(label)) && vivas === '0')
+    .map(([, valor]) => valor));
+  for (const texto of ['Jhon Deer', 'Agromec']) {
+    assert(!laMarca(texto), `ya hay una marca «${texto}» con publicaciones activas: ${JSON.stringify(laMarca(texto))}`);
+  }
+  const marcasDeAntes = new Set(todasLasMarcas().map(([, valor]) => valor));
+  const creadas = [];
+  const publicar = async (nombre, extra) => {
+    const { data } = await apiRequest('/products', {
+      method: 'POST', token: vendedor.token,
+      body: {
+        name: `${MARCADOR} ${nombre}`, description: 'Publicación del caso 239.', price: 2390, stock: 1,
+        unit: 'unidad', locality_id: localidad, publication_type: 'producto', operation_kind: 'activo',
+        category_id: tractores.categoriaId, subcategory_id: tractores.id, condition: 'usado', ...extra,
+      },
+    });
+    creadas.push(data.id);
+    return data.id;
+  };
+  const marcaDe = (id) => queryRows(`SELECT coalesce(brand, '(sin marca)'), 'fin' FROM products WHERE id = ${sqlLiteral(id)}`)[0][0];
+  const delFiltro = async () => (await apiRequest(
+    `/catalog/products?subcategory=${tractores.id}&page_size=1`)).data.brands ?? [];
+  const delAlta = async () => (await apiRequest('/catalog/form-options')).data.brand.map((o) => o.label);
+  const pedirComo = (token, ruta, method = 'GET', body) => pedirCrudo(ruta, { method, header: token, body });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const medida of [{ n: 'escritorio', width: 1440, height: 900 }, { n: 'celular', width: 390, height: 844 }]) {
+      const donde = medida.n;
+      // Un paso que no se pudo hacer queda anotado con lo que ya se había
+      // visto, y el otro ancho corre igual.
+      try {
+        const jhon = await publicar(`${donde} Jhon Deer`, { otra_marca: 'Jhon Deer' });
+        const agro = await publicar(`${donde} Agromec`, { otra_marca: 'Agromec' });
+        const jdAntes = (await delFiltro()).find((m) => m.value === 'john-deere')?.count ?? 0;
+
+        const contexto = await browser.newContext({ viewport: { width: medida.width, height: medida.height } });
+        await contexto.addInitScript(({ a, r }) => {
+          window.localStorage.setItem('access_token', a);
+          window.localStorage.setItem('refresh_token', r);
+        }, { a: admin.access_token, r: admin.refresh_token });
+        const page = await contexto.newPage();
+        const panel = page.getByRole('dialog', { name: 'Administración' });
+        const fila = (nombre) => panel.locator('[class*="_marcas_"] > li')
+          .filter({ has: page.locator('[class*="_marcaNombre_"]', { hasText: new RegExp(`^${nombre}$`) }) });
+        const abrirMarcas = async () => {
+          await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+          await page.getByRole('button', { name: 'Admin', exact: true }).click();
+          await panel.getByRole('button', { name: 'Marcas', exact: true }).click();
+          await panel.locator('[class*="_marcas_"] > li').first().waitFor({ state: 'visible', timeout: 20_000 });
+        };
+        const confirmar = async (titulo, boton) => {
+          const capa = page.getByRole('dialog', { name: titulo });
+          await capa.waitFor({ state: 'visible', timeout: 10_000 });
+          const texto = (await capa.innerText()).replace(/\s+/g, ' ');
+          await capa.getByRole('button', { name: boton, exact: true }).click();
+          await capa.waitFor({ state: 'hidden', timeout: 15_000 });
+          return texto;
+        };
+        const filtroEnPantalla = async () => {
+          const mercado = await contexto.newPage();
+          await mercado.goto(`${FRONTEND_URL}/?section=marketplace&category=${encodeURIComponent(tractores.categoria)}`
+            + `&subcategory=${encodeURIComponent(tractores.nombre)}`, { waitUntil: 'domcontentloaded' });
+          await mercado.locator('article[class*="card"]').first().waitFor({ state: 'visible', timeout: 25_000 });
+          const plegador = mercado.getByRole('button', { name: /^Filtros/ });
+          if ((await plegador.count()) > 0 && (await plegador.isVisible())
+            && (await plegador.getAttribute('aria-expanded')) !== 'true') await plegador.click();
+          await mercado.locator('#catalog-brand').waitFor({ state: 'visible', timeout: 20_000 });
+          const textos = (await mercado.locator('#catalog-brand option').allInnerTexts()).map((t) => t.trim());
+          await mercado.close();
+          return textos;
+        };
+        const marcaEnLaFicha = async (id) => {
+          const ficha = await contexto.newPage();
+          await ficha.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+          await ficha.locator('main dl[class*="_datos_"]').waitFor({ state: 'visible', timeout: 20_000 });
+          const filas = Object.fromEntries(await ficha.locator('main dl[class*="_datos_"] > div').evaluateAll((d) => d
+            .map((f) => [f.querySelector('dt')?.textContent?.trim(), f.querySelector('dd')?.textContent?.trim()])));
+          await ficha.close();
+          return filas.Marca;
+        };
+
+        // --- A. La lista ------------------------------------------------------
+        await abrirMarcas();
+        const textoDeJhon = (await fila('Jhon Deer').innerText()).replace(/\s+/g, ' ');
+        if (!/1 publicación/.test(textoDeJhon) || !/Escrita al publicar/.test(textoDeJhon)) {
+          problemas.push(`${donde}: la fila de «Jhon Deer» dice «${textoDeJhon}»`);
+        }
+        if (!/De la lista/.test(await fila('John Deere').innerText())) {
+          problemas.push(`${donde}: John Deere no dice «De la lista»`);
+        }
+
+        // --- B. Unir «Jhon Deer» a John Deere ----------------------------------
+        await fila('Jhon Deer').getByRole('button', { name: 'Unir Jhon Deer con otra marca' }).click();
+        await fila('Jhon Deer').locator('select').selectOption({ label: 'John Deere' });
+        await fila('Jhon Deer').getByRole('button', { name: 'Unir marcas' }).click();
+        const avisoDeUnir = await confirmar('Unir marcas', 'Unir con John Deere');
+        if (!avisoDeUnir.includes('Su publicación pasa a John Deere.')) {
+          problemas.push(`${donde}: la confirmación de unir no dice cuántas se mueven: «${avisoDeUnir}»`);
+        }
+        await page.getByText('«Jhon Deer» se unió a «John Deere»: pasó 1 publicación.').first()
+          .waitFor({ state: 'visible', timeout: 15_000 })
+          .catch(() => problemas.push(`${donde}: unir no avisa que pasó 1 publicación`));
+        await fila('Jhon Deer').waitFor({ state: 'detached', timeout: 15_000 })
+          .catch(() => problemas.push(`${donde}: unida, «Jhon Deer» sigue en la lista del panel`));
+        if (marcaDe(jhon) !== 'john-deere') problemas.push(`${donde}: unida, la publicación quedó con «${marcaDe(jhon)}»`);
+        if (laMarca('Jhon Deer')) problemas.push(`${donde}: unida, «Jhon Deer» sigue en la base`);
+        const jdDespues = (await delFiltro()).find((m) => m.value === 'john-deere')?.count;
+        if (jdDespues !== jdAntes + 1) problemas.push(`${donde}: John Deere cuenta ${jdDespues} en el filtro y tenía que contar ${jdAntes + 1}`);
+        if ((await delFiltro()).some((m) => clave(m.label) === 'jhondeer')) problemas.push(`${donde}: «Jhon Deer» sigue en el filtro`);
+        if ((await delAlta()).includes('Jhon Deer')) problemas.push(`${donde}: «Jhon Deer» sigue en el alta`);
+        const filtroUnido = await filtroEnPantalla();
+        if (!filtroUnido.includes(`John Deere (${jdAntes + 1})`) || filtroUnido.some((t) => t.startsWith('Jhon Deer'))) {
+          problemas.push(`${donde}: en la pantalla el filtro ofrece ${JSON.stringify(filtroUnido)}`);
+        }
+
+        // --- C. Corregir «Agromec» a «AgroMec» ---------------------------------
+        await fila('Agromec').getByRole('button', { name: 'Corregir el nombre de Agromec' }).click();
+        await panel.getByLabel('Nombre corregido').fill('AgroMec');
+        await panel.getByRole('button', { name: 'Guardar nombre' }).click();
+        await fila('AgroMec').waitFor({ state: 'visible', timeout: 15_000 })
+          .catch(() => problemas.push(`${donde}: corregida, la lista del panel no dice «AgroMec»`));
+        if ((await marcaEnLaFicha(agro)) !== 'AgroMec') problemas.push(`${donde}: corregida, la ficha dice «Marca: ${await marcaEnLaFicha(agro)}»`);
+        if (!(await filtroEnPantalla()).includes('AgroMec (1)')) problemas.push(`${donde}: corregida, el filtro no ofrece «AgroMec (1)»`);
+        if (marcaDe(agro) !== laMarca('AgroMec')?.[1]) problemas.push(`${donde}: corregir cambió la marca guardada en la publicación`);
+
+        // --- D. Dar de baja y de alta -------------------------------------------
+        await fila('AgroMec').getByRole('button', { name: 'Dar de baja AgroMec' }).click();
+        const avisoDeBaja = await confirmar('Dar de baja la marca', 'Dar de baja');
+        if (!avisoDeBaja.includes('Su publicación la sigue mostrando en su página.')) {
+          problemas.push(`${donde}: la confirmación de dar de baja dice «${avisoDeBaja}»`);
+        }
+        await esperarA(async () => /Dada de baja/.test(await fila('AgroMec').innerText()),
+          'dada de baja, la fila no lo dice', 15_000).catch((e) => problemas.push(`${donde}: ${e.message.split('\n')[0]}`));
+        if ((await delAlta()).includes('AgroMec')) problemas.push(`${donde}: dada de baja, sigue en el alta`);
+        if ((await delFiltro()).some((m) => m.label === 'AgroMec')) problemas.push(`${donde}: dada de baja, sigue en el filtro de la API`);
+        if ((await filtroEnPantalla()).some((t) => t.startsWith('AgroMec'))) problemas.push(`${donde}: dada de baja, sigue en el filtro de la pantalla`);
+        if ((await marcaEnLaFicha(agro)) !== 'AgroMec') problemas.push(`${donde}: dada de baja, la ficha dice «Marca: ${await marcaEnLaFicha(agro)}»`);
+
+        await fila('AgroMec').getByRole('button', { name: 'Dar de alta AgroMec' }).click();
+        await confirmar('Dar de alta la marca', 'Dar de alta');
+        await esperarA(async () => !/Dada de baja/.test(await fila('AgroMec').innerText()),
+          'dada de alta, la fila sigue diciendo «Dada de baja»', 15_000).catch((e) => problemas.push(`${donde}: ${e.message.split('\n')[0]}`));
+        if (!(await delAlta()).includes('AgroMec')) problemas.push(`${donde}: dada de alta, no vuelve al alta`);
+        if (!(await delFiltro()).some((m) => m.label === 'AgroMec' && m.count === 1)) problemas.push(`${donde}: dada de alta, no vuelve al filtro con 1`);
+        await contexto.close();
+
+        // El otro ancho empieza de cero: estas publicaciones y AgroMec se retiran.
+        querySql(`UPDATE products SET status = 'DELETED' WHERE id IN (${[jhon, agro].map(sqlLiteral).join(',')})`);
+        retirar(todasLasMarcas().filter(([, valor, , , vivas]) => !marcasDeAntes.has(valor) && vivas === '0')
+          .map(([, valor]) => valor));
+        medidos.push(`${donde}: unir «Jhon Deer» a John Deere la pasa de ${jdAntes} a ${jdAntes + 1} en el filtro, y «Jhon `
+          + 'Deer» sale de la lista, el filtro y el alta; «AgroMec» se ve en la ficha y en el filtro; dada de baja sale '
+          + 'del alta y del filtro, la ficha la sigue mostrando, y dada de alta vuelve');
+      } catch (error) {
+        problemas.push(`${donde}: no se pudo seguir: ${error.message.split('\n')[0]}`);
+        querySql(`UPDATE products SET status = 'DELETED' WHERE id IN (${creadas.map(sqlLiteral).join(',')})`);
+        retirar(todasLasMarcas().filter(([, valor, , , vivas]) => !marcasDeAntes.has(valor) && vivas === '0')
+          .map(([, valor]) => valor));
+      }
+    }
+
+    // --- E. La API: permisos ------------------------------------------------
+    const [jdId] = laMarca('John Deere');
+    const otraVez = await publicar('para unir dos veces', { otra_marca: `Doble ${sello}` });
+    const [dobleId, dobleValor] = laMarca(`Doble ${sello}`);
+    const ajenas = [
+      ['listar', '/admin/brands', 'GET'],
+      ['corregir', `/admin/brands/${dobleId}`, 'PATCH', { label: 'Otro nombre' }],
+      ['dar de baja', `/admin/brands/${dobleId}`, 'PATCH', { is_active: false }],
+      ['unir', `/admin/brands/${dobleId}/merge`, 'POST', { destino_id: jdId }],
+    ];
+    for (const [que, ruta, method, body] of ajenas) {
+      const r = await pedirComo(vendedor.token, ruta, method, body);
+      if (r.status !== 403) problemas.push(`API: quien vende pide ${que} y recibe ${r.status} y no 403`);
+    }
+    if (marcaDe(otraVez) !== dobleValor || laMarca(`Doble ${sello}`)?.[2] !== `Doble ${sello}`
+      || laMarca(`Doble ${sello}`)?.[3] !== 'true') {
+      problemas.push('API: lo que pidió quien vende cambió algo');
+    }
+
+    // --- F. Unir dos veces seguidas, y a la vez ------------------------------
+    const jdAntesDeUnir = Number(laMarca('John Deere')[4]);
+    const primera = await pedirComo(admin.access_token, `/admin/brands/${dobleId}/merge`, 'POST', { destino_id: jdId });
+    const segunda = await pedirComo(admin.access_token, `/admin/brands/${dobleId}/merge`, 'POST', { destino_id: jdId });
+    if (primera.status !== 200 || primera.datos?.movidas !== 1 || segunda.status !== 404) {
+      problemas.push(`API: unir dos veces respondió ${primera.status} (movidas ${primera.datos?.movidas}) y ${segunda.status}`);
+    }
+    if (Number(laMarca('John Deere')[4]) !== jdAntesDeUnir + 1 || marcaDe(otraVez) !== 'john-deere') {
+      problemas.push(`API: después de unir dos veces John Deere tiene ${laMarca('John Deere')[4]} y la publicación «${marcaDe(otraVez)}»`);
+    }
+    const aLaVez = await publicar('para unir a la vez', { otra_marca: `Junta ${sello}` });
+    const [juntaId] = laMarca(`Junta ${sello}`);
+    const juntas = await Promise.all([0, 1].map(() => pedirComo(admin.access_token,
+      `/admin/brands/${juntaId}/merge`, 'POST', { destino_id: jdId })));
+    const estados = juntas.map((r) => r.status).sort();
+    if (JSON.stringify(estados) !== JSON.stringify([200, 404]) || marcaDe(aLaVez) !== 'john-deere' || laMarca(`Junta ${sello}`)) {
+      problemas.push(`API: dos uniones a la vez respondieron ${JSON.stringify(estados)} y la publicación quedó «${marcaDe(aLaVez)}»`);
+    }
+
+    // --- G. Consigo misma, a una dada de baja, a un nombre que ya existe ------
+    // Sobre una marca descartable y no sobre John Deere: si la regla faltara,
+    // estos pedidos la borrarían de la base.
+    const sola = await publicar('para la dada de baja', { otra_marca: `Sola ${sello}` });
+    const [solaId, solaValor] = laMarca(`Sola ${sello}`);
+    const misma = await pedirComo(admin.access_token, `/admin/brands/${solaId}/merge`, 'POST', { destino_id: solaId });
+    if (misma.status !== 400 || !existe(solaId)) problemas.push(`API: unir una marca consigo misma respondió ${misma.status}`);
+    // La dada de baja también es propia: con la baja rota, dar de baja una de
+    // la lista la borraría de la base.
+    await publicar('para dar de baja', { otra_marca: `Baja ${sello}` });
+    const [bajaId] = laMarca(`Baja ${sello}`);
+    await pedirComo(admin.access_token, `/admin/brands/${bajaId}`, 'PATCH', { is_active: false });
+    const aLaDeBaja = await pedirComo(admin.access_token, `/admin/brands/${solaId}/merge`, 'POST', { destino_id: bajaId });
+    if (aLaDeBaja.status !== 400 || marcaDe(sola) !== solaValor) {
+      problemas.push(`API: unir a una dada de baja respondió ${aLaDeBaja.status} y la publicación quedó «${marcaDe(sola)}»`);
+    }
+    const aOtra = await pedirComo(admin.access_token, `/admin/brands/${solaId}`, 'PATCH', { label: 'john  deere' });
+    if (aOtra.status !== 409 || aOtra.datos?.detail?.otra?.value !== 'john-deere' || laMarca(`Sola ${sello}`)?.[2] !== `Sola ${sello}`) {
+      problemas.push(`API: corregir al nombre de John Deere respondió ${aOtra.status} con ${JSON.stringify(aOtra.datos).slice(0, 160)}`);
+    }
+    const corta = await pedirComo(admin.access_token, `/admin/brands/${solaId}`, 'PATCH', { label: 'A' });
+    if (corta.status !== 422) problemas.push(`API: corregir a «A» respondió ${corta.status}`);
+    const generica = await pedirComo(admin.access_token, `/admin/form-options/${solaId}`, 'DELETE');
+    if (generica.status !== 400 || !existe(solaId)) {
+      problemas.push(`API: Configuración borró una marca por la ruta genérica (HTTP ${generica.status})`);
+    }
+    medidos.push('quien vende recibe 403 al listar, corregir, dar de baja y unir, y no cambia nada; unir dos veces '
+      + `seguidas responde ${primera.status} y ${segunda.status}, y dos a la vez ${JSON.stringify(estados)}, con la `
+      + `publicación movida una sola vez; unir consigo misma, ${misma.status}; a una dada de baja, 400; corregir al `
+      + `nombre de otra, ${aOtra.status} con esa otra; a «A», ${corta.status}; borrar una marca desde Configuración, `
+      + `${generica.status}`);
+  } finally {
+    await browser.close();
+    if (creadas.length) {
+      querySql(`UPDATE products SET status = 'DELETED' WHERE id IN (${creadas.map(sqlLiteral).join(',')})`);
+    }
+    retirar(todasLasMarcas().filter(([, valor, , , vivas]) => !marcasDeAntes.has(valor) && vivas === '0')
+      .map(([, valor]) => valor));
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return medidos.join('; ');
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
