@@ -5,74 +5,27 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre CAMBIAR-CONTRASENA-1 — aceptada en rama
+## Decisión sobre SESIONES-AL-CAMBIAR-1 — aceptada en rama
 
-Sobre `02e82e3` (producto en `f7340f5` y `001507f`). Evidencia en
-`REPRODUCCION-CAMBIAR-CONTRASENA-1-2026-10-01.md`.
+Sobre `6265cc2` (producto en `cc439b9`, `f306af7` y `f0ac6df`). Evidencia en
+`REPRODUCCION-SESIONES-AL-CAMBIAR-1-2026-10-02.md`.
 
-- **El 235:** 1/1.
-- **Negativos:** tus cuatro dan rojo. También dan rojo los tres míos:
-  - el alta del panel con su regla vieja;
-  - un error que borra lo escrito;
-  - el filtro del 422 que mira sólo `password` y no `new_password`.
-- **Suite completa desde base nueva:** 234/235. Sólo cae el 169, de entorno.
+- **Casos:** 130, 235 y 236 en 3/3.
+- **Negativos:** tus once dan rojo. De los míos, dos dan rojo:
+  - la edición del panel que no cierra;
+  - las sesiones firmadas en 0.
+- **El tercero mío quedó verde:** `get_current_user_optional` sin mirar la
+  versión. El código está bien y el riesgo es mínimo; queda como P3 de
+  cobertura.
+- **Migración en modo producción:** sube sobre una copia con datos, deja 23
+  cuentas en 0 sin tocar nada más, y repetirla no cambia nada.
+- **Suite completa desde base nueva:** 235/236. Sólo cae el 169, de entorno.
 - **Auditorías y las dos guías:** verdes.
-- **Tus riesgos:** aceptados.
-- **Sacar la contraseña del 422:** bien visto, y se queda.
+- **Los bordes del choque y de la pestaña en vuelo:** muy bien encontrados.
 
 La publicación a `main` la decide Emi. No integres ni despliegues.
 
-`INICIO-ECOSISTEMA-1` está publicada en `30f9791`.
-
----
-
-## Tarea activa — SESIONES-AL-CAMBIAR-1
-
-**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM. Va antes de `FILTROS-DE-PUBLICACIONES-1`.
-
-### Problema
-
-Cambiar la contraseña no cierra ninguna sesión. Lo midió la Dev en el freno
-`3f9f2e5`:
-
-- el token de renovación dura 30 días;
-- cada renovación emite otro de 30 días.
-
-Una sesión abierta en otro dispositivo no vence nunca. Es justo el caso de
-las dos contraseñas que quedaron en chats: cambiarlas no saca a quien ya
-hubiera entrado.
-
-### Qué entra
-
-1. **Cambiar la propia contraseña** deja sin valor todas las sesiones
-   anteriores de esa cuenta, de acceso y de renovación. La sesión desde la
-   que se cambió sigue abierta, o se reabre sola, sin pedir ingresar de
-   nuevo.
-2. **Restablecerla desde el panel** también invalida las sesiones
-   anteriores de esa cuenta.
-3. **Desactivar una cuenta desde el panel:** decí en el informe si hoy sus
-   sesiones siguen valiendo. Si siguen, que también se invaliden.
-4. **Cómo, lo elegís vos.** Por ejemplo, la marca de cuándo cambió que
-   propusiste. Si necesita migración, aditiva y probada en modo producción.
-
-### Aceptación verificable
-
-1. **Caso nuevo con dos sesiones de la misma cuenta.**
-   - Cambiar la contraseña en una:
-     - la otra recibe 401, tanto con el token de acceso como con el de
-       renovación;
-     - la que cambió sigue funcionando.
-   - Lo mismo al restablecer desde el panel.
-2. **Negativo:** sin la comprobación, la sesión vieja sigue entrando y da
-   rojo.
-3. **Migración:** si hay una, el caso corre sobre una base sin siembra y se
-   prueba en modo producción.
-4. Suite completa desde base nueva y las puertas de siempre.
-
-### Frená y consultá
-
-- Si invalidar obliga a cerrar la sesión de todas las cuentas a la vez, o a
-  cambiar `JWT_SECRET`.
+`CAMBIAR-CONTRASENA-1` está publicada en `c21fb9d`.
 
 ---
 
@@ -129,7 +82,9 @@ Entregala por separado.
 
 ---
 
-## Siguiente — FILTROS-DE-PUBLICACIONES-1 (apenas entregues SESIONES-AL-CAMBIAR-1)
+## Tarea activa — FILTROS-DE-PUBLICACIONES-1
+
+**Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
 **Decisión de Emi (01/10), por pedido de la clienta.** Revierte la decisión
 del 25/09 («el filtro de marca muestra las 44»). Va antes de
