@@ -20,6 +20,15 @@ Actualizado: 2026-10-01.
   - **«Tecnologizar»** en «Cómo funciona» va «Tecnificar».
   - **Categorías:** «Bienes y Ganado» no va, según ella, pero está en el contrato firmado el 28/07. La hacienda puede ser de cualquier especie. Pide distinguir el tipo de producción, agrícola o pecuaria, y revisar «Origen y Destino» en «Producción». **Lo quiere ver en una reunión.**
   - **Emi (01/10):** las marcas y «Tecnificar» van sin reunión, en `FILTROS-DE-PUBLICACIONES-1`, después de `SESIONES-AL-CAMBIAR-1`. Las categorías y «Origen y Destino» esperan la reunión.
+- **Documento de la clienta «indexación» (02/10, por Emi).** Está en `originales/INDEXACION-CLIENTA-2026-10-02.docx`. Lectura de PM:
+  - **Compatible con lo hecho:** «Producción animal» en lugar de «Bienes y Ganado», con especies. Es la misma familia del contrato, más amplia. También los filtros que salen de lo publicado (`FILTROS-DE-PUBLICACIONES-1`) y el formulario estándar con campos por rubro.
+  - **Fuera del MVP:**
+    - publicar sin elegir categoría;
+    - la clasificación automática y la búsqueda que «interpreta» frases, que piden inteligencia artificial, costo y moderación;
+    - los tipos «Compra» y «Disponibilidad»;
+    - la familia «Producción» con vegetal, forestal y acuícola. El contrato pide filtros por categoría y ubicación.
+  - **Puente barato propuesto:** un buscador de texto que entienda acentos, plurales y sinónimos, por ejemplo que «colmena» encuentre «apicultura».
+  - Va a la reunión con las categorías.
 - **Devolución de la clienta del 30/09, después de la presentación (por Emi):** quedó muy contenta. Pidió:
   - **sacar «Quiénes somos»** (el menú, el pie y la página); con eso también dejan de hacer falta misión y visión (#12) y lo que quedaba de «Nuestro equipo»;
   - **que Inicio muestre el ecosistema y no sólo el mercado:** los servicios que van más allá del Mercado —trazabilidad, noticias del agro, charlas, entre otros—, aunque muchos queden fuera del MVP, para que se entienda el proyecto. Es la decisión #10, que Emi había dejado para más adelante el 27/09;
