@@ -357,7 +357,8 @@
   text-decoration: underline;
 }
 
-/* La octava: la invitación a escribir por los servicios que vienen. */
+/* La octava: la invitación a escribir por los servicios que vienen. En
+   celular no va en la grilla sino al final de la página (ver `.cierre`). */
 .porEtapas {
   display: flex;
   flex-direction: column;
@@ -369,7 +370,7 @@
   color: var(--tg-color-text-inverse);
 }
 
-.porEtapas h3 {
+.porEtapas .porEtapasTitulo {
   margin-top: 22px;
   color: var(--tg-color-text-inverse);
   font-size: 30px;
@@ -773,7 +774,7 @@
     padding: 26px var(--tg-space-5);
   }
 
-  .porEtapas h3 {
+  .porEtapas .porEtapasTitulo {
     margin-top: 18px;
     font-size: 26px;
   }
@@ -787,8 +788,14 @@
     margin-top: 10px;
   }
 
+  /* Debajo del principio va el cierre, más cerca: es la última palabra de la
+     misma página. El margen de abajo pasa al cierre. */
   .principioMarco {
-    padding: 0 0 var(--tg-space-12);
+    padding: 0 0 var(--tg-space-6);
+  }
+
+  .cierre {
+    padding-bottom: var(--tg-space-12);
   }
 
   .principio {

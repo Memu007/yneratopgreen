@@ -6,6 +6,7 @@ import { CartButton } from '../Cart/CartModal';
 import { useNavegacionActual } from '../../navegacion/navegacion';
 import type { Seccion } from '../../navegacion/politica';
 import { useToast } from '../../hooks/useToast';
+import { useEsMovil } from '../../hooks/useEsMovil';
 import { explicarMP, resultadoDeMercadoPago } from '../../utils/mercadoPago';
 
 // El tipo de secciones sale de la política y no se copia acá: esta lista
@@ -39,31 +40,6 @@ const SECCIONES: [PageSection, string][] = [
   ['marketplace', 'Mercado'],
   ['contact', 'Contacto'],
 ];
-
-// El punto de corte contractual de celular, leído una sola vez y escuchado.
-// Se usa para lo único que el CSS no puede resolver: el texto de un
-// `placeholder` es un atributo, no contenido, y no se puede reescribir con una
-// media query. Todo lo demás que cambia en celular lo decide la hoja.
-const CONSULTA_MOVIL = '(max-width: 599px)';
-
-function useEsMovil(): boolean {
-  const [esMovil, setEsMovil] = useState(
-    () => typeof window !== 'undefined'
-      && typeof window.matchMedia === 'function'
-      && window.matchMedia(CONSULTA_MOVIL).matches,
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const consulta = window.matchMedia(CONSULTA_MOVIL);
-    const alCambiar = () => setEsMovil(consulta.matches);
-    alCambiar();
-    consulta.addEventListener('change', alCambiar);
-    return () => consulta.removeEventListener('change', alCambiar);
-  }, []);
-
-  return esMovil;
-}
 
 export const Header: React.FC<HeaderProps> = ({
   searchQuery,

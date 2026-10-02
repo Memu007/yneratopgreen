@@ -1,5 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import styles from './HomePage.module.css';
+import { useEsMovil } from '../../hooks/useEsMovil';
 import type { VistaPrevia } from '../../hooks/useVistaPrevia';
 
 interface HomePageProps {
@@ -101,6 +102,43 @@ export const HomePage: React.FC<HomePageProps> = ({
     titulo.scrollIntoView({ block: 'start' });
     titulo.focus({ preventScroll: true });
   };
+
+  // En celular, «¿Te interesa alguno?» cierra la página, después del principio:
+  // entre las tarjetas cortaba la lectura, y dejaba suelto el crédito de las
+  // fotos. Desde 600 px la grilla tiene dos o cuatro columnas y el bloque la
+  // completa como octava, así que ahí se queda. Cambia de lugar en el
+  // documento, y no sólo en lo que se ve, para que el lector de pantalla y el
+  // Tab lo encuentren donde está: por eso lo decide el ancho y no la hoja.
+  const cierre = useRef<HTMLElement>(null);
+  const escribinos = useRef<HTMLButtonElement>(null);
+  const devolverElFoco = useRef(false);
+  const cierreAlFinal = useEsMovil(() => {
+    devolverElFoco.current = !!cierre.current?.contains(document.activeElement);
+  });
+
+  // Al mudarse, el bloque es otro elemento: si tenía el foco (girar el celular
+  // o achicar la ventana con el foco en «Escribinos»), se lo devuelve.
+  useEffect(() => {
+    if (!devolverElFoco.current) return;
+    devolverElFoco.current = false;
+    escribinos.current?.focus();
+  }, [cierreAlFinal]);
+
+  // Al final es una sección más de la página, y su título es de nivel 2; en la
+  // grilla es una tarjeta más, de nivel 3.
+  const TituloDelCierre = cierreAlFinal ? 'h2' : 'h3';
+  const porEtapas = (
+    <aside ref={cierre} className={`tg-sobre-marca ${styles.porEtapas}`} aria-labelledby="titulo-por-etapas">
+      <div>
+        <p className="tg-eyebrow">Por etapas</p>
+        <TituloDelCierre id="titulo-por-etapas" className={styles.porEtapasTitulo}>¿Te interesa alguno?</TituloDelCierre>
+        <p>Cada servicio se suma por etapas, después del Mercado.</p>
+      </div>
+      <button ref={escribinos} type="button" className={`tg-button ${styles.botonBlanco}`} onClick={onNavigateToContact}>
+        Escribinos
+      </button>
+    </aside>
+  );
 
   // Es el contenido principal de la página: va en `main`, como el Mercado, la
   // ficha y Mi cuenta.
@@ -206,16 +244,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </div>
               </article>
             ))}
-            <aside className={`tg-sobre-marca ${styles.porEtapas}`} aria-labelledby="titulo-por-etapas">
-              <div>
-                <p className="tg-eyebrow">Por etapas</p>
-                <h3 id="titulo-por-etapas">¿Te interesa alguno?</h3>
-                <p>Cada servicio se suma por etapas, después del Mercado.</p>
-              </div>
-              <button type="button" className={`tg-button ${styles.botonBlanco}`} onClick={onNavigateToContact}>
-                Escribinos
-              </button>
-            </aside>
+            {!cierreAlFinal && porEtapas}
           </div>
 
           {/* Las dos fotos CC BY 2.0 llevan crédito, con la obra, el autor y la
@@ -291,6 +320,8 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
+
+      {cierreAlFinal && <div className={`tg-container ${styles.cierre}`}>{porEtapas}</div>}
     </main>
   );
 };
