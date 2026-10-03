@@ -152,7 +152,7 @@ SABOTAJES = {
     ),
     "teclado-se-va": (
         AVISOS,
-        [("    if (opciones.accion && conTeclado.current) {\n",
+        [("    if (opciones.accion && conTeclado.current && !enCapa) {\n",
           "    if (false) {\n")],
         ["escritorio 1440px teclado: agregado con el teclado, el aviso se fue antes de los 6 s"],
         ["táctil", "el foco quedó"],
