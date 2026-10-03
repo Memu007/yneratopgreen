@@ -96,6 +96,31 @@ archivos y dejá una línea que remita ahí, en un commit aparte del agregado:
 Ya saqué la copia de `ONBOARDING-DEV.md` y la que estaba arriba de
 `ONBOARDING-PM.md`.
 
+**Compactar y cambiar de chat (Emi, 03/10).** En el mismo commit aparte,
+reescribí «Eficiencia de chats» de `AGENTS.md`, que es su única copia y vale
+para las dos. Tiene que decir:
+
+- **Para qué se cambia de chat:** cuando el chat se hizo tan largo que, aun
+  después de compactar, se pierde contexto que la tarea necesita. No por la
+  longitud sola.
+- **Avisar cuándo compactar.** PM y Dev le avisan a Emi cuando les toca
+  compactar. El aviso trae el comando listo para copiar y lo que hay que
+  conservar, por ejemplo: `/compact conservar: AVISOS-1, SHA base, negativos
+  pendientes y decisiones abiertas`. Se avisa en un corte natural (después de
+  una entrega o un veredicto), no en medio de una corrida.
+- Antes de compactar o de cambiar de chat, el estado vigente queda guardado en
+  el repositorio. Lo que sigue vigente de la sección actual se conserva.
+
+**Subagentes antes de entregar (Emi, 03/10).** Desde ahora, en las piezas de
+dinero, sesión, permisos o datos mandás dos subagentes adversariales antes de
+`/entregar`: la regla está en `ONBOARDING-DEV.md`, «Calidad mínima de una
+entrega». La primera es `COBRO-ESTADOS-1`, que entra en la cola después de
+`AVISOS-1`.
+
+Configuración vigente, que vive en `NOW.md` y no se copia: PM con Opus 5.5 en
+esfuerzo alto y Dev con Opus 5.5 en esfuerzo medio. Desde ya, aplicala en tu
+sesión.
+
 **Sobre la regla 4 («una pieza nueva arranca con el veredicto de la
 anterior»): de acuerdo.** Desde ahora, lo que le sumo a una tarea queda
 escrito antes de activarla.
@@ -235,7 +260,119 @@ después.
 
 ---
 
-## Después — CONTROLES-AUTOMATICOS-1 (apenas entregues AVISOS-1)
+## Después — COBRO-ESTADOS-1 (apenas entregues AVISOS-1)
+
+**Decisión de Emi (03/10), opción 1.** El 03/10 PM mandó subagentes sobre lo
+publicado y reprodujo seis huecos en el cobro con Mercado Pago. Hoy el cobro
+está apagado en producción, así que no le pasa a nadie, pero **la prueba de
+Mercado Pago (etapa 2) no arranca hasta que esta pieza esté aceptada.**
+Evidencia, pasos y casos 901 a 906 para tus rojos:
+`REPRODUCCION-SUBAGENTES-2026-10-03.md` y `archivo/subagentes-2026-10-03/`.
+Esfuerzo alto y los dos subagentes de `ONBOARDING-DEV.md` antes de entregar.
+
+### Qué entra
+
+1. **Orden cancelada con el cierre pendiente que después se paga (caso
+   901).** Hoy queda cancelada, con el pago aprobado, el stock descontado y
+   sin aviso. Tiene que terminar igual que el pago que llega a una orden ya
+   cerrada (`PAGO-ORDEN-CERRADA-1`): sin un estado final falso y con los
+   avisos verdaderos a las dos partes.
+2. **Pago en reclamo (`in_mediation`, caso 902).** Cuenta como cobro: la
+   orden no se puede cancelar ni rechazar mientras esté así, y la pantalla
+   no dice «en proceso», dice que Mercado Pago lo tiene en reclamo. También
+   cuenta para detectar dos cobros.
+3. **Pago devuelto o con contracargo sobre una orden pagada (caso 903).** La
+   orden tiene salida: se puede cancelar o rechazar, el stock vuelve, y el
+   409 no dice nunca que hay un pago acreditado cuando ya volvió. Si ese
+   pago era el de una orden cerrada, la pantalla deja de decir «en revisión»
+   cuando el vendedor ya lo devolvió. Dos cobros con uno solo devuelto
+   siguen en revisión, como hoy (caso 98).
+4. **Si lo primero que se ve es un pago devuelto o con contracargo (caso
+   904),** no se avisa «Pago aprobado» ni «Venta pagada», y el vendedor no
+   puede confirmar ni despachar.
+5. **Cancelar o rechazar con un pago en proceso (caso 905)** se rechaza con
+   un texto que diga que hay un pago en revisión en Mercado Pago, igual que
+   el reconciliador no libera nada por reloj.
+6. **Webhook con una firma no ASCII:** 401, no 500.
+7. **Investigá y decí (caso 906, parcial):** rechazar mientras se arma el
+   link deja una preferencia con `link_cerrado=false`. El comprador no
+   recibió el link. Decí si alguien puede llegar a él y pagar. Si se puede,
+   apagalo; si no, explicá por qué y no lo toques.
+
+### Fuera de alcance
+
+- Programar el reconciliador o tocar Railway.
+- Las rutas `async` bloqueantes: son `CONFIABILIDAD-API-1`.
+- Cambiar textos de avisos que no estén en esta lista.
+
+### Aceptación verificable
+
+1. **Un caso por punto,** del 1 al 6, con su rojo sobre `e5d592e` y verde
+   después. Podés partir de los casos 901 a 905: hoy imprimen, no afirman.
+2. **Negativos:** sacar cada arreglo da rojo en su caso, por el motivo.
+3. **Suite completa desde base limpia, auditorías y puertas:** toca órdenes,
+   stock y cobros.
+4. **La tabla de tus dos subagentes** en el informe.
+
+### Frená y consultá
+
+- Si algún punto cambia lo que ven quien compra o quien vende más allá de
+  un texto verdadero, o pide una decisión de producto (por ejemplo, qué
+  pasa con la mercadería ya despachada en un contracargo).
+- Si arreglar uno abre otro de los conocidos de `NOW.md`.
+
+---
+
+## Después — SESIONES-SEGURAS-1 (apenas entregues COBRO-ESTADOS-1)
+
+**Decisión de Emi (03/10), opción 1.** Reproducidos por PM sobre `e5d592e`
+con `archivo/subagentes-2026-10-03/sesiones.py` (casos 1 a 4). Esfuerzo alto
+y los dos subagentes antes de entregar.
+
+### Qué entra
+
+1. **Cambiar la contraseña tiene que echar al que sabe la vieja.** Hoy un
+   login con la clave vieja que se cruza con el cambio sale con un token de
+   la versión nueva, que sigue sirviendo. Un login que verificó la clave
+   vieja no puede emitir una sesión válida si la clave cambió mientras
+   tanto.
+2. **Límite de intentos en `/auth/change-password`:** la contraseña actual
+   equivocada cuenta como un intento fallido, con el mismo freno que el
+   login.
+3. **«Cerrar sesión» cierra la sesión en el servidor,** y una renovación ya
+   usada no vuelve a servir. Si alguien reusa una ya usada, se cierran las
+   sesiones de esa cuenta.
+4. **El administrador no restablece su propia contraseña desde el panel:**
+   la API lo rechaza con un texto que mande a «Mi cuenta», y el botón no
+   aparece en su fila.
+
+### Fuera de alcance
+
+- Recuperar la contraseña por correo: no existe y no entra.
+- Las dos pestañas a la vez y el reintento con la cuenta de otra pestaña
+  (hallazgos 5 y 7): quedan registrados como riesgo.
+- Bajar y volver a subir la migración (hallazgo 6).
+
+### Aceptación verificable
+
+1. **Un caso por punto,** con su rojo sobre `e5d592e` y verde después. El 1
+   tiene que forzar el cruce, sin depender de la suerte: el script de PM lo
+   hace tomando la fila desde otra conexión.
+2. **Negativos** de cada punto.
+3. **Suite completa desde base limpia, auditorías y puertas;** el 235 y los
+   casos de sesión, verdes.
+4. **La tabla de tus dos subagentes** en el informe.
+
+### Frená y consultá
+
+- **Antes de cambiar cuánto dura una sesión.** Hoy el acceso dura 24 h: aun
+  con el punto 3, un acceso robado sirve hasta que vence. Decí cuánto
+  recomendás y qué cambia para la persona; lo decide Emi.
+- Si el punto 3 obliga a cerrar las sesiones de todos al publicarse.
+
+---
+
+## Después — CONTROLES-AUTOMATICOS-1 (apenas entregues SESIONES-SEGURAS-1)
 
 **Decisión de Emi (03/10), por tu D7: sí, sólo la parte rápida.** Hoy el
 repositorio no tiene ningún control automático. Entregala por separado.
@@ -675,6 +812,36 @@ nueva. Entregala por separado.
 
 - Si las cuatro cifras de arriba necesitan un pedido nuevo a la API.
 - Si el panel lateral cambia cómo se arma o se paga un pedido.
+
+---
+
+## Después — MARCAS-ROBUSTEZ-1 (al final de la cola, antes de OBSERVABILIDAD-1)
+
+**Decisión de Emi (03/10), opción 1.** Reproducidos por PM sobre `e5d592e`
+con `archivo/subagentes-2026-10-03/marcas.py` y `marcas_carrera.py`.
+
+### Qué entra
+
+1. **Un nombre de marca que se agranda al normalizarlo** («㎒», «ⅷ») o que
+   trae caracteres que la base no guarda (NUL): 422 con un texto claro, en
+   el alta, la edición y el renombrado del panel. Nunca 500, y nunca queda
+   una marca rota en la lista.
+2. **Unir deja el nombre viejo apuntando al nuevo:** si alguien vuelve a
+   escribir «Jhon Deere» después de unirla a «John Deere», se usa John
+   Deere y no se crea otra.
+3. **Unir o dar de baja mientras alguien publica con esa marca** no deja la
+   publicación con una marca que ya no existe.
+
+### Fuera de alcance
+
+Las marcas sin publicaciones que quedan ofrecidas, las letras de otro
+alfabeto, el enlace con una marca unida y el cambio de nombre y estado
+juntos por API: quedan como riesgo registrado.
+
+### Aceptación verificable
+
+Un caso por punto con su rojo sobre `e5d592e` y verde después; el 239 y la
+guía del panel, verdes; suite, auditorías y puertas.
 
 ---
 

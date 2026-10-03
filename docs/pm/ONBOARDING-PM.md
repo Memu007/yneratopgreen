@@ -235,10 +235,18 @@ negativos y el navegador.
   mirar, qué afirma el informe y «buscá cómo esto pierde datos, cobra mal,
   deja entrar a quien no debe o se traba». Que devuelva hallazgos con
   archivo, línea y cómo reproducirlos, no opiniones.
-- Si es posible, otro modelo que el de la PM y la Dev: comparten puntos
-  ciegos.
+- Modelo según la tarea, Opus o Sonnet; Fable no se usa para subagentes
+  (Emi, 03/10). Sonnet aporta otros puntos ciegos que los de la PM y la Dev;
+  Opus, más profundidad. El veredicto dice cuál se usó.
+- La revisión de la Dev con su propio subagente, antes de entregar, es
+  autorrevisión: suma, pero no reemplaza este paso.
 - Lo que encuentra es una hipótesis. La PM lo reproduce o lo descarta con
   evidencia antes de llevarlo a `PARA-DEV.md`.
+- **Medición (Emi, 03/10).** El veredicto anota tres números: hallazgos del
+  subagente, cuántos reproducidos y cuántos no los había visto nadie más
+  (ni la Dev, ni sus casos y negativos, ni la PM). Se suman en `NOW.md`,
+  «Medición de subagentes». Con tres o cuatro piezas, PM le informa a Emi
+  cuánto aportan.
 
 ## Hablar con Emi
 
