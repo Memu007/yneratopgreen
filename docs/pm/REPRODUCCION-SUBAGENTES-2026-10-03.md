@@ -70,3 +70,63 @@ Ningún hallazgo resultó falso; los que no se reprodujeron no se intentaron o
 son especulativos. Las tres piezas habían pasado la revisión de PM con
 negativos y suite completa: los subagentes encontraron huecos de estado y de
 carrera alrededor de lo que se afirmaba, no violaciones de lo afirmado.
+
+---
+
+# Barrido sobre lo no revisado — 03/10, segunda parte
+
+Pedido de Emi: hasta dos días de mejoras, con subagentes donde haga falta.
+PM mandó tres más sobre `e5d592e`, en sólo lectura, y reprodujo en el mismo
+entorno. Scripts: `permisos.py`, `archivos.py` y `ordenes.py` en
+`archivo/subagentes-2026-10-03/`; corren desde `backend/` con el `.venv` y
+tocan sólo la base local.
+
+**Corrección de PM:** la consigna de permisos decía «el CBU sólo lo ve quien
+le compró por transferencia». Esa regla no existe en ningún documento: la
+escribió PM. El hallazgo 1 de permisos pasa a decisión de Emi, no a defecto.
+
+## Permisos y datos personales (Sonnet): 8 hallazgos, 8 reproducidos
+
+| # | Hallazgo | Reproducción PM |
+|---|---|---|
+| 1 | Con algo en el carrito, `/orders/payment-options` devuelve CBU y alias del vendedor sin orden. | `permisos.py 1`: 200 con `cbu` y `alias_bancario`. **Decisión de Emi** (ver arriba). |
+| 2 | El vendedor deshace la suspensión del administrador. | `permisos.py 2`: admin pausa 200; el vendedor pone `active` 200; ficha pública 200. |
+| 3 | El comprador cancela una orden por transferencia ya aprobada y confirmada. | `permisos.py 3`: aprobada (`PAID`, stock 500→499), confirmada, el comprador cancela 200: `CANCELLED` y stock otra vez 500. |
+| 4 | Un vendedor desactivado sigue publicado y vendiendo. | `permisos.py 4`: desactivado; catálogo 200 con sus 20 publicaciones, ficha 200, compra por transferencia 200. Se restauró. |
+| 5 | Los comprobantes de transferencia se sirven sin sesión desde `/uploads`. | `permisos.py 3`: `curl` sin sesión a `/uploads/transfer_receipts/…png`: 200. |
+| 6 | Elegir transportista sin comprar devuelve email, teléfono y patente. | `permisos.py 6 cerca`: 200 con los tres. Es como está diseñado («después de elegir»); elegir no compromete nada. |
+| 7 | El transportista ve órdenes sin pagar y canceladas. | `permisos.py 7 cerca`: la ve sin pagar y la sigue viendo cancelada. |
+| 8 | Se puede calificar dos veces la misma compra. | `permisos.py 8 cerca`: cuatro en paralelo, dos 200; dos filas en `ratings`. |
+
+## Archivos, registro y logística (Sonnet): 8 hallazgos, 6 reproducidos (2 repetidos)
+
+| # | Hallazgo | Reproducción PM |
+|---|---|---|
+| 1 | Las constancias fiscales se guardarían en disco efímero en Railway: `DOCUMENTOS_DIR` no está en `RAILWAY.md` ni en el inventario del 13/09, y su valor por omisión cae fuera del volumen `/data`. | **Por verificar en Railway** (Emi). Confirmado que `RAILWAY.md`, `Dockerfile.railway` y `railway-entrypoint.sh` no la mencionan; `docker-compose.yml` sí usa `/data/documentos`. |
+| 2 | Comprobantes públicos. | Igual que permisos 5. |
+| 3 | Registrar el correo de otra persona: la bloquea, y si confirma, entra quien la registró. | `archivos.py 3`: el atacante registra 201; la víctima recibe «El email ya está registrado»; la víctima pide el enlace y confirma 200; el atacante entra con su contraseña 200. |
+| 4 | El correo distingue mayúsculas. | `archivos.py 4`: registro `Ana.…@Example.com` 201; login en minúsculas 401; una segunda cuenta en minúsculas 201. |
+| 5 | Las subidas se leen enteras antes de validar el tamaño. | No reproducido (podría tirar la API local); confirmado leyendo `products.py`. |
+| 6 | Una subida rechazada deja archivos huérfanos en disco. | `archivos.py 6`: dos PNG y un `.gif` → 400; dos archivos nuevos en disco y 0 filas. |
+| 7 | Se puede saber si un correo está registrado. | Visto en `archivos.py 3`: el 400 «El email ya está registrado». |
+| 8 | Contacto de transportistas sin comprar. | Igual que permisos 6. |
+
+## Órdenes, checkout y stock (Opus): 7 hallazgos, 5 reproducidos
+
+| # | Hallazgo | Reproducción PM |
+|---|---|---|
+| 1 | Por transferencia no se reserva stock: dos compradores pagan la última unidad. | `ordenes.py 1`: stock 1, dos compras 200 y 200, los dos suben comprobante; aprobar al primero 200, al segundo 400 «Stock insuficiente». **Ya registrado** en `DECISIONS.md` («verifica stock al crear la orden pero no lo reserva»): es una decisión pendiente, no un hallazgo nuevo. |
+| 2 | El comprador cancela una transferencia aprobada. | Igual que permisos 3. |
+| 3 | Subir el comprobante pisa una aprobación simultánea. | No reproducido; confirmado leyendo que la escritura no mira el estado. |
+| 4 | La misma compra dos veces (otra pestaña o recarga) crea dos órdenes. | `ordenes.py 4`: 200 y 200, órdenes distintas. |
+| 5 | Un precio cambiado entre el carrito y la confirmación se cobra. | `ordenes.py 5`: 100→1000, la orden sale en 1000. **Es la decisión del 12/08** («rige el precio vigente cuando el comprador confirma»); queda revisar que la pantalla muestre ese total antes de pagar. |
+| 6 | Una publicación con precio 0 se compra por API y da una orden de $0. | `ordenes.py 6`: 200, total 0.00. |
+| 7 | Entradas sin tope dan 500. | `ordenes.py 7`: notas de 600 caracteres → 500. La cantidad de 3.000.000.000 da 400, no 500: esa parte no se confirma. |
+
+## Números de la segunda parte
+
+| | Hallazgos | Reproducidos | Nadie más los vio |
+|---|---|---|---|
+| Permisos (Sonnet) | 8 | 8 | 6 (1 era regla inventada por PM; 6 es diseño) |
+| Archivos y registro (Sonnet) | 8 (2 repetidos) | 4 propios | 5 |
+| Órdenes (Opus) | 7 (1 repetido) | 4 propios | 3 (1 y 5 ya estaban decididos) |
