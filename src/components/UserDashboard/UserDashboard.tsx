@@ -659,11 +659,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
   const [categories, setCategories] = useState<CategoryFromBackend[]>([]);
   // Las marcas que ofrece el alta: la edición ofrece la misma lista.
   const [marcas, setMarcas] = useState<{ value: string; label: string }[]>([]);
-  // El nombre de la marca que la publicación tiene guardada, para cuando ya
-  // no está en la lista porque la dieron de baja. Sin nombre, el valor.
-  const nombreDeLaMarcaGuardada = (productId: string, marca: string) => {
+  // La marca que la publicación tiene guardada, cuando ya no está en la lista
+  // porque la dieron de baja. Sale de lo guardado y no de lo elegido en
+  // «Editar»: si no, al elegir otra desaparece y no se puede volver a elegir.
+  // Con su nombre, «AgroMec»; sin nombre, el valor.
+  const marcaGuardadaFueraDeLista = (productId: string) => {
     const guardada = backendProducts.find(p => p.id === productId);
-    return (guardada?.brand === marca && guardada.brand_label) || marca;
+    if (!guardada?.brand || guardada.brand === OTRA_MARCA
+      || marcas.some(opcion => opcion.value === guardada.brand)) return null;
+    return { value: guardada.brand, label: guardada.brand_label || guardada.brand };
   };
 
   // Preparar o recuperar el link de pago de una orden propia.
@@ -4018,15 +4022,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onPublishClick }) 
                       {marcas.map(opcion => (
                         <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
                       ))}
-                      {/* La que tiene y ya no está en la lista se sigue viendo:
-                          si no, el selector diría «Sin declarar» sin serlo. Con
-                          su nombre, «AgroMec», y no con su valor, «agromec». */}
-                      {editingProduct.marca && editingProduct.marca !== OTRA_MARCA
-                        && !marcas.some(opcion => opcion.value === editingProduct.marca) && (
-                        <option value={editingProduct.marca}>
-                          {nombreDeLaMarcaGuardada(editingProduct.id, editingProduct.marca)}
-                        </option>
-                      )}
+                      {/* La que tiene guardada y ya no está en la lista se sigue
+                          ofreciendo: si no, el selector diría «Sin declarar» sin
+                          serlo, y elegida otra no se podría volver a ella. */}
+                      {(() => {
+                        const guardada = marcaGuardadaFueraDeLista(editingProduct.id);
+                        return guardada && <option value={guardada.value}>{guardada.label}</option>;
+                      })()}
                       <option value={OTRA_MARCA}>Otra marca</option>
                     </select>
                   </div>

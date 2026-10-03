@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * El punto de corte contractual de celular, leído una sola vez y escuchado.
@@ -22,18 +22,25 @@ export function useEsMovil(antesDeCambiar?: () => void): boolean {
       && typeof window.matchMedia === 'function'
       && window.matchMedia(CONSULTA_MOVIL).matches,
   );
+  // El aviso y el valor vigente se guardan después de dibujar, no mientras.
   const aviso = useRef(antesDeCambiar);
-  aviso.current = antesDeCambiar;
+  const vigente = useRef(esMovil);
+  useLayoutEffect(() => {
+    aviso.current = antesDeCambiar;
+    vigente.current = esMovil;
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     const consulta = window.matchMedia(CONSULTA_MOVIL);
     const alCambiar = () => {
+      if (consulta.matches === vigente.current) return;
       aviso.current?.();
       setEsMovil(consulta.matches);
     };
-    // Por si cambió entre el primer dibujo y este efecto.
-    setEsMovil(consulta.matches);
+    // Por si cambió entre el primer dibujo y este efecto: con el mismo aviso,
+    // para que el foco tampoco se pierda en ese caso.
+    alCambiar();
     consulta.addEventListener('change', alCambiar);
     return () => consulta.removeEventListener('change', alCambiar);
   }, []);

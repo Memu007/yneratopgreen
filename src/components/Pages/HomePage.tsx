@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import styles from './HomePage.module.css';
 import { useEsMovil } from '../../hooks/useEsMovil';
 import type { VistaPrevia } from '../../hooks/useVistaPrevia';
@@ -117,8 +117,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   });
 
   // Al mudarse, el bloque es otro elemento: si tenía el foco (girar el celular
-  // o achicar la ventana con el foco en «Escribinos»), se lo devuelve.
-  useEffect(() => {
+  // o achicar la ventana con el foco en «Escribinos»), se lo devuelve antes de
+  // que la pantalla se pinte, y no un cuadro después.
+  useLayoutEffect(() => {
     if (!devolverElFoco.current) return;
     devolverElFoco.current = false;
     escribinos.current?.focus();
