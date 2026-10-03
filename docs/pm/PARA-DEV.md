@@ -5,26 +5,31 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
-## Decisión sobre MARCAS-PANEL-1 — aceptada en rama
+## Decisión sobre INICIO-CIERRE-CELULAR-1 y el agregado de MARCAS-PANEL-1 — aceptadas en rama
 
-Sobre `ee8e90e` (producto en `24296c5`). Evidencia en
-`REPRODUCCION-MARCAS-PANEL-1-2026-10-02.md`.
+Sobre `6a96b0d` (producto en `666bbf1` y `1eb819d`). Evidencia en
+`REPRODUCCION-INICIO-CIERRE-CELULAR-1-2026-10-02.md`.
 
-- **Caso 239:** 1/1, en escritorio, celular y por la API.
-- **Negativos:** tus ocho dan rojo. De los míos, dan rojo dos:
-  - contar las eliminadas;
-  - corregir y dar de baja sin pedir administración.
-- **Dos negativos míos sobreviven.** El código está bien; falta el caso.
-  Van abajo, en el agregado de `INICIO-CIERRE-CELULAR-1`.
-- **Suite completa desde base nueva:** 237/239.
+- **Casos 128, 195, 232, 233, 239 y 240:** 6/6.
+- **Negativos:** tus seis de Inicio y los doce de marcas dan rojo. También
+  dan rojo mis dos:
+  - el corte en 600 en vez de 599;
+  - «Escribinos» sin destino sólo al final.
+- **Suite completa desde base nueva:** 238/240.
   - Cae el 169, de entorno.
-  - Cae el 195, por una carrera del caso. Está explicada abajo.
-- **Auditorías, las dos guías y las puertas:** verdes.
-- **Se aceptan tus cuatro supuestos y los riesgos declarados.**
-- **Cerrar la ruta genérica de Configuración sin que te lo pidieran:**
-  excelente. Lo mismo el contraste del subtítulo.
+  - Cae el 204, por la misma carrera del 195. Abajo, en el agregado de
+    `AVISOS-1`.
+- **Auditorías, guía de uso y puertas:** verdes.
+- **La guía del panel** falló una vez en el paso 28, en escritorio, y
+  repetida pasó.
+- **Se aceptan tus tres supuestos.** También el corte en 599 y
+  `brand_label`.
+- **Reproducir la carrera del 195 retrasando el catálogo y revisar los
+  demás casos sin que te lo pidiera:** excelente.
 
-**Publicada en `main` (`4085a9a`, 02/10)** con autorización de Emi. No integres ni despliegues por tu cuenta.
+La publicación a `main` la decide Emi. No integres ni despliegues.
+
+`MARCAS-PANEL-1` está publicada en `4085a9a`.
 
 ---
 
@@ -81,65 +86,10 @@ Entregala por separado.
 
 ---
 
-## Tarea activa — INICIO-CIERRE-CELULAR-1
+## Tarea activa — AVISOS-1
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
-
-**Decisión de Emi (02/10), opción A.** En el celular, después de las siete
-tarjetas aparece «¿Te interesa alguno?», un bloque verde grande, y debajo
-queda suelto el crédito de las fotos. Corta la lectura a mitad de página. En
-la computadora es la octava tarjeta y completa la grilla, así que ahí está
-bien.
-
-### Qué entra
-
-1. **En el celular, «¿Te interesa alguno?» pasa al final de Inicio,**
-   después de «Principio de AgroBoeda», como cierre. Lleva los mismos
-   textos y el mismo botón.
-2. **El crédito de las fotos queda pegado a las tarjetas.**
-3. **En la computadora no cambia nada.** Decí desde qué ancho cambia, y por
-   qué ahí.
-4. **El orden de lectura** (lector de pantalla y tabulación) tiene que
-   coincidir con lo que se ve en cada ancho.
-
-### Aceptación verificable
-
-1. **Caso nuevo:**
-   - en 390, «¿Te interesa alguno?» está después de «Principio de
-     AgroBoeda» y el crédito está inmediatamente después de la tarjeta 07;
-   - en 1440, sigue como octava tarjeta;
-   - en los dos anchos, el bloque aparece una sola vez en el árbol del
-     documento.
-2. **Negativo:** el bloque otra vez en el medio, en el celular, da rojo.
-3. El 232 y el 233 siguen verdes. Suite, a11y, contraste, móvil y las
-   puertas.
-
-### Agregado chico, de la revisión de MARCAS-PANEL-1
-
-Va en un commit aparte, dentro de esta entrega:
-
-1. **El 239 comprueba que unir mueve también las pausadas y las
-   eliminadas.** Mi negativo «unir mueve sólo las activas» sobrevive: el 239
-   pasa aunque una pausada quede con la marca borrada.
-2. **El 239 comprueba que Configuración no renombra una marca** por
-   `PUT /admin/form-options/{id}`. Hoy prueba sólo el borrado. Mi negativo
-   «sacar la guarda del cambio de nombre» sobrevive.
-3. **«Editar» muestra el nombre de una marca dada de baja,** no su valor
-   interno: «AgroMec» y no «agromec». Hoy el selector agrega la opción con el
-   valor. Dar de baja ahora está en la pantalla, así que esto se va a ver.
-4. **El 195 espera las opciones del filtro de tipo antes de leerlas.** En mi
-   suite cayó con «el filtro de tipo ofrece ["Todos"] y en la base hay
-   ["Arados (14)","Rastras (3)"]», y repetido solo pasó. Lee las opciones
-   apenas aparece el selector, antes de que lleguen las cantidades. Fijate
-   si otro caso de `FILTROS-DE-PUBLICACIONES-1` lee igual.
-
-Cada uno con su negativo en rojo: el 1 y el 2 con mis sabotajes, y el 3 con
-volver a mostrar el valor interno.
-
----
-
-## Después — AVISOS-1 (apenas entregues INICIO-CIERRE-CELULAR-1)
 
 **Decisión de Emi (02/10): opción A de `maquetas/AVISOS-V2-2026-10-02.html`**
 (y `.jpg`), la «píldora verde de la marca». Los avisos de hoy le parecen
@@ -183,6 +133,26 @@ feos y genéricos. Entregala por separado.
 4. **Capturas** de éxito, error y pila, en los dos anchos.
 5. Suite, a11y (contraste del texto sobre el verde incluido), móvil y las
    puertas.
+
+### Agregado chico, de la revisión de INICIO-CIERRE-CELULAR-1
+
+Va en un commit aparte, dentro de esta entrega:
+
+1. **El 204 espera «Marca» antes de leer el orden del panel.** En mi suite
+   cayó dos veces seguidas, en 1440 y en 390: «el panel va […
+   "Potencia","Año" …] y el acordado es [… "Potencia","Marca","Año" …]».
+   Solo, más tarde, pasó. Es la carrera del 195: «Marca» se dibuja recién
+   cuando llegan las cantidades, y el 204 lee rótulos apenas aparece el
+   orden de la lista. Fijate si otro caso lee rótulos del panel igual.
+2. **El paso 28 de `guia-admin.mjs`** falló una vez en escritorio, después
+   de la suite: «Dar de baja y de alta: no se pudo hacer: locator.waitFor:
+   Timeout 15000ms exceeded». Es la espera de la lista de «Marcas». La API
+   no registró errores, y en las otras tres pasadas pasó. Mirá por qué pudo
+   tardar más de 15 s. Si es la misma clase de carrera, corregila. Si no lo
+   reproducís, decilo.
+
+Demostrá el 1 como el 195: con el catálogo retrasado, rojo antes y verde
+después.
 
 ---
 
