@@ -40925,6 +40925,9 @@ await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se desliz
 
       // A2. Deslizar de costado: 40 px no lo cierra, 100 px sí. Se mide con
       //     lo que salió bien, apenas llega: 4 s alcanzan para dos gestos.
+      //     Si el de A1 quedó, se cierra antes: es otro motivo.
+      for (const resto of await page.locator(`${AVISO} [data-cerrar]`).all()) await resto.evaluate((b) => b.click());
+      await esperarA(async () => (await avisos(page)).length === 0, 'no se cerró lo que quedó de A1', 5_000);
       await agregar.tap();
       await esperarA(async () => (await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'agregar no dejó otro aviso', 10_000);
       const llego = Date.now();
@@ -41166,7 +41169,9 @@ await runCase(243, 'Con un error a la vista, «Publicar producto», «Continuar 
       }
 
       // Se descarta el formulario; el error queda.
-      await vender.getByRole('button', { name: 'Cancelar' }).click();
+      // Sin depender de que «Cancelar» se pueda tocar: eso no es lo que se
+      // mide acá, y si el aviso lo tapa el caso tiene que llegar a decirlo.
+      await vender.getByRole('button', { name: 'Cancelar' }).evaluate((b) => b.click());
       await page.getByRole('button', { name: 'Descartar cambios' }).click({ timeout: 10_000 });
       await vender.waitFor({ state: 'hidden', timeout: 10_000 });
       if (await error.count() === 0) problemas.push(`${donde}: el error no siguió a la vista después de cerrar «Vender»`);

@@ -139,7 +139,7 @@ SABOTAJES = {
     ),
     "touch-none": (
         ESTILOS,
-        [("  touch-action: pan-y;\n", "  touch-action: none;\n")],
+        [("  touch-action: pan-y pinch-zoom;\n", "  touch-action: none;\n")],
         ["celular 390px táctil: deslizar en vertical sobre el aviso no desplazó la página"],
         ["de costado", "tocado con el dedo", "teclado"],
         242,
