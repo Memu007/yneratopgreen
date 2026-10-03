@@ -117,8 +117,9 @@ Sobre esto se construye después la logística por cercanía.
 `SETUP_PAYMENTS.md`, `USER_MANUAL.md`, `KNOWN_ISSUES.md`,
 `RECOMMENDATIONS.md`, `PM_ROADMAP.md`, `PM_DEV_GUIDE.md`.
 
-Raíz: `README.md`, `README_LOCAL_SETUP.md`, `DELIVERY_CHECKLIST.md`,
-`docker-compose.yml`.
+Raíz: `README.md`, `README_LOCAL_SETUP.md`, `docker-compose.yml`. La entrega
+de la Fase I (junio) quedó en `docs/pm/archivo/DELIVERY_CHECKLIST.md`: es
+historia, no un checklist vigente.
 
 ## Levantar en local
 

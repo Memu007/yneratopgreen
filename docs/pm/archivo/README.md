@@ -15,3 +15,4 @@ Subdirectorios actuales:
 
 - `auditorias/` — revisiones externas o independientes ya triageadas.
 - `PARA-DEV-historico.md` — canal histórico previo existente.
+- `DELIVERY_CHECKLIST.md` — la entrega de la Fase I (junio), antes en la raíz. Sus enlaces relativos apuntan a la raíz y no se corrigieron: es historia.
