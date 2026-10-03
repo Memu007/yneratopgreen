@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import styles from './HomePage.module.css';
 import { useEsMovil } from '../../hooks/useEsMovil';
 import type { VistaPrevia } from '../../hooks/useVistaPrevia';
