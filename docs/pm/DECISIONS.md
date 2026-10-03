@@ -10,6 +10,19 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-03 — Relevo de PM y revisor distinto para la seguridad final
+
+- **La PM sigue en una sesión nueva, abierta sobre este repositorio (D10).** Las herramientas de
+  PM quedaron en `docs/pm/herramientas/` y los comandos `/revisar-entrega` y `/como-venimos` en
+  `.claude/skills/`. Motivo: la sesión anterior estaba abierta sobre otro repositorio, ya había
+  pasado por un resumen automático y cada turno cargaba todo el historial.
+- **PM no deja loop de espera** (Emi lo confirmó, 1A).
+- **D9:** la auditoría de seguridad final la hace un revisor distinto de la PM y la Dev (otro
+  modelo o Astra). Emi delegó en la recomendación de PM, que es sí: PM y Dev son el mismo modelo
+  y pueden compartir puntos ciegos.
+- **Subagentes adversariales:** PM los usa en piezas de dinero, sesión, permisos o datos, con
+  contexto nuevo; lo que encuentran se reproduce antes de pasarlo a la Dev (Emi, 03/10).
+
 ## 2026-10-03 — Controles automáticos en GitHub, y PM sigue con «respondió»
 
 Emi eligió (03/10): **sí** a los controles automáticos rápidos en cada push (lint, tipos, build,

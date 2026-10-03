@@ -6,14 +6,13 @@ Actualizado: 2026-10-03.
 
 ## Resumen ejecutivo
 
-- **Relevo de PM (03/10, D10):** la PM sigue en una sesión nueva, abierta sobre este repositorio. Un solo PM escribe `PARA-DEV.md`. Arrancar por `ONBOARDING-PM.md`: las herramientas de PM están en `docs/pm/herramientas/` y los comandos en `.claude/skills/` (`/revisar-entrega`, `/como-venimos`). PM no deja loop: retoma con el «respondió» de Emi. En piezas de dinero, sesión, permisos o datos, un subagente adversarial («Subagentes adversariales» en `ONBOARDING-PM.md`).
+- **Relevo de PM (03/10, D10):** la PM sigue en una sesión nueva, abierta sobre este repositorio. Un solo PM escribe `PARA-DEV.md`. Arrancar por `ONBOARDING-PM.md`: las herramientas de PM están en `docs/pm/herramientas/` y los comandos en `.claude/skills/` (`/revisar-entrega`, `/como-venimos`). PM no deja loop: retoma con el «respondió» de Emi (confirmado por Emi, 03/10). **D9 decidido (Emi, 03/10: «lo que vos digas»):** la auditoría de seguridad final la hace un revisor distinto de la PM y la Dev (otro modelo o Astra), como dice `PLAN-RED-TEAM-CIERRE-MVP.md`. En piezas de dinero, sesión, permisos o datos, un subagente adversarial («Subagentes adversariales» en `ONBOARDING-PM.md`).
 - **Espera a Emi (03/10), en orden de urgencia:**
   1. verificar en el celular lo publicado en `e5d592e` («¿Te interesa alguno?» al final de Inicio);
-  2. confirmar D9: un revisor distinto (otro modelo o Astra) para la auditoría de seguridad final. PM recomienda sí;
-  3. UptimeRobot (lo crea Emi, sin código);
-  4. Mercado Pago, etapa 1 (`PASOS-MERCADO-PAGO-2026-09-30.md`);
-  5. mostrarle a la clienta la maqueta v3 de Inicio y hacer la reunión: categorías, «Producción», «Origen y Destino», clasificación automática fuera del MVP;
-  6. crear la cuenta de la clienta, el teléfono de contacto (abajo), el correo (#15), `FRONTEND_URL`, backups en producción y Railway antes del 01/12 (abajo).
+  2. UptimeRobot (lo crea Emi, sin código);
+  3. Mercado Pago, etapa 1 (`PASOS-MERCADO-PAGO-2026-09-30.md`);
+  4. mostrarle a la clienta la maqueta v3 de Inicio y hacer la reunión: categorías, «Producción», «Origen y Destino», clasificación automática fuera del MVP;
+  5. crear la cuenta de la clienta, el teléfono de contacto (abajo), el correo (#15), `FRONTEND_URL`, backups en producción y Railway antes del 01/12 (abajo).
 - **Próximo control de PM: 15/10.** Si la Dev no entregó al menos hasta `FILTROS-VISUAL-1`, la cola va atrasada para el congelamiento (~27/10): proponerle a Emi un segundo dev sólo para lo visual, o pasar `CUENTA-VISUAL-1` a después del lanzamiento. Lanzamiento: 12/11.
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `e5d592e`, publicado el 03/10 con autorización de Emi («Te autorizo»), por fast-forward desde `4085a9a`. Suma `INICIO-CIERRE-CELULAR-1` (en el celular, «¿Te interesa alguno?» cierra Inicio) y el agregado de `MARCAS-PANEL-1` («Editar» muestra el nombre de una marca dada de baja; `/products/my` suma `brand_label`). Sin migraciones. La verificación previa fue sobre el mismo código (`6a96b0d`, que difiere sólo en `docs/pm`): suite 238/240 (169 de entorno y 204 por una carrera del caso), veinte negativos en rojo, puertas verdes, sin secretos ni archivos prohibidos. **Falta que Emi lo verifique en el celular.** Antes, `4085a9a` sumó `MARCAS-PANEL-1`, verificado por Emi (02/10).

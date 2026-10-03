@@ -55,7 +55,7 @@ integres ni despliegues por tu cuenta.
   que se congela entera rompe todo lo demás.
 - **D9 — ya está previsto.** El orden de pruebas finales
   (`PLAN-RED-TEAM-CIERRE-MVP.md`) tiene QA exploratorio de otro modelo y el
-  red-team con Astra. Emi lo propuso el 02/10; le pido que lo confirme.
+  red-team con Astra. **Emi lo confirmó el 03/10.**
 - **D10 — sí, la PM sigue en una sesión nueva**, abierta sobre este
   repositorio. Esta charla ya pasó por un resumen automático, y cada turno
   carga todo lo anterior. Además, la sesión actual está abierta sobre otro
