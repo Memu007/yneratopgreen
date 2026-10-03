@@ -12,10 +12,29 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | agregado de MARCAS-PANEL-1 | código `1eb819d`; casos y negativos `baa2705` |
 | no integrado, no desplegado | `main` está en `4085a9a`, tu publicación de `MARCAS-PANEL-1` |
 
-**Nada para decidir.** Los cuatro puntos del agregado están hechos, cada uno
-con su negativo en rojo. Están más abajo, en «Agregado de MARCAS-PANEL-1».
-El único cambio de API es aditivo: `/products/my` suma el nombre de la
-marca.
+### Decisiones
+
+Contestalas en `PARA-DEV.md` con el mismo número. El detalle de cada una está
+al final.
+
+| | Qué decidís | Recomiendo |
+|---|---|---|
+| D1 | Qué hallazgos de la revisión independiente se suman a esta entrega | El 1 (un P2 de «Editar», con arreglo y rojo listos sin subir), el 3, el 4 (sólo lo del foco), el 8 y el 9: los cuatro últimos son de una línea |
+| D2 | `/como-venimos` (borrador en `.claude/propuestas/`, para Emi) | Adoptarlo: Emi pregunta el estado a cada lado por separado |
+| D3 | `/revisar-entrega` (borrador de tu comando) | Adoptarlo y adaptarlo a tu gusto: es tu método de `ONBOARDING-PM` en orden |
+| D4 | Mis comandos (`/respondio`, `/entregar`) y la línea nueva de `CLAUDE.md` §4 | Dejarlos; si algo te sobra, decime qué saco |
+| D5 | Tu loop de espera de unos 30 min después de cada veredicto | Dejarlo: lo decidió Emi |
+| D6 | `DELIVERY_CHECKLIST.md`, en la raíz: es la entrega de la Fase I de junio, pero se llama como un checklist vigente (lo cita `REPO_MAP.md`) | Moverlo a `docs/pm/archivo/` y corregir la cita |
+| D7 | Controles automáticos en GitHub en cada push, que no dependen de ninguna IA: lint, tipos, build, compilación, `alembic check` y unos casos rápidos; la suite completa, una vez por semana. Hoy el repositorio no tiene ninguno | Pieza propia antes del lanzamiento. Necesita el visto bueno de Emi por los minutos de GitHub (el plan gratis alcanza para la parte rápida) |
+| D8 | Que la API no se pueda congelar entera. En producción corre un solo proceso (`railway-entrypoint.sh`, sin `--workers`), y 17 rutas `async` hacen consultas bloqueantes a la base: 9 de `orders.py`, 7 de `products.py`, el webhook y el vínculo de Mercado Pago, contacto y documentación. Si una se traba, se traba todo. Es la causa del P0 de FILTROS, que arreglé sólo para las marcas | Pieza propia de confiabilidad antes del lanzamiento, con la suite completa: toca órdenes y cobros |
+| D9 | Un revisor distinto para la auditoría de seguridad final, otro modelo o una persona: vos y yo somos el mismo modelo y podemos compartir puntos ciegos | Sí. Lo decide Emi |
+
+Lo que no adoptes se borra: al final, `.claude/propuestas/` no tiene que
+existir, y ninguna regla queda escrita en dos lugares.
+
+Los cuatro puntos del agregado están hechos, cada uno con su negativo en
+rojo. Están más abajo, en «Agregado de MARCAS-PANEL-1». El único cambio de API
+es aditivo: `/products/my` suma el nombre de la marca.
 
 **Resultado de INICIO-CIERRE-CELULAR-1.**
 
@@ -204,3 +223,134 @@ que no cambiaron.
   retrasar la respuesta, y con la respuesta retrasada la espera lo cubre.
 - **Si un navegador no supiera leer el ancho** (`matchMedia`, que tienen
   todos los actuales), el bloque queda en la grilla, como estaba antes.
+
+## Revisión independiente de esta entrega
+
+Es el paso nuevo de `/entregar` (abajo), corrido por primera vez sobre esta
+entrega: `/code-review` en nivel alto, sobre `4f453a0..HEAD`, sin `docs/pm`.
+Sólo lee el código: no corre la app ni los casos. Encontró nueve puntos.
+Ninguno rompe un flujo principal ni toca datos.
+
+Emi me pidió no sumar nada sin que lo veas. El arreglo del punto 1 está
+hecho, con su rojo, pero **no está subido**.
+
+| # | Qué encontró | Severidad | Recomendación |
+|---|---|---|---|
+| 1 | En «Editar», con la marca dada de baja: si quien vende elige otra, la dada de baja desaparece del selector y ya no la puede volver a elegir (sólo cancelando). Ya pasaba antes de esta entrega, en el mismo selector del agregado | P2 | **Sumarlo.** El 239 lo detecta en los dos anchos: «escritorio: dada de baja, en «Editar» quien elige otra ya no puede volver a elegir «AgroMec»» (rojo antes del arreglo, verde después) |
+| 2 | El nombre de una marca: si hubiera dos filas con el mismo valor, «Editar» y la ficha podrían elegir nombres distintos | P3 | Nada por ahora: hoy no se pueden crear dos (el alta las une con candado) |
+| 3 | Si el ancho cambia justo entre el primer dibujo y el arranque de Inicio, el bloque se muda sin devolver el foco | P3 | Sumarlo: una línea |
+| 4 | Al girar el celular, un cuadro con el bloque en su lugar viejo y el estilo nuevo, y el foco vuelve después de ese cuadro | P3 | Sumar lo del foco: una línea. El cuadro, no |
+| 5 | La espera nueva de los filtros (198, 238, 239) acepta cualquier cantidad, no la de la respuesta nueva | P3, de las pruebas | Nada por ahora: cada lectura es en una página recién abierta |
+| 6 | El corte de 599 px también está escrito en la foto de la portada | P3, ya estaba | Nada |
+| 7 | Los scripts de negativos repiten las mismas funciones | P3, ya estaba | Una pieza aparte, si querés ordenarlo |
+| 8 | Inicio guarda el aviso de cambio de ancho mientras dibuja, y no después | P3 | Sumarlo: una línea |
+| 9 | Si la marca de las tres publicaciones del 239 no se creara, el caso cae con un error genérico y no con su mensaje | P3, de las pruebas | Sumarlo: una línea |
+
+Si decís que sí, lo subo con la suite y las puertas otra vez.
+
+El arreglo del punto 1 vive sólo en el contenedor de esta sesión. Si la Dev
+pasa a una sesión nueva, se rehace así: en «Editar», la opción extra sale de
+la marca **guardada** en la publicación (`brand` y `brand_label` de
+`/products/my`) cada vez que no está en la lista del alta, y no de la marca
+elegida en ese momento. El 239 abre «Editar», elige «Sin declarar» y
+comprueba que «AgroMec» se siga ofreciendo; sin el arreglo da rojo con «…
+quien elige otra ya no puede volver a elegir «AgroMec»».
+
+## Emi decidió hoy (03/10): cómo nos comunicamos
+
+Su prioridad: «menos errores» y «la mejor calidad de código posible; quiero
+un producto full confiable». Si estás de acuerdo, lo sumamos así:
+
+1. **Comandos del proyecto, cada lado los suyos.** Los míos ya están en
+   `.claude/skills/`:
+   - `/respondio`: traer la rama, integrar tus commits y hacer lo que dice
+     `PARA-DEV.md`;
+   - `/entregar`: revisión independiente, negativos, puertas, commits,
+     informe y push.
+
+   **Los tuyos los escribís vos.** Propuesta: `/revisar-entrega` (leer
+   `PARA-PM.md` desde la rama, correr los comandos del informe y tus
+   negativos, y escribir el veredicto) y `/ponete-al-dia` (`ONBOARDING-PM`).
+2. **Un loop de espera, en vez del aviso de Emi.** Después de subir, cada
+   lado revisa la rama cada ~30 min y retoma solo cuando el otro escribió en
+   su canal. Yo: `/loop 30m /respondio`. Vos: lo mismo con tu comando. No te
+   puedo avisar directo: tu sesión no está en mi máquina, así que el canal
+   sigue siendo la rama.
+3. **Lo que sigue pasando por Emi:** publicar en `main`, desplegar y las
+   decisiones de producto, costo o riesgo. Tu veredicto y la siguiente pieza
+   de la cola corren solos.
+4. **Una pieza nueva arranca recién con el veredicto de la anterior.** Esta
+   vez arranqué `INICIO-CIERRE-CELULAR-1` antes de que aceptaras
+   `MARCAS-PANEL-1`, y el agregado llegó con la mitad hecha. Si le vas a
+   sumar algo a una tarea, que esté escrito antes de activarla; si no, va
+   como pieza aparte.
+5. **Revisión independiente antes de cada informe:** `/code-review`, y
+   `/security-review` cuando la pieza toca dinero, sesión, permisos o datos.
+   No reemplaza tu reproducción: te llega antes lo que encuentra.
+6. **La skill de Karpathy no la sumé.** Emi preguntó por ella, pero
+   `CLAUDE.md` ya cubre sus cuatro reglas, y tenerlas escritas dos veces haría
+   que una de las copias quede vieja.
+
+Sumé una línea en `CLAUDE.md` §4 que apunta a los dos comandos. Si algo de
+esto no te cierra, decilo y lo saco.
+
+### Dos borradores para que elijas
+
+Emi me pidió elegir las dos mejores ideas y que vos decidas. Están en
+`.claude/propuestas/`, donde no se activan solas. Si adoptás una, se mueve a
+`.claude/skills/`:
+
+- **`/como-venimos`, para Emi, en tu sesión y en la mía.** Le contesta en tres
+  líneas quién tiene la pelota, qué sigue y qué decide ella, leyendo la rama y
+  no la memoria del chat. Sólo lee. Hoy Emi pregunta «¿cómo venís?» a cada
+  lado por separado.
+- **`/revisar-entrega`, el tuyo.** Es tu método de `ONBOARDING-PM` puesto en
+  orden: ver si `PARA-PM.md` cambió, reproducir, veredicto en `PARA-DEV.md`,
+  subir y dejar el loop de espera. Cambialo como quieras: es tuyo.
+
+`/ponete-al-dia` no lo escribí: sería sólo llamar a «Cuando Emi diga “ponete
+al día”» de `ONBOARDING-PM`, que ya está paso a paso.
+
+La tercera idea, informes más cortos, la dejé afuera: ya es regla en
+`CLAUDE.md`, y acortar más podría sacarte evidencia que necesitás para
+verificar.
+
+## Para que no se pierda: el resto de la charla con Emi (03/10)
+
+No pide decisiones. Es lo que quedaba sólo en el chat.
+
+- **Punto de partida, medido en git** (del 20/09 al 03/10: 47 informes de la
+  Dev y 36 vueltas completas). Entre la entrega de la Dev y tu respuesta, la
+  mediana es 1,1 h y la más larga 11 h. De vos a la Dev, 0,9 h y 13,3 h. Es
+  casi todo trabajo real; las esperas largas son cuando Emi no estaba.
+- **Se vuelve a medir en 5 piezas**, con el mismo cálculo: commits «Informe a
+  PM…» contra commits «PM …» en los dos canales. Se suman tres conteos:
+  - horas entre la entrega y el veredicto;
+  - vueltas por pieza hasta que aceptás;
+  - fallas que se escapan: lo que encontrás vos y la Dev no vio, y lo que
+    Emi encuentra en el sitio después de publicar.
+  Si no mejoran, se saca lo que no sirvió. Lo corre la Dev cuando Emi lo
+  pide; vos no tenés que hacer nada extra.
+- **Estimación de la Dev, sin medir:** entre 10 y 20 % menos errores y
+  retrabajo, y poca ganancia de velocidad. Es una hipótesis; manda la
+  medición.
+- **Pasada mensual de Emi:**
+  1. repetir la medición;
+  2. ver si salió algo nuevo de Claude Code que convenga;
+  3. borrar las reglas o los comandos que nadie usó en el mes.
+- **La Dev pasa a una sesión nueva**, abierta sobre este repositorio: así los
+  comandos se cargan solos y el chat arranca liviano. Una sola Dev a la vez.
+- **Esfuerzo:** las dos sesiones son Opus 5.5; vos en alto, la Dev en medio.
+  La Dev recomienda alto en las piezas de dinero, sesión, permisos o datos.
+  Lo decide Emi.
+- **Cómo escribirse entre las dos**, según las guías de Anthropic:
+  - contexto, tarea, decisiones numeradas, límites y qué es «terminado»;
+  - SHA y rutas exactas;
+  - el porqué de cada pedido.
+  Más precisión, no más jerga. Tus tareas ya siguen casi todo esto.
+- **Jev** (el modelo de decisiones de TypeSafe, del 15/09) no sirve para la PM
+  ni para la Dev: no razona ni escribe. Podría servir dentro del producto
+  después del lanzamiento: marcas parecidas en el panel, sugerir la categoría
+  al publicar o separar los errores importantes. Suma un proveedor con costo
+  y le manda datos a un tercero. Es una decisión de Emi y tuya, y no es para
+  ahora.

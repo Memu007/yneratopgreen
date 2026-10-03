@@ -43,6 +43,8 @@ Dinero, autenticación, permisos, órdenes, stock, migraciones, datos y segurida
 - La revisión de PM es cara: cada informe le deja lo mínimo para verificar. Arriba, el resultado y lo que decide ella; después, un solo bloque corto de comandos copiables con lo que cada uno tiene que mostrar. Lo ya corrido va con su salida exacta, para que no tenga que repetirlo para enterarse.
 - No pedirle pasos que un script pueda hacer. Si algo depende del estado de otros casos o del entorno, se avisa antes de que lo descubra corriéndolo.
 
+El procedimiento está en dos comandos del proyecto (`.claude/skills/`): `/entregar` cierra una pieza, con una revisión independiente del diff antes del informe, y `/respondio` retoma después de que la PM escribió. Al subir una entrega, Dev deja un loop de espera (`/loop 30m /respondio`) en vez de esperar el aviso de Emi. Una pieza nueva arranca recién con el veredicto de la anterior.
+
 La revisión independiente la hace PM/QA sobre la misma composición cuando corresponda. Dos corridas de Dev no sustituyen independencia. Abaratarle la verificación no es reemplazarla: qué reproduce lo decide ella.
 
 ## 5. Detalles del repositorio
