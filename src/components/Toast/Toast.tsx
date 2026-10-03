@@ -76,7 +76,12 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     };
   }, []);
 
+  // Los que llegaron por el teclado con una acción: esperan sin temporizador
+  // a que la persona llegue con Tab.
+  const esperando = useRef(new Set<number>());
+
   const removeToast = useCallback((id: number) => {
+    esperando.current.delete(id);
     const temporizador = temporizadores.current.get(id);
     if (temporizador?.pendiente) clearTimeout(temporizador.pendiente);
     temporizadores.current.delete(id);
@@ -119,10 +124,28 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     setToasts(prev => [...prev, {
       id, message, type, detalle: opciones.detalle, accion: opciones.accion, origen, saliendo: false,
     }]);
-    if (type !== 'error' && !(opciones.accion && conTeclado.current)) {
-      temporizadores.current.set(id, { restante: DURACION, desde: Date.now() });
-      if (!enPausa.current) correr(id);
+    if (type === 'error') return;
+    if (opciones.accion && conTeclado.current) {
+      esperando.current.add(id);
+      return;
     }
+    temporizadores.current.set(id, { restante: DURACION, desde: Date.now() });
+    if (!enPausa.current) correr(id);
+  }, [correr]);
+
+  // Si el foco entra a una capa, desde ahí el teclado no llega a los avisos
+  // (la capa lo encierra): los que esperaban empiezan a contar como los demás.
+  useEffect(() => {
+    const alEnfocar = (e: FocusEvent) => {
+      if (!(e.target instanceof Element) || !e.target.closest('[aria-modal="true"]')) return;
+      for (const id of esperando.current) {
+        temporizadores.current.set(id, { restante: DURACION, desde: Date.now() });
+        if (!enPausa.current) correr(id);
+      }
+      esperando.current.clear();
+    };
+    document.addEventListener('focusin', alEnfocar);
+    return () => document.removeEventListener('focusin', alEnfocar);
   }, [correr]);
 
   useEffect(() => () => {
@@ -159,12 +182,15 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const desplegada = conMouse || conFoco;
   // Al cerrar con el teclado el último aviso, el foco no se pierde en la
   // página: vuelve al botón que lo provocó y, si ya no está, a donde estaba
-  // antes de entrar a los avisos.
+  // antes de entrar a los avisos. Con una capa abierta, nunca detrás de ella:
+  // a algo de la capa o, si no, a la capa misma.
   const focoPrevio = useRef<HTMLElement | null>(null);
   const devolverFoco = (origen: HTMLElement | null) => {
     const previo = focoPrevio.current;
     focoPrevio.current = null;
-    const destino = [origen, previo].find((e) => e?.isConnected);
+    const capas = document.querySelectorAll<HTMLElement>('[aria-modal="true"]');
+    const capa = capas[capas.length - 1];
+    const destino = [origen, previo].find((e) => e?.isConnected && (!capa || capa.contains(e))) ?? capa;
     if (destino) destino.focus();
     else (document.activeElement as HTMLElement | null)?.blur();
   };
@@ -189,6 +215,14 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const alturas = useRef(new Map<number, number>());
   const [, medir] = useState(0);
   const nodos = useRef(new Map<number, HTMLLIElement>());
+  // Al cambiar el ancho (girar el celular) el texto se reacomoda y la altura
+  // cambia: se vuelve a medir.
+  const [ancho, setAncho] = useState(0);
+  useEffect(() => {
+    const alCambiar = () => setAncho(window.innerWidth);
+    window.addEventListener('resize', alCambiar);
+    return () => window.removeEventListener('resize', alCambiar);
+  }, []);
   useLayoutEffect(() => {
     let cambio = false;
     for (const id of alturas.current.keys()) {
@@ -203,7 +237,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       }
     }
     if (cambio) medir((n) => n + 1);
-  }, [toasts]);
+  }, [toasts, ancho]);
 
   // Al cerrarse con el teclado el que tenía el foco, el foco pasa al siguiente
   // aviso y no se pierde en la página. Con el mouse o el dedo no: dejarle el
@@ -314,11 +348,10 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
           {toasts.map(toast => {
             const atras = toast.saliendo ? 0 : posicion(toast.id);
             const arrastrado = desplazado?.id === toast.id ? desplazado : null;
-            const transform = arrastrado
-              ? `translateX(${arrastrado.dx}px)`
-              : desplegada
-                ? `translateY(-${subidas.get(toast.id) ?? 0}px)`
-                : `translateY(-${Math.min(atras, A_LA_VISTA) * 14}px) scale(${1 - Math.min(atras, A_LA_VISTA) * 0.06})`;
+            const enLaPila = desplegada
+              ? `translateY(-${subidas.get(toast.id) ?? 0}px)`
+              : `translateY(-${Math.min(atras, A_LA_VISTA) * 14}px) scale(${1 - Math.min(atras, A_LA_VISTA) * 0.06})`;
+            const transform = arrastrado ? `translateX(${arrastrado.dx}px) ${enLaPila}` : enLaPila;
             return (
               <li
                 key={toast.id}
