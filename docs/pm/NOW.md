@@ -305,6 +305,16 @@ De la puerta contractual completa, hoy siguen vivos estos bloqueos:
 
 Después de una migración de esquema no se hace rollback ciego sólo de código. La recuperación normal es forward-fix; un downgrade necesita procedimiento probado y backup recuperable.
 
+## Medición de subagentes
+
+Desde el 03/10 (Emi). La regla está en `ONBOARDING-PM.md`, «Subagentes
+adversariales». Antecedente sin subagente de PM: en la entrega de
+`INICIO-CIERRE-CELULAR-1`, la autorrevisión de la Dev encontró 9 hallazgos,
+adoptó 5 y uno era un error real (P2 de «Editar»).
+
+| Pieza | Modelo | Hallazgos | Reproducidos | Nadie más los vio |
+|---|---|---|---|---|
+
 ## Restricciones operativas
 
 - PM sólo modifica `docs/pm/` durante el flujo normal; no implementa producto.

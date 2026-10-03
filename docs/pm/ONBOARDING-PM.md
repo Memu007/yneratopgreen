@@ -242,6 +242,11 @@ negativos y el navegador.
   autorrevisión: suma, pero no reemplaza este paso.
 - Lo que encuentra es una hipótesis. La PM lo reproduce o lo descarta con
   evidencia antes de llevarlo a `PARA-DEV.md`.
+- **Medición (Emi, 03/10).** El veredicto anota tres números: hallazgos del
+  subagente, cuántos reproducidos y cuántos no los había visto nadie más
+  (ni la Dev, ni sus casos y negativos, ni la PM). Se suman en `NOW.md`,
+  «Medición de subagentes». Con tres o cuatro piezas, PM le informa a Emi
+  cuánto aportan.
 
 ## Hablar con Emi
 
