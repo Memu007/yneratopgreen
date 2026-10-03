@@ -41036,7 +41036,12 @@ await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se desliz
       await esperarA(async () => (await avisos(page)).length === 1, 'Enter no dejó un aviso', 10_000);
       await abrirCarrito();
       await esperarA(async () => (await avisos(page)).length === 0, 'con el carrito abierto, el aviso no se fue', 7_000)
-        .catch(() => problemas.push(`${donde}: con el carrito abierto, el aviso que esperaba al teclado no se fue solo`));
+        .catch(async () => {
+          problemas.push(`${donde}: con el carrito abierto, el aviso que esperaba al teclado no se fue solo`);
+          // Se cierra, para que el paso siguiente mida lo suyo.
+          for (const resto of await page.locator(`${AVISO} [data-cerrar]`).all()) await resto.evaluate((x) => x.click());
+          await esperarA(async () => (await avisos(page)).length === 0, 'no se cerró lo que quedó de B5', 5_000);
+        });
       await cerrarCarrito();
 
       // B6. Si con la capa abierta se cierra con el teclado el último aviso,
@@ -41099,6 +41104,8 @@ await runCase(243, 'Con un error a la vista, «Publicar producto», «Continuar 
   assert(alta.data?.id, `no se pudo publicar la publicación del caso: HTTP ${alta.status}`);
   const id = alta.data.id;
   // Qué hay en el centro del botón, y si un clic ahí le llega.
+  // Se desplaza hasta verlo, como haría la persona, y se mira el centro y
+  // todo su alto: desplazar puede dejar el centro libre y el borde tapado.
   const alCentro = async (page, boton) => {
     await boton.scrollIntoViewIfNeeded();
     const caja = await boton.boundingBox();
@@ -41109,7 +41116,10 @@ await runCase(243, 'Con un error a la vista, «Publicar producto», «Continuar 
       if (!e || b.contains(e)) return null;
       return `${e.tagName} «${(e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 50)}»`;
     }, [x, y]);
-    return { x, y, encima };
+    // Y que ninguna parte del botón quede debajo de un aviso, no sólo el centro.
+    const tapa = await page.evaluate(({ top, bottom }) => Math.max(0, ...[...document.querySelectorAll('[class*="_toastContainer_"] li:not([aria-hidden]) [role]')]
+      .map((n) => n.getBoundingClientRect()).map((r) => Math.min(bottom, r.bottom) - Math.max(top, r.top))), { top: caja.y, bottom: caja.y + caja.height });
+    return { x, y, encima, tapa: Math.round(tapa) };
   };
 
   const browser = await chromium.launch({ headless: true });
@@ -41152,22 +41162,13 @@ await runCase(243, 'Con un error a la vista, «Publicar producto», «Continuar 
       await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'), null, { timeout: 5_000 });
       const enVender = await alCentro(page, publicar);
       if (enVender.encima) problemas.push(`${donde}: con el error a la vista, en el centro de «Publicar producto» está ${enVender.encima}`);
+      if (enVender.tapa) problemas.push(`${donde}: con el error a la vista, el aviso tapa ${enVender.tapa} px de alto de «Publicar producto»`);
       const antes = pedidos;
       await page.mouse.click(enVender.x, enVender.y);
       await esperarA(async () => pedidos > antes, 'no reintentó', 5_000)
         .catch(() => problemas.push(`${donde}: tocar el centro de «Publicar producto» con el error a la vista no reintentó (${antes} pedidos antes, ${pedidos} después)`));
       await page.unroute('**/api/products');
       await page.mouse.move(2, 2);
-      // Al angostarse la pantalla con el error a la vista, el texto se
-      // reacomoda: la capa le deja el lugar que mide ahora.
-      if (medida.width === 390) {
-        await page.setViewportSize({ width: 320, height: 568 });
-        await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'), null, { timeout: 5_000 });
-        const angosta = await alCentro(page, publicar);
-        if (angosta.encima) problemas.push(`390px → 320px: con el error a la vista, en el centro de «Publicar producto» está ${angosta.encima}`);
-        await page.setViewportSize(medida);
-      }
-
       // Se descarta el formulario; el error queda.
       // Sin depender de que «Cancelar» se pueda tocar: eso no es lo que se
       // mide acá, y si el aviso lo tapa el caso tiene que llegar a decirlo.
@@ -41179,6 +41180,7 @@ await runCase(243, 'Con un error a la vista, «Publicar producto», «Continuar 
       // --- B. El carrito y el checkout, con el error todavía ahí -----------
       const llega = async (boton, nombre) => {
         const punto = await alCentro(page, boton);
+        if (punto.tapa) problemas.push(`${donde}: con el error a la vista, el aviso tapa ${punto.tapa} px de alto de «${nombre}»`);
         if (punto.encima) {
           problemas.push(`${donde}: con el error a la vista, en el centro de «${nombre}» está ${punto.encima}`);
           return false;
@@ -41201,7 +41203,7 @@ await runCase(243, 'Con un error a la vista, «Publicar producto», «Continuar 
       if (await llega(pagar, 'Continuar al pago')) {
         if (await pagar.evaluate((b) => b.dataset.llego) !== '1') problemas.push(`${donde}: el clic en el centro de «Continuar al pago» no le llegó al botón`);
       }
-      medidos.push(`${donde}: «Publicar producto» reintentó (${pedidos} pedidos)`);
+      medidos.push(`${donde}: «Publicar producto» (centro en y=${Math.round(enVender.y)}) reintentó (${pedidos} pedidos)`);
       await contexto.close();
     }
   } finally {

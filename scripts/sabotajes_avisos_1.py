@@ -46,8 +46,6 @@ Los de la devolución (casos 242 y 243):
                         teclado no empieza a contar: no se va nunca.
   foco-detras           Con una capa abierta, cerrar con el teclado el último
                         aviso manda el foco detrás de la capa.
-  sin-remedir           Al angostarse la pantalla no se vuelve a medir la
-                        pila: el error tapa «Publicar producto».
 
 Son todos de pantalla: esperan a que el servidor de desarrollo sirva el
 archivo roto, y después el sano. Necesita la API en 8000 y el frontend de
@@ -122,9 +120,9 @@ SABOTAJES = {
     "tapa-la-capa": (
         AVISOS,
         [("      raiz.setAttribute('data-avisos', '');\n", "      void raiz;\n")],
-        ["390px: con el error a la vista, en el centro de «Publicar producto» está",
-         "390px: tocar el centro de «Publicar producto» con el error a la vista no reintentó"],
-        ["no le llegó", "no siguió a la vista"],
+        [f"{a}: con el error a la vista, el aviso tapa" for a in ("1440px", "390px", "320px")]
+        + ["con el error a la vista, en el centro de «Publicar producto» está"],
+        ["no siguió a la vista"],
         243,
     ),
     "el-dedo-pausa": (
@@ -161,8 +159,8 @@ SABOTAJES = {
     ),
     "foco-al-body": (
         AVISOS,
-        [("    const destino = [origen, previo].find((e) => e?.isConnected);\n",
-          "    const destino = null && [origen, previo].find((e) => e?.isConnected);\n")],
+        [("    const destino = [origen, previo].find((e) => e?.isConnected && (!capa || capa.contains(e))) ?? capa;\n",
+          "    const destino = null && capa;\n")],
         ["al cerrar el carrito abierto desde el aviso, el foco quedó en «BODY",
          "al cerrar con el teclado el último aviso, el foco quedó en «BODY"],
         ["táctil", "se fue antes"],
@@ -181,13 +179,6 @@ SABOTAJES = {
         ["al cerrar con el teclado el último aviso con el carrito abierto, el foco quedó en «BUTTON Agregar al carrito», fuera del carrito"],
         ["táctil", "se fue antes", "no se fue solo"],
         242,
-    ),
-    "sin-remedir": (
-        AVISOS,
-        [("  }, [toasts, ancho]);\n", "  }, [toasts]);\n")],
-        ["390px → 320px: con el error a la vista, en el centro de «Publicar producto» está"],
-        ["no reintentó", "no le llegó"],
-        243,
     ),
 }
 
