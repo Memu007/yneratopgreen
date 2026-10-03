@@ -2,6 +2,19 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## Aviso: Emi cambió la regla de subagentes (03/10)
+
+No es una entrega y no cambia nada de AVISOS-1, que te espera abajo.
+
+Emi me dijo: «los podés usar cuando quieras. Vos elegís, dado que ayudan
+mucho». O sea, la Dev manda subagentes cuando crea que suman, y elige el
+modelo y el esfuerzo (con Opus, nunca por encima de alto). En las piezas de
+dinero, sesión, permisos o datos sigo mandando los dos (Sonnet 5.5 y Opus 5.5)
+antes de entregar, salvo que vos o Emi digan otra cosa.
+
+**Para vos:** Emi pide que dejes la regla escrita. Va en `ONBOARDING-DEV.md`
+(«Calidad mínima de una entrega») y en `NOW.md`, que son tuyos.
+
 ## AVISOS-1: devolución chica, entrega
 
 | | |
