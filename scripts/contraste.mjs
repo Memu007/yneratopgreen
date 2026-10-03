@@ -499,8 +499,8 @@ for (const medida of MEDIDAS) {
     await aviso.getByRole('button', { name: 'Ver carrito' }).click();
     // El aviso se apaga al irse: se mide el carrito cuando ya no está.
     // Que no quede ningún aviso, tampoco el que se está yendo: ése ya no
-  // tiene rol (aria-hidden), así que el localizador lo daba por ido.
-  await page.waitForFunction(() => !document.querySelector('[class*="_toastContainer_"] li'), null, { timeout: ESPERA });
+    // tiene rol (aria-hidden), así que el localizador lo daba por ido.
+    await page.waitForFunction(() => !document.querySelector('[class*="_toastContainer_"] li'), null, { timeout: ESPERA });
     await revisar(page, `${medida.n} carrito`, page.getByRole('heading', { name: /Mi carrito/i }));
 
     await page.getByRole('button', { name: 'Continuar compra' }).click();

@@ -44,6 +44,8 @@ Los de la devolución (casos 242 y 243):
                         pierde en la página.
   capa-no-arranca       Con una capa abierta, el aviso que esperaba al
                         teclado no empieza a contar: no se va nunca.
+  mouse-no-arranca      Después de agregar con el teclado, un clic en la
+                        página no hace que el aviso empiece a contar.
   foco-detras           Con una capa abierta, cerrar con el teclado el último
                         aviso manda el foco detrás de la capa.
 
@@ -170,6 +172,13 @@ SABOTAJES = {
         [("    document.addEventListener('focusin', alEnfocar);\n", "    void alEnfocar;\n")],
         ["escritorio 1440px teclado: con el carrito abierto, el aviso que esperaba al teclado no se fue solo"],
         ["táctil", "se fue antes"],
+        242,
+    ),
+    "mouse-no-arranca": (
+        AVISOS,
+        [("    document.addEventListener('pointerdown', alApoyar);\n", "    void alApoyar;\n")],
+        ["escritorio 1440px teclado: agregado con el teclado, después de un clic en la página el aviso no se fue solo"],
+        ["táctil", "se fue antes", "el foco quedó"],
         242,
     ),
     "foco-detras": (

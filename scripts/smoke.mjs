@@ -41058,6 +41058,15 @@ await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se desliz
       }
       await cerrarCarrito();
 
+      // B7. Si después de agregar con el teclado la persona pasa al mouse,
+      //     el que esperaba empieza a contar y se va solo.
+      await agregar.focus();
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await avisos(page)).length === 1, 'Enter no dejó un aviso', 10_000);
+      await page.mouse.click(2, 300);
+      await esperarA(async () => (await avisos(page)).length === 0, 'después del clic, no se fue', 7_000)
+        .catch(() => problemas.push(`${donde}: agregado con el teclado, después de un clic en la página el aviso no se fue solo`));
+
       // B4. Agregar con el mouse: lo bueno se va solo, aunque tenga acción.
       await agregar.click();
       await page.mouse.move(2, 2);
@@ -41069,6 +41078,9 @@ await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se desliz
   } finally {
     await browser.close();
     querySql(`UPDATE products SET status = 'DELETED' WHERE id = ${sqlLiteral(id)}`);
+    // El carrito de la cuenta de demostración queda vacío, como lo esperan
+    // los demás casos.
+    await apiRequest('/cart', { method: 'DELETE', token: compra.token });
   }
   assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
   return 'con el dedo: tocar no lo deja quieto, 40 px de costado no lo cierra y 100 px sí, lo vertical desplaza la página; '
@@ -41209,6 +41221,9 @@ await runCase(243, 'Con un error a la vista, «Publicar producto», «Continuar 
   } finally {
     await browser.close();
     querySql(`UPDATE products SET status = 'DELETED' WHERE id = ${sqlLiteral(id)}`);
+    // El carrito de la cuenta de demostración queda vacío, como lo esperan
+    // los demás casos.
+    await apiRequest('/cart', { method: 'DELETE', token: compra.token });
   }
   assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
   return `${medidos.join('; ')}; en el carrito y en el checkout el centro del botón principal es el botón y el clic le llega`;
