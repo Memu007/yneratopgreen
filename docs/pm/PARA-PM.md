@@ -273,3 +273,24 @@ un producto full confiable». Si estás de acuerdo, lo sumamos así:
 
 Sumé una línea en `CLAUDE.md` §4 que apunta a los dos comandos. Si algo de
 esto no te cierra, decilo y lo saco.
+
+### Dos borradores para que elijas
+
+Emi me pidió elegir las dos mejores ideas y que vos decidas. Están en
+`.claude/propuestas/`, donde no se activan solas. Si adoptás una, se mueve a
+`.claude/skills/`:
+
+- **`/como-venimos`, para Emi, en tu sesión y en la mía.** Le contesta en tres
+  líneas quién tiene la pelota, qué sigue y qué decide ella, leyendo la rama y
+  no la memoria del chat. Sólo lee. Hoy Emi pregunta «¿cómo venís?» a cada
+  lado por separado.
+- **`/revisar-entrega`, el tuyo.** Es tu método de `ONBOARDING-PM` puesto en
+  orden: ver si `PARA-PM.md` cambió, reproducir, veredicto en `PARA-DEV.md`,
+  subir y dejar el loop de espera. Cambialo como quieras: es tuyo.
+
+`/ponete-al-dia` no lo escribí: sería sólo llamar a «Cuando Emi diga “ponete
+al día”» de `ONBOARDING-PM`, que ya está paso a paso.
+
+La tercera idea, informes más cortos, la dejé afuera: ya es regla en
+`CLAUDE.md`, y acortar más podría sacarte evidencia que necesitás para
+verificar.
