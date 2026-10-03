@@ -27,9 +27,8 @@ Sobre `6a96b0d` (producto en `666bbf1` y `1eb819d`). Evidencia en
 - **Reproducir la carrera del 195 retrasando el catálogo y revisar los
   demás casos sin que te lo pidiera:** excelente.
 
-La publicación a `main` la decide Emi. No integres ni despliegues.
-
-`MARCAS-PANEL-1` está publicada en `4085a9a`.
+**Publicada en `main` (`e5d592e`, 03/10)** con autorización de Emi. No
+integres ni despliegues por tu cuenta.
 
 ### Respuestas a D1–D9 (de `2ef9fbe`)
 
@@ -42,15 +41,14 @@ La publicación a `main` la decide Emi. No integres ni despliegues.
 - **Borrá `.claude/propuestas/` entero**, en un commit aparte del agregado.
 - **D4 — sí.** `/respondio`, `/entregar` y la línea de `CLAUDE.md` §4 son tus
   herramientas, y se quedan.
-- **D5 — tu loop, sí:** lo decidió Emi. **El mío lo decide Emi** por costo:
-  cada vuelta mía carga toda la revisión. Hasta que diga otra cosa, sigo con
-  su «respondió».
+- **D5 — tu loop, sí:** lo decidió Emi. **Yo no dejo loop** (Emi, 03/10):
+  cada vuelta mía carga toda la revisión. Sigo con su «respondió».
 - **D6 — sí.** Mové `DELIVERY_CHECKLIST.md` a `docs/pm/archivo/` y corregí la
   cita de `docs/pm/REPO_MAP.md`. Va en el agregado.
-- **D7 — de acuerdo; espera el visto bueno de Emi** por los minutos de
-  GitHub. No lo empieces.
+- **D7 — sí, sólo la parte rápida** (Emi, 03/10). Sin la suite completa
+  semanal. Es `CONTROLES-AUTOMATICOS-1`, abajo, después de `AVISOS-1`.
 - **D8 — sí, y antes de lo visual.** Es `CONFIABILIDAD-API-1`, abajo,
-  después de `AVISOS-1`. Emi pidió «un producto full confiable», y una API
+  después de `CONTROLES-AUTOMATICOS-1`. Emi pidió «un producto full confiable», y una API
   que se congela entera rompe todo lo demás.
 - **D9 — ya está previsto.** El orden de pruebas finales
   (`PLAN-RED-TEAM-CIERRE-MVP.md`) tiene QA exploratorio de otro modelo y el
@@ -195,7 +193,53 @@ después.
 
 ---
 
-## Después — CONFIABILIDAD-API-1 (apenas entregues AVISOS-1)
+## Después — CONTROLES-AUTOMATICOS-1 (apenas entregues AVISOS-1)
+
+**Decisión de Emi (03/10), por tu D7: sí, sólo la parte rápida.** Hoy el
+repositorio no tiene ningún control automático. Entregala por separado.
+
+### Qué entra
+
+1. **Un flujo de GitHub Actions** que corre en cada push a
+   `claude/dev-role-repo-3l0kp3` y a `main`:
+   - lint, tipos y build del frontend;
+   - `compileall` y `alembic check` del backend, contra una base PostGIS
+     del propio flujo;
+   - unos casos rápidos, los que elijas. Decí cuáles y por qué esos.
+2. **Que entre en el plan gratis.** Decí cuántos minutos tarda cada corrida
+   y cuántos daría un mes con el ritmo de pushes de las últimas dos semanas.
+3. **Valores inventados.** Ningún secreto en el flujo ni en los registros.
+   No usa los secretos del repositorio.
+4. **Una línea en `CLAUDE.md`** que diga qué corre y dónde se ve el
+   resultado.
+
+### Fuera de alcance
+
+- La suite completa semanal: Emi eligió sólo la parte rápida.
+- Desplegar, tocar Railway o bloquear el despliegue: Railway sigue
+  publicando `main` como hoy.
+- Protección de ramas o pull requests obligatorios.
+
+### Aceptación verificable
+
+1. **Una corrida verde** sobre tu entrega, con el enlace a la corrida.
+2. **Una corrida roja a propósito:** un error de tipos o de lint en una rama
+   descartable, que el flujo marque en rojo y diga dónde. Después se borra
+   la rama.
+3. **Ningún secreto** en el flujo ni en sus registros: decí cómo lo
+   comprobaste.
+4. Lo de siempre: suite local, auditorías y puertas, aunque el producto no
+   cambie.
+
+### Frená y consultá
+
+- Si los minutos estimados pasan del plan gratis.
+- Si hace falta algún permiso o configuración en GitHub que sólo puede dar
+  Emi.
+
+---
+
+## Después — CONFIABILIDAD-API-1 (apenas entregues CONTROLES-AUTOMATICOS-1)
 
 **Decisión PM (03/10), por tu D8.** En producción la API corre en un solo
 proceso (`backend/railway-entrypoint.sh`, sin `--workers`). Según tu

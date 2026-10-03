@@ -10,6 +10,14 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-03 — Controles automáticos en GitHub, y PM sigue con «respondió»
+
+Emi eligió (03/10): **sí** a los controles automáticos rápidos en cada push (lint, tipos, build,
+compilación, `alembic check` y unos casos rápidos), dentro del plan gratis de GitHub y sin la
+suite completa semanal. Es `CONTROLES-AUTOMATICOS-1`, después de `AVISOS-1`. Y **PM no deja un
+loop de espera**: sigue retomando con el «respondió» de Emi, porque cada vuelta de PM carga la
+revisión entera y gasta tokens aunque no haya nada nuevo.
+
 ## 2026-10-03 — La API no se puede congelar entera, antes de lo visual
 
 La Dev midió (D8 de `2ef9fbe`) que en producción la API corre en un solo proceso y que 17 rutas
