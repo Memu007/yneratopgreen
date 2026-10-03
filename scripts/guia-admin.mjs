@@ -1398,7 +1398,13 @@ async function marcasDelFiltro(c) {
     const plegador = mercado.getByRole('button', { name: /^Filtros/ });
     if ((await plegador.count()) > 0 && (await plegador.isVisible())
       && (await plegador.getAttribute('aria-expanded')) !== 'true') await plegador.click();
-    await mercado.locator('#catalog-brand').waitFor({ timeout: 15_000 });
+    // Las marcas llegan con la misma respuesta que las tarjetas: con la primera
+    // tarjeta a la vista, el panel ya decidió. Si Tractores no tiene ninguna
+    // otra marca publicada (la de la siembra puede no estar en el Mercado
+    // después de la suite), «Marca» no se dibuja, y eso es una lista vacía, no
+    // algo que esperar: antes se esperaban 15 s y la guía caía en el paso 28.
+    await mercado.locator('button[aria-controls="mas-filtros"]').waitFor({ state: 'visible', timeout: 15_000 });
+    if ((await mercado.locator('#catalog-brand').count()) === 0) return [];
     return (await mercado.locator('#catalog-brand option').allInnerTexts()).map((t) => t.trim());
   } finally {
     await mercado.close();

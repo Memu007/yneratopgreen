@@ -39,6 +39,12 @@ son sus negativos, que antes sobrevivían):
                         La lista de publicaciones propias no trae el nombre de
                         la marca, y «Editar» cae en el valor interno.
 
+Del agregado de AVISOS-1 (el punto 1 de la autorrevisión):
+
+  editar-ofrece-la-elegida
+                        En «Editar», la marca dada de baja se ofrece según la
+                        elegida en ese momento: elegida otra, desaparece.
+
 Los del backend reinician la API antes y después con REINICIAR_API (por
 omisión, `./scripts/entorno_nativo.sh --reiniciar-api`). Los de pantalla
 esperan a que el servidor de desarrollo sirva el archivo roto, y después el
@@ -165,8 +171,8 @@ SABOTAJES = {
     ),
     "editar-valor-interno": (
         DASHBOARD,
-        [("                          {nombreDeLaMarcaGuardada(editingProduct.id, editingProduct.marca)}\n",
-          "                          {editingProduct.marca}\n")],
+        [("    return { value: guardada.brand, label: guardada.brand_label || guardada.brand };\n",
+          "    return { value: guardada.brand, label: guardada.brand };\n")],
         ["escritorio: dada de baja, «Editar» muestra la marca como «agromec»",
          "celular: dada de baja, «Editar» muestra la marca como «agromec»"],
         ["API:", "unida,", "corregida,", "la ficha dice"],
@@ -177,6 +183,19 @@ SABOTAJES = {
         ["escritorio: dada de baja, «Editar» muestra la marca como «agromec»",
          "celular: dada de baja, «Editar» muestra la marca como «agromec»"],
         ["API:", "unida,", "corregida,", "la ficha dice"],
+    ),
+    # El arreglo del punto 1 de la autorrevisión, deshecho: la opción extra
+    # vuelve a salir de la marca elegida en ese momento y no de la guardada.
+    "editar-ofrece-la-elegida": (
+        DASHBOARD,
+        [("    const guardada = backendProducts.find(p => p.id === productId);\n"
+          "    if (!guardada?.brand",
+          "    const fila = backendProducts.find(p => p.id === productId);\n"
+          "    const guardada = fila && editingProduct && { ...fila, brand: editingProduct.marca };\n"
+          "    if (!guardada?.brand")],
+        ["escritorio: dada de baja, en «Editar» quien elige otra ya no puede volver a elegir «AgroMec»",
+         "celular: dada de baja, en «Editar» quien elige otra ya no puede volver a elegir «AgroMec»"],
+        ["API:", "unida,", "corregida,", "la ficha dice", "muestra la marca como"],
     ),
 }
 
