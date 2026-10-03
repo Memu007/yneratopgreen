@@ -12,6 +12,18 @@
   pointer-events: none;
 }
 
+/* Mientras haya avisos, las capas (`aria-modal`) se achican y suben lo que
+   mide la pila plegada: así sus botones de abajo no quedan debajo de un
+   aviso. `--tg-avisos-alto` lo pone Toast.tsx. */
+:global(html[data-avisos]) {
+  --tg-avisos-reserva: calc(var(--tg-avisos-alto, 0px) + var(--tg-space-6) + env(safe-area-inset-bottom, 0px));
+}
+
+:global(html[data-avisos] [aria-modal="true"]) {
+  max-height: min(90dvh, calc(100dvh - var(--tg-avisos-reserva) - 40px)) !important;
+  margin-bottom: var(--tg-avisos-reserva);
+}
+
 /* La pila. Cada aviso se apoya abajo; los de atrás suben un poco, se achican
    y se apagan. Desplegada (mouse o foco encima), cada uno sube lo que miden
    los de adelante. */
@@ -58,7 +70,8 @@
   box-shadow: 0 12px 30px rgba(20, 53, 38, 0.28), 0 2px 6px rgba(20, 53, 38, 0.18);
   font-family: var(--tg-font-ui);
   pointer-events: auto;
-  touch-action: none;
+  /* Lo vertical desplaza la página; de costado se cierra (Toast.tsx). */
+  touch-action: pan-y;
   animation: entrar 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 

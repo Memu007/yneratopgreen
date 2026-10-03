@@ -10,6 +10,9 @@ interface Toast {
   type: ToastType;
   detalle?: string;
   accion?: OpcionesDelAviso['accion'];
+  // Lo que tenía el foco cuando apareció (el botón que lo provocó): ahí
+  // vuelve el foco cuando se cierra con el teclado.
+  origen: HTMLElement | null;
   saliendo: boolean;
 }
 
@@ -35,6 +38,7 @@ const sinMovimiento = () => typeof window !== 'undefined'
 
 // El tiempo que le queda a cada aviso que se va solo. Se pausa con el mouse o
 // el foco encima: nadie tiene que correr para leer ni para llegar al botón.
+// Con el dedo no: tocarlo para leerlo lo dejaba quieto para siempre.
 interface Temporizador {
   restante: number;
   desde: number;
@@ -54,8 +58,23 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   });
 
   const siguienteId = useRef(0);
+  const contenedor = useRef<HTMLDivElement>(null);
   const temporizadores = useRef(new Map<number, Temporizador>());
   const enPausa = useRef(false);
+
+  // Si lo último fue una tecla y no el puntero. Quien usa el teclado tarda
+  // varios Tab en llegar a la acción de un aviso: ése no se va solo.
+  const conTeclado = useRef(false);
+  useEffect(() => {
+    const tecla = () => { conTeclado.current = true; };
+    const puntero = () => { conTeclado.current = false; };
+    window.addEventListener('keydown', tecla, true);
+    window.addEventListener('pointerdown', puntero, true);
+    return () => {
+      window.removeEventListener('keydown', tecla, true);
+      window.removeEventListener('pointerdown', puntero, true);
+    };
+  }, []);
 
   const removeToast = useCallback((id: number) => {
     const temporizador = temporizadores.current.get(id);
@@ -94,10 +113,13 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const showToast = useCallback((message: string, type: ToastType = 'info', opciones: OpcionesDelAviso = {}) => {
     siguienteId.current += 1;
     const id = siguienteId.current;
+    const activo = document.activeElement;
+    const origen = activo instanceof HTMLElement && activo !== document.body
+      && !contenedor.current?.contains(activo) ? activo : null;
     setToasts(prev => [...prev, {
-      id, message, type, detalle: opciones.detalle, accion: opciones.accion, saliendo: false,
+      id, message, type, detalle: opciones.detalle, accion: opciones.accion, origen, saliendo: false,
     }]);
-    if (type !== 'error') {
+    if (type !== 'error' && !(opciones.accion && conTeclado.current)) {
       temporizadores.current.set(id, { restante: DURACION, desde: Date.now() });
       if (!enPausa.current) correr(id);
     }
@@ -135,11 +157,21 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const [conMouse, setConMouse] = useState(false);
   const [conFoco, setConFoco] = useState(false);
   const desplegada = conMouse || conFoco;
+  // Al cerrar con el teclado el último aviso, el foco no se pierde en la
+  // página: vuelve al botón que lo provocó y, si ya no está, a donde estaba
+  // antes de entrar a los avisos.
+  const focoPrevio = useRef<HTMLElement | null>(null);
+  const devolverFoco = (origen: HTMLElement | null) => {
+    const previo = focoPrevio.current;
+    focoPrevio.current = null;
+    const destino = [origen, previo].find((e) => e?.isConnected);
+    if (destino) destino.focus();
+    else (document.activeElement as HTMLElement | null)?.blur();
+  };
   // Cerrar un aviso con el mouse lo saca de debajo del puntero, y el navegador
   // no avisa que el mouse salió: sin esto la pila quedaba desplegada y en
   // pausa, y lo bueno que llegaba después no se iba. Cuando cambia la lista se
   // vuelve a preguntar si el puntero sigue encima.
-  const contenedor = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const cuadro = requestAnimationFrame(() => {
       const nodo = contenedor.current;
@@ -188,31 +220,37 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       const otro = quedan[quedan.length - 1];
       const destino = otro && nodos.current.get(otro.id)?.querySelector<HTMLButtonElement>('[data-cerrar]');
       if (destino) destino.focus();
-      else (document.activeElement as HTMLElement | null)?.blur();
+      else devolverFoco(toasts.find(t => t.id === id)?.origen ?? null);
     }
     removeToast(id);
   };
 
-  // En el celular se cierra deslizándolo con el dedo, de costado o hacia abajo.
-  const arrastre = useRef<{ id: number; x: number; y: number; dx: number; dy: number } | null>(null);
-  const [desplazado, setDesplazado] = useState<{ id: number; dx: number; dy: number } | null>(null);
+  // En el celular se cierra deslizándolo de costado con el dedo. Lo vertical
+  // es del navegador (`touch-action: pan-y`): desplaza la página, y si
+  // empieza, el navegador cancela el arrastre y el aviso vuelve a su lugar.
+  // Hacia abajo no se cerraba: quieto, el aviso está a menos de lo que hay
+  // que deslizar del borde de la pantalla.
+  const arrastre = useRef<{ id: number; x: number; dx: number } | null>(null);
+  const [desplazado, setDesplazado] = useState<{ id: number; dx: number } | null>(null);
   const alApoyar = (id: number) => (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' || (e.target as HTMLElement).closest('button')) return;
-    arrastre.current = { id, x: e.clientX, y: e.clientY, dx: 0, dy: 0 };
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    arrastre.current = { id, x: e.clientX, dx: 0 };
   };
   const alMover = (e: React.PointerEvent<HTMLDivElement>) => {
     const a = arrastre.current;
     if (!a) return;
     a.dx = e.clientX - a.x;
-    a.dy = Math.max(0, e.clientY - a.y);
-    setDesplazado({ id: a.id, dx: a.dx, dy: a.dy });
+    setDesplazado({ id: a.id, dx: a.dx });
   };
   const alSoltar = () => {
     const a = arrastre.current;
     arrastre.current = null;
     setDesplazado(null);
-    if (a && (Math.abs(a.dx) > DESLIZAR || a.dy > DESLIZAR)) cerrar(a.id);
+    if (a && Math.abs(a.dx) > DESLIZAR) cerrar(a.id);
+  };
+  const alCancelar = () => {
+    arrastre.current = null;
+    setDesplazado(null);
   };
 
   const visibles = toasts.filter(t => !t.saliendo);
@@ -225,9 +263,31 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     subidas.set(t.id, subida);
     subida += (alturas.current.get(t.id) ?? 0) + 8;
   }
+  const altoPlegado = visibles.length
+    ? (alturas.current.get(visibles[visibles.length - 1].id) ?? 0) + Math.min(visibles.length - 1, A_LA_VISTA) * 14
+    : 0;
   const altoDeLaPila = desplegada
     ? Math.max(0, subida - 8)
     : (visibles.length ? (alturas.current.get(visibles[visibles.length - 1].id) ?? 0) : 0);
+
+  // Los avisos van encima de todo, y abajo es donde las capas (vender, el
+  // checkout, ingresar…) tienen sus botones: un error que se queda tapaba
+  // «Publicar producto». Mientras haya avisos, las capas les dejan ese lugar
+  // (la regla está en Toast.module.css).
+  useLayoutEffect(() => {
+    const raiz = document.documentElement;
+    if (altoPlegado > 0) {
+      raiz.style.setProperty('--tg-avisos-alto', `${altoPlegado}px`);
+      raiz.setAttribute('data-avisos', '');
+    } else {
+      raiz.style.removeProperty('--tg-avisos-alto');
+      raiz.removeAttribute('data-avisos');
+    }
+  }, [altoPlegado]);
+  useEffect(() => () => {
+    document.documentElement.style.removeProperty('--tg-avisos-alto');
+    document.documentElement.removeAttribute('data-avisos');
+  }, []);
 
   return (
     <ToastContext.Provider value={valor}>
@@ -239,9 +299,13 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
         ref={contenedor}
         className={styles.toastContainer}
         data-desplegada={desplegada || undefined}
-        onMouseEnter={() => setConMouse(true)}
-        onMouseLeave={() => setConMouse(false)}
-        onFocus={() => setConFoco(true)}
+        onPointerEnter={(e) => { if (e.pointerType !== 'touch') setConMouse(true); }}
+        onPointerLeave={() => setConMouse(false)}
+        onFocus={(e) => {
+          const desde = e.relatedTarget as HTMLElement | null;
+          if (!conFoco) focoPrevio.current = desde && !e.currentTarget.contains(desde) ? desde : null;
+          setConFoco(true);
+        }}
         onBlur={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setConFoco(false);
         }}
@@ -251,7 +315,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
             const atras = toast.saliendo ? 0 : posicion(toast.id);
             const arrastrado = desplazado?.id === toast.id ? desplazado : null;
             const transform = arrastrado
-              ? `translate(${arrastrado.dx}px, ${arrastrado.dy}px)`
+              ? `translateX(${arrastrado.dx}px)`
               : desplegada
                 ? `translateY(-${subidas.get(toast.id) ?? 0}px)`
                 : `translateY(-${Math.min(atras, A_LA_VISTA) * 14}px) scale(${1 - Math.min(atras, A_LA_VISTA) * 0.06})`;
@@ -263,6 +327,9 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
                   else nodos.current.delete(toast.id);
                 }}
                 className={styles.lugar}
+                // El que se está yendo ya no se lee ni se alcanza con Tab: si
+                // no, el foco podía caer en él en vez de en el que llegó.
+                aria-hidden={toast.saliendo || undefined}
                 data-atras={(!desplegada && atras > 0) || atras >= DESPLEGADOS ? Math.min(atras, A_LA_VISTA) : undefined}
                 style={{ transform, zIndex: 100 - atras }}
               >
@@ -275,7 +342,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
                   onPointerDown={alApoyar(toast.id)}
                   onPointerMove={alMover}
                   onPointerUp={alSoltar}
-                  onPointerCancel={alSoltar}
+                  onPointerCancel={alCancelar}
                 >
                   <span className={styles.icono} aria-hidden="true">
                     {toast.type === 'success' ? (
@@ -293,7 +360,12 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
                     <button
                       type="button"
                       className={styles.accion}
-                      onClick={() => {
+                      tabIndex={toast.saliendo ? -1 : undefined}
+                      onClick={(e) => {
+                        // Con el teclado, el foco vuelve a donde estaba antes
+                        // de abrir lo que abre la acción: así, al cerrarlo,
+                        // vuelve ahí y no a un botón que ya no está.
+                        if (e.detail === 0) devolverFoco(toast.origen);
                         toast.accion?.alHacer();
                         cerrar(toast.id);
                       }}
@@ -304,6 +376,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
                   <button
                     type="button"
                     className={styles.closeBtn}
+                    tabIndex={toast.saliendo ? -1 : undefined}
                     aria-label="Cerrar aviso"
                     data-cerrar=""
                     // Un clic hecho con el teclado (Enter o espacio) llega con detail 0.
