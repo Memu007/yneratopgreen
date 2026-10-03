@@ -1,0 +1,27 @@
+import {chromium,login,ctx,FE,API,avisos} from './lib.mjs';
+const sv=await login('vendedor@ejemplo.com','vendedor123');
+const b=await chromium.launch();
+const c=await ctx(b,sv,{viewport:{width:390,height:844}}); const p=await c.newPage();
+await p.goto(`${FE}/`); await p.waitForTimeout(1500);
+await p.getByRole('button',{name:/^Vender/}).first().click(); await p.waitForTimeout(1000);
+const d=p.getByRole('dialog');
+await d.getByPlaceholder(/Semillas de Maíz/).fill('QA aviso publicar');
+const sels=d.locator('select');
+console.log('selects',await sels.count());
+await sels.nth(0).selectOption({index:1}); await p.waitForTimeout(800);
+if(await sels.nth(1).isEnabled()) await sels.nth(1).selectOption({index:1});
+await d.locator('textarea').first().fill('Descripción de prueba suficiente para pasar la validación del formulario.');
+for(const [i,v] of [['price','100'],['stock','5']]){const e=d.locator(`input[name="${i}"]`); if(await e.count()) await e.fill(v);}
+await d.locator('#condition').selectOption({index:1}).catch(()=>{});
+await d.locator('#province').selectOption({index:1}); await p.waitForTimeout(1200);
+await d.locator('#locality').selectOption({index:1});
+console.log(await d.locator('input,select,textarea').evaluateAll(es=>es.map(e=>`${e.tagName}:${e.name||e.id}:${e.required?'req':''}:${(e.value||'').slice(0,12)}`)));
+let posts=0; await p.route('**/api/products',r=>{if(r.request().method()==='POST'){posts++;return r.abort('failed');} return r.continue();});
+await d.getByRole('button',{name:'Publicar producto'}).scrollIntoViewIfNeeded();
+await d.getByRole('button',{name:'Publicar producto'}).click(); await p.waitForTimeout(1200); console.log('post routed?');
+console.log(JSON.stringify(await avisos(p)));
+await p.screenshot({path:'t12.png'});
+const pub=d.getByRole('button',{name:'Publicar producto'}); const bb=await pub.boundingBox(); console.log('button box',JSON.stringify(bb));
+console.log('elementFromPoint at button center:',await p.evaluate(([x,y])=>{const e=document.elementFromPoint(x,y);return e.tagName+'.'+e.className+' inToast='+!!e.closest('[class*="_toastContainer_"]')},[bb.x+bb.width/2,bb.y+bb.height/2]));
+await p.mouse.click(bb.x+bb.width/2,bb.y+bb.height/2); await p.waitForTimeout(1500); console.log('PM: POST antes del toque',1,'| después de tocar el centro del botón',posts);
+await b.close();

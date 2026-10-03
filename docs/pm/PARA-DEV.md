@@ -5,6 +5,77 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
+## Decisión sobre AVISOS-1 y su agregado — devolución chica
+
+Sobre `5b1032d` (producto en `259f232`). Evidencia en
+`REPRODUCCION-AVISOS-1-2026-10-03.md`.
+
+**Lo tuyo se sostiene:**
+
+- 204, 239 y 241: 3/3. Tus 7 sabotajes dan rojo.
+- Mi suite desde base nueva: **240/241**. Cae sólo el 169, de mi entorno, y el
+  131 pasa.
+- a11y, contraste, móvil, las dos guías, build, tsc, lint y diff-check: verdes.
+- Las capturas son la opción A.
+- El agregado (204, paso 28, «Editar», 3, 4, 8, 9 y D6) queda aceptado.
+- Se aceptan tus ocho supuestos.
+- Encontrar que el 204 era un dato y no la carrera, y decir que no sabés qué
+  saca a Pauny: bien.
+
+**Lo que vuelve.** Mi subagente (Sonnet 5.5) dio 6 hallazgos; reproduje 4.
+Yo encontré uno más.
+
+1. **Rompe. Un error que se queda tapa el botón de un modal.** En «Vender», a
+   390, si falla la publicación, el error queda encima de «Publicar
+   producto»: tocar el centro del botón **no manda el pedido** (1 POST antes,
+   1 después; `archivo/avisos-1/subagente/pm-t12.mjs`). El contenedor tiene
+   `z-index: 10000` desde antes, pero ahora está abajo, donde los modales
+   tienen sus botones (`AddProductModal`, `AuthModal`, `CartModal`: 1000;
+   `CheckoutModal`: 2000). El mecanismo lo elegís vos. **Aceptación:** con un
+   error presente, el centro del botón principal es el botón y tocarlo
+   reintenta, en «Vender» y en el checkout, en 1440, 390 y 320. Con su
+   sabotaje en rojo.
+2. **Riesgo. El dedo deja el aviso quieto (tu D1).** Va tu recomendación: en
+   pantallas táctiles no se pausa por tener el dedo encima.
+   **Aceptación:** tocar el texto de un aviso bueno con el dedo y que se vaya
+   antes de los 5,5 s. Con su rojo.
+3. **Riesgo. Deslizar hacia abajo no se puede.** Quieto, el aviso queda a 48 px
+   del borde y cierra con más de 60 (mi B1, `negativos-pm-2.mjs`). Además,
+   con `touch-action: none` un deslizamiento vertical que empieza sobre el
+   aviso no mueve la página (scrollY 684 → 684). Te sugiero cerrar sólo de
+   costado y dejar que lo vertical desplace la página (`pan-y`); si preferís
+   otra cosa, decime por qué. **Aceptación, en un caso con pantalla táctil
+   emulada:** deslizar 100 px de costado cierra, 40 px no, y deslizar en
+   vertical sobre el aviso desplaza la página.
+4. **Riesgo. Teclado.** Al cerrar con Enter el último aviso, el foco cae en
+   `BODY` y el Tab siguiente va al logo (`pm-t8.mjs`). Además, desde
+   «Agregar» hay 11 Tab hasta «Ver carrito», y el aviso se va a los 4 s
+   porque no se pausa hasta que el foco entra.
+   **Aceptación:**
+   - el foco vuelve a donde estaba antes de entrar a los avisos;
+   - quien usa teclado llega a «Ver carrito» antes de que se vaya. El
+     mecanismo lo elegís vos.
+   Con su rojo.
+
+**No entran:** el nombre de 100 caracteres sin espacios a 320 px y la pila
+de cinco en celular apaisado. Los anoté.
+
+**Aparte, en otro commit, fuera de producto: subagentes con esfuerzo.** Emi
+decidió (03/10, opción 1) que en piezas de riesgo mandes uno con Sonnet 5.5 y
+otro con Opus 5.5. En las demás elegís el modelo. El esfuerzo lo elegís
+siempre, con Opus nunca por encima de alto (`ONBOARDING-DEV.md`). Para poder
+elegirlo, dejá definiciones en `.claude/agents/`. Por ejemplo, Sonnet medio,
+Sonnet alto, Opus medio y Opus alto. Cada una con la consigna adversarial de
+`ONBOARDING-DEV.md` y sin escribir en el repositorio. Antes, verificá en la
+documentación de Claude Code cómo se fija el esfuerzo en esas definiciones.
+Si no se puede, decímelo y no lo inventes.
+
+**Orden:** primero esta devolución, después `COBRO-ESTADOS-1`. Es una pieza
+visual chica: mandá un subagente si creés que suma. No hace falta suite
+completa. Corré los focales: 241, el caso nuevo de táctil y teclado, el
+sabotaje de cada punto, a11y y contraste del aviso, y la guía del panel en el
+paso 24. No integres ni despliegues: publicar lo autoriza Emi.
+
 ## Decisión sobre INICIO-CIERRE-CELULAR-1 y el agregado de MARCAS-PANEL-1 — aceptadas en rama
 
 Sobre `6a96b0d` (producto en `666bbf1` y `1eb819d`). Evidencia en
@@ -180,7 +251,7 @@ Entregala por separado.
 
 ---
 
-## Tarea activa — AVISOS-1
+## AVISOS-1 — en devolución (arriba)
 
 **Rama y base:** `claude/dev-role-repo-3l0kp3`, desde el último commit PM.
 
@@ -260,7 +331,7 @@ después.
 
 ---
 
-## Después — COBRO-ESTADOS-1 (apenas entregues AVISOS-1)
+## Después — COBRO-ESTADOS-1 (apenas entregues la devolución de AVISOS-1)
 
 **Decisión de Emi (03/10), opción 1.** El 03/10 PM mandó subagentes sobre lo
 publicado y reprodujo seis huecos en el cobro con Mercado Pago. Hoy el cobro
