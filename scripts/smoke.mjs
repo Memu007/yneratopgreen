@@ -40626,6 +40626,10 @@ await runCase(241, 'Los avisos van abajo al centro, lo bueno se va a los 4 s y e
         mayusculas: [...n.querySelectorAll('*')].some((e) => getComputedStyle(e).textTransform === 'uppercase'),
       };
     }));
+  // Los avisos se mueven con animaciones y transiciones: se mide cuando
+  // terminaron, no después de un tiempo fijo.
+  const quietos = (page) => page.waitForFunction(() => document.getAnimations()
+    .every((a) => a.playState !== 'running'), null, { timeout: 5_000 });
   const seEncima = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
   const encimados = (lista) => {
     const leidos = lista.filter((a) => a.seLee);
@@ -40669,7 +40673,7 @@ await runCase(241, 'Los avisos van abajo al centro, lo bueno se va a los 4 s y e
       await esperarA(async () => (await avisos(page)).some((a) => /pausado/.test(a.texto)),
         'pausar no dejó un aviso', 10_000);
       const desde = Date.now();
-      await page.waitForTimeout(400);
+      await quietos(page);
       await capturar(page, `exito-${medida.width}`);
       const [bueno] = (await avisos(page)).filter((a) => /pausado/.test(a.texto));
       const centro = (bueno.caja.left + bueno.caja.right) / 2;
@@ -40736,7 +40740,7 @@ await runCase(241, 'Los avisos van abajo al centro, lo bueno se va a los 4 s y e
       for (let i = 0; i < 3; i += 1) await alternar();
       await esperarA(async () => (await avisos(page)).length === 3, 'no quedaron tres avisos', 10_000)
         .catch(async () => problemas.push(`${donde}: tres errores seguidos dejan ${(await avisos(page)).length} avisos`));
-      await page.waitForTimeout(500);
+      await quietos(page);
       const plegada = await avisos(page);
       await capturar(page, `pila-${medida.width}`);
       const adelante = plegada[plegada.length - 1];
@@ -40754,7 +40758,8 @@ await runCase(241, 'Los avisos van abajo al centro, lo bueno se va a los 4 s y e
           + `${JSON.stringify(plegada.map((a) => Math.round(a.caja.top)))}`);
       }
       await page.locator('[class*="_toastContainer_"] [role="alert"]').last().hover();
-      await page.waitForTimeout(500);
+      await page.locator('[class*="_toastContainer_"][data-desplegada]').waitFor({ timeout: 5_000 });
+      await quietos(page);
       const desplegada = await avisos(page);
       await capturar(page, `pila-desplegada-${medida.width}`);
       const noSeLeen = desplegada.filter((a) => !a.seLee).length;
@@ -40780,6 +40785,18 @@ await runCase(241, 'Los avisos van abajo al centro, lo bueno se va a los 4 s y e
           }
         }
       }
+      // D2. Con el mouse, cerrar el error de adelante con un aviso bueno
+      //     detrás: la pila no se queda en pausa, y el bueno se va solo.
+      await page.unroute(`**/api/products/${id}`);
+      await alternar();
+      await page.route(`**/api/products/${id}`, (ruta) => (ruta.request().method() === 'PATCH'
+        ? ruta.abort('failed') : ruta.continue()));
+      await alternar();
+      await esperarA(async () => (await avisos(page)).some((a) => a.papel === 'alert'), 'el error de D2 no llegó', 10_000);
+      await page.locator('[class*="_toastContainer_"] [role="alert"]').getByRole('button', { name: 'Cerrar aviso' }).click();
+      await page.mouse.move(2, 2);
+      await esperarA(async () => (await avisos(page)).length === 0, 'con el bueno detrás, la pila quedó en pausa', 8_000)
+        .catch(() => problemas.push(`${donde}: al cerrar con el mouse el de adelante, el bueno de atrás no se fue solo`));
       await page.unroute(`**/api/products/${id}`);
       await contexto.close();
 

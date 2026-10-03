@@ -23,6 +23,10 @@ Y los demás:
                         seguir ahí.)
   foco-perdido          Al cerrar con el teclado, el foco no pasa al aviso
                         siguiente.
+  foco-al-cerrar-con-mouse
+                        Cerrar con el mouse el de adelante le pasa el foco al
+                        siguiente, y la pila queda desplegada y en pausa: el
+                        bueno de atrás no se va.
   sin-ver-carrito       Agregar desde la ficha no ofrece «Ver carrito».
 
 Son todos de pantalla: esperan a que el servidor de desarrollo sirva el
@@ -81,6 +85,12 @@ SABOTAJES = {
         [("      if (destino) destino.focus();\n", "      if (destino) void destino;\n")],
         [f"{a} al cerrar con el teclado, el foco quedó" for a in ANCHOS],
         ["no está abajo", "se enciman", "Ver carrito", "se fue a los"],
+    ),
+    "foco-al-cerrar-con-mouse": (
+        AVISOS,
+        [("      if (!conTeclado) {\n", "      if (false) {\n")],
+        [f"{a} al cerrar con el mouse el de adelante, el bueno de atrás no se fue solo" for a in ANCHOS],
+        ["no está abajo", "se enciman", "Ver carrito", "se fue a los", "el foco quedó"],
     ),
     "sin-ver-carrito": (
         FICHA,
