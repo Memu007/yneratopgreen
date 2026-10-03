@@ -215,14 +215,6 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const alturas = useRef(new Map<number, number>());
   const [, medir] = useState(0);
   const nodos = useRef(new Map<number, HTMLLIElement>());
-  // Al cambiar el ancho (girar el celular) el texto se reacomoda y la altura
-  // cambia: se vuelve a medir.
-  const [ancho, setAncho] = useState(0);
-  useEffect(() => {
-    const alCambiar = () => setAncho(window.innerWidth);
-    window.addEventListener('resize', alCambiar);
-    return () => window.removeEventListener('resize', alCambiar);
-  }, []);
   useLayoutEffect(() => {
     let cambio = false;
     for (const id of alturas.current.keys()) {
@@ -237,7 +229,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       }
     }
     if (cambio) medir((n) => n + 1);
-  }, [toasts, ancho]);
+  }, [toasts]);
 
   // Al cerrarse con el teclado el que tenía el foco, el foco pasa al siguiente
   // aviso y no se pierde en la página. Con el mouse o el dedo no: dejarle el
