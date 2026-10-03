@@ -268,7 +268,7 @@ async function comprador(page, medida) {
   await page.getByRole('heading', { name: 'Fertilizante Triple 15 - NPK', exact: true, level: 3 })
     .getByRole('link').click();
   await page.locator('main[aria-busy="false"]:has(#detalle-titulo)').waitFor({ state: 'visible', timeout: ESPERA });
-  await page.getByRole('button', { name: 'Agregar al carrito' }).click();
+  await page.locator('main').getByRole('button', { name: 'Agregar', exact: true }).click();
   const aviso = page.locator('[class*="_toastContainer_"] [role="status"]')
     .filter({ has: page.getByRole('button', { name: 'Ver carrito' }) });
   await aviso.waitFor({ state: 'visible', timeout: ESPERA });

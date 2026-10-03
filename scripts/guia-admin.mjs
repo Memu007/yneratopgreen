@@ -244,6 +244,22 @@ async function presentarDocumentacion(token, cuit, razonSocial) {
 
 // --- El navegador ------------------------------------------------------------
 
+// Los avisos van abajo al centro (AVISOS-1) y se pausan con el mouse encima.
+// En el celular pueden tapar un botón del pie de la pantalla: una persona lo
+// cierra con su «×» o lo desliza. El recorrido hace lo mismo, y lo anota.
+async function sinAvisoEncima(page, control) {
+  await control.scrollIntoViewIfNeeded();
+  const tapado = await control.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const arriba = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !!arriba?.closest('[class*="_toastContainer_"]');
+  });
+  if (!tapado) return;
+  console.log('     (un aviso tapaba el control: se cierra con «Cerrar aviso»)');
+  const cerrar = page.locator('[class*="_toastContainer_"]').getByRole('button', { name: 'Cerrar aviso' });
+  while (await cerrar.count()) await cerrar.last().click();
+}
+
 const esperarTexto = (page, texto, timeout = 15_000) =>
   page.getByText(texto, { exact: false }).first().waitFor({ state: 'visible', timeout });
 
@@ -1341,6 +1357,7 @@ const RECORRIDOS = {
     });
     await panel.getByLabel('Estado de la opcion').selectOption('inactive');
     await v.mirar(page);
+    await sinAvisoEncima(page, panel.getByRole('button', { name: `Guardar la opción ${c.opcion.etiqueta}` }));
     await panel.getByRole('button', { name: `Guardar la opción ${c.opcion.etiqueta}` }).click();
     await esperarTexto(page, 'Opción actualizada');
     await v.mirar(page);
