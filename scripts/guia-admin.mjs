@@ -256,8 +256,13 @@ async function sinAvisoEncima(page, control) {
   });
   if (!tapado) return;
   console.log('     (un aviso tapaba el control: se cierra con «Cerrar aviso»)');
-  const cerrar = page.locator('[class*="_toastContainer_"]').getByRole('button', { name: 'Cerrar aviso' });
-  while (await cerrar.count()) await cerrar.last().click();
+  const avisos = page.locator('[class*="_toastContainer_"] [role]');
+  for (let quedan = await avisos.count(); quedan > 0; quedan -= 1) {
+    await avisos.last().getByRole('button', { name: 'Cerrar aviso' }).click();
+    // Cada uno se apaga antes de irse: se espera a que se vaya del todo.
+    await page.waitForFunction((n) => document.querySelectorAll('[class*="_toastContainer_"] [role]').length < n,
+      quedan, { timeout: 5_000 });
+  }
 }
 
 const esperarTexto = (page, texto, timeout = 15_000) =>

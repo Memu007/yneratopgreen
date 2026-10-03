@@ -275,6 +275,8 @@ async function comprador(page, medida) {
   await aviso.hover();
   await revisar(page, 'aviso con acción', medida, aviso);
   await aviso.getByRole('button', { name: 'Ver carrito' }).click();
+  // El aviso se apaga al irse: se mide el carrito cuando ya no está.
+  await aviso.waitFor({ state: 'detached', timeout: ESPERA });
   await revisar(page, 'carrito', medida,
     page.getByRole('heading', { name: /Mi carrito/i }));
 

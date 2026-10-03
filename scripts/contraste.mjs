@@ -497,6 +497,8 @@ for (const medida of MEDIDAS) {
     await aviso.hover();
     await revisar(page, `${medida.n} aviso con acción`, aviso);
     await aviso.getByRole('button', { name: 'Ver carrito' }).click();
+    // El aviso se apaga al irse: se mide el carrito cuando ya no está.
+    await aviso.waitFor({ state: 'detached', timeout: ESPERA });
     await revisar(page, `${medida.n} carrito`, page.getByRole('heading', { name: /Mi carrito/i }));
 
     await page.getByRole('button', { name: 'Continuar compra' }).click();
