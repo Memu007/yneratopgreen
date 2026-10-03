@@ -125,7 +125,9 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       id, message, type, detalle: opciones.detalle, accion: opciones.accion, origen, saliendo: false,
     }]);
     if (type === 'error') return;
-    if (opciones.accion && conTeclado.current) {
+    // Si el foco ya está en una capa, el teclado no llega: cuenta como todos.
+    const enCapa = document.activeElement?.closest('[aria-modal="true"]');
+    if (opciones.accion && conTeclado.current && !enCapa) {
       esperando.current.add(id);
       return;
     }
@@ -133,19 +135,29 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     if (!enPausa.current) correr(id);
   }, [correr]);
 
-  // Si el foco entra a una capa, desde ahí el teclado no llega a los avisos
-  // (la capa lo encierra): los que esperaban empiezan a contar como los demás.
+  // Los que esperaban al teclado empiezan a contar como los demás si el foco
+  // entra a una capa (la capa lo encierra y el teclado ya no llega) o si la
+  // persona pasa al mouse o al dedo fuera de los avisos.
   useEffect(() => {
-    const alEnfocar = (e: FocusEvent) => {
-      if (!(e.target instanceof Element) || !e.target.closest('[aria-modal="true"]')) return;
+    const arrancar = () => {
       for (const id of esperando.current) {
         temporizadores.current.set(id, { restante: DURACION, desde: Date.now() });
         if (!enPausa.current) correr(id);
       }
       esperando.current.clear();
     };
+    const alEnfocar = (e: FocusEvent) => {
+      if (e.target instanceof Element && e.target.closest('[aria-modal="true"]')) arrancar();
+    };
+    const alApoyar = (e: PointerEvent) => {
+      if (!(e.target instanceof Node) || !contenedor.current?.contains(e.target)) arrancar();
+    };
     document.addEventListener('focusin', alEnfocar);
-    return () => document.removeEventListener('focusin', alEnfocar);
+    document.addEventListener('pointerdown', alApoyar);
+    return () => {
+      document.removeEventListener('focusin', alEnfocar);
+      document.removeEventListener('pointerdown', alApoyar);
+    };
   }, [correr]);
 
   useEffect(() => () => {
@@ -261,6 +273,9 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const alApoyar = (id: number) => (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' || (e.target as HTMLElement).closest('button')) return;
     arrastre.current = { id, x: e.clientX, dx: 0 };
+    // El dedo ya la tiene; el lápiz no, y sin esto soltarlo fuera del aviso
+    // lo dejaba corrido.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
   };
   const alMover = (e: React.PointerEvent<HTMLDivElement>) => {
     const a = arrastre.current;
@@ -289,8 +304,12 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     subidas.set(t.id, subida);
     subida += (alturas.current.get(t.id) ?? 0) + 8;
   }
-  const altoPlegado = visibles.length
-    ? (alturas.current.get(visibles[visibles.length - 1].id) ?? 0) + Math.min(visibles.length - 1, A_LA_VISTA) * 14
+  // El que se está yendo sigue ocupando su lugar hasta que se va del todo:
+  // si no, la capa bajaba mientras el aviso todavía pasaba por encima.
+  const paraLaReserva = visibles.length ? visibles : toasts;
+  const altoPlegado = paraLaReserva.length
+    ? (alturas.current.get(paraLaReserva[paraLaReserva.length - 1].id) ?? 0)
+      + Math.min(paraLaReserva.length - 1, A_LA_VISTA) * 14
     : 0;
   const altoDeLaPila = desplegada
     ? Math.max(0, subida - 8)

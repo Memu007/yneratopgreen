@@ -20,8 +20,8 @@
 }
 
 :global(html[data-avisos] [aria-modal="true"]) {
-  max-height: min(90vh, calc(100vh - var(--tg-avisos-reserva) - 40px)) !important;
-  max-height: min(90dvh, calc(100dvh - var(--tg-avisos-reserva) - 40px)) !important;
+  max-height: calc(100vh - var(--tg-avisos-reserva) - 40px) !important;
+  max-height: calc(100dvh - var(--tg-avisos-reserva) - 40px) !important;
   margin-bottom: var(--tg-avisos-reserva);
 }
 
@@ -83,6 +83,7 @@
 
 .toast.saliendo {
   animation: salir 200ms ease-in forwards;
+  pointer-events: none;
 }
 
 @keyframes salir {
