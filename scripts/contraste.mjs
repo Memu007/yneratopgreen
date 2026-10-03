@@ -484,8 +484,19 @@ for (const medida of MEDIDAS) {
     await buscador.press('Enter');
     await page.getByRole('heading', { name: 'Fertilizante Triple 15 - NPK', exact: true, level: 3 })
       .waitFor({ state: 'visible', timeout: ESPERA });
-    await page.getByRole('button', { name: /Agregar/ }).first().click();
-    await page.getByRole('button', { name: /Carrito/ }).click();
+    // Desde su ficha, para medir el aviso de AVISOS-1 con su acción y su
+    // segunda línea: el texto blanco, el tenue y «Ver carrito» sobre el verde.
+    // El carrito queda igual que antes: esta publicación, una unidad.
+    await page.getByRole('heading', { name: 'Fertilizante Triple 15 - NPK', exact: true, level: 3 })
+      .getByRole('link').click();
+    await page.locator('main[aria-busy="false"]:has(#detalle-titulo)').waitFor({ state: 'visible', timeout: ESPERA });
+    await page.getByRole('button', { name: 'Agregar al carrito' }).click();
+    const aviso = page.locator('[class*="_toastContainer_"] [role="status"]')
+      .filter({ has: page.getByRole('button', { name: 'Ver carrito' }) });
+    await aviso.waitFor({ state: 'visible', timeout: ESPERA });
+    await aviso.hover();
+    await revisar(page, `${medida.n} aviso con acción`, aviso);
+    await aviso.getByRole('button', { name: 'Ver carrito' }).click();
     await revisar(page, `${medida.n} carrito`, page.getByRole('heading', { name: /Mi carrito/i }));
 
     await page.getByRole('button', { name: 'Continuar compra' }).click();

@@ -40580,6 +40580,239 @@ await runCase(240, 'En celular «¿Te interesa alguno?» cierra Inicio y el cré
   }
 });
 
+// 241. Los avisos (AVISOS-1): la píldora verde de la marca, abajo al centro.
+//
+// Se disparan desde un recorrido real —pausar y activar una publicación
+// propia en «Mis publicaciones»—, y el error, cortando ese mismo pedido. Lo de
+// «Ver carrito» sale de la ficha, al agregar.
+await runCase(241, 'Los avisos van abajo al centro, lo bueno se va a los 4 s y el error se queda, se apilan sin encimarse y se cierran con el botón y con el teclado', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  const NOMBRE = `Aviso 241 ${sello}`;
+  const vende = await sesionDe('vendedor@ejemplo.com', 'vendedor123');
+  const compra = await sesionDe('cliente@ejemplo.com', 'cliente123');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const alta = await apiRequest('/products', {
+    method: 'POST', token: vende.token,
+    body: {
+      name: NOMBRE, description: 'Publicación del caso 241.',
+      category_id: tractores.categoriaId, subcategory_id: tractores.id,
+      price: 2410, stock: 5, unit: 'unidad', locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+      publication_type: 'producto', operation_kind: 'activo', condition: 'usado',
+    },
+  });
+  assert(alta.data?.id, `no se pudo publicar la publicación del caso: HTTP ${alta.status}`);
+  const id = alta.data.id;
+  const CAPTURAS = process.env.SMOKE_CAPTURAS || mkdtempSync(`${tmpdir()}/topgreen-avisos-`);
+  mkdirSync(CAPTURAS, { recursive: true });
+  const capturar = (page, nombre) => page.screenshot({ path: `${CAPTURAS}/avisos-${nombre}.png` });
+
+  // Los avisos que hay en pantalla, sin los que se están yendo: su papel, su
+  // texto, dónde están y si el texto se ve.
+  const avisos = (page) => page.evaluate(() => [...document.querySelectorAll('[class*="_toastContainer_"] [role]')]
+    .filter((n) => !/_saliendo_/.test(n.className))
+    .map((n) => {
+      const caja = n.getBoundingClientRect();
+      const mensaje = n.querySelector('[class*="_message_"]');
+      const m = mensaje.getBoundingClientRect();
+      const lugar = n.closest('li');
+      return {
+        papel: n.getAttribute('role'),
+        texto: (n.textContent || '').replace(/\s+/g, ' ').trim(),
+        caja: { top: caja.top, bottom: caja.bottom, left: caja.left, right: caja.right },
+        msg: { top: m.top, bottom: m.bottom, left: m.left, right: m.right },
+        seLee: getComputedStyle(mensaje).visibility === 'visible' && Number(getComputedStyle(lugar).opacity) > 0.5,
+        mayusculas: [...n.querySelectorAll('*')].some((e) => getComputedStyle(e).textTransform === 'uppercase'),
+      };
+    }));
+  const seEncima = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const encimados = (lista) => {
+    const leidos = lista.filter((a) => a.seLee);
+    const pares = [];
+    for (let i = 0; i < leidos.length; i += 1) {
+      for (let j = i + 1; j < leidos.length; j += 1) {
+        if (seEncima(leidos[i].msg, leidos[j].msg)) pares.push(`«${leidos[i].texto}» y «${leidos[j].texto}»`);
+      }
+    }
+    return pares;
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const medida of [{ n: 'escritorio', width: 1440, height: 900 }, { n: 'celular', width: 390, height: 844 }]) {
+      const donde = `${medida.n} ${medida.width}px`;
+      querySql(`UPDATE products SET status = 'ACTIVE' WHERE id = ${sqlLiteral(id)}`);
+      const contexto = await browser.newContext({ viewport: { width: medida.width, height: medida.height } });
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: vende.token, r: vende.refresco });
+      const page = await contexto.newPage();
+      await page.goto(`${FRONTEND_URL}/?section=account`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /publicaciones/i }).first().click();
+      const tarjeta = page.locator('[class*="_productCard_"]').filter({ hasText: NOMBRE }).first();
+      await tarjeta.waitFor({ state: 'visible', timeout: 20_000 });
+      const alternar = async () => {
+        await tarjeta.locator('[class*="_toggleBtn_"]').click();
+        const confirmacion = page.locator('[class*="_confirmModal_"]');
+        await confirmacion.waitFor({ state: 'visible', timeout: 10_000 });
+        await confirmacion.locator('[class*="_confirmButton_"]').click();
+        await confirmacion.waitFor({ state: 'hidden', timeout: 10_000 });
+        // El mouse, lejos de los avisos: encima los pausa.
+        await page.mouse.move(2, 2);
+      };
+      const cabecera = await page.locator('header').first().evaluate((h) => h.getBoundingClientRect().bottom);
+
+      // --- A. Lo que salió bien: abajo al centro, y se va a los 4 s --------
+      await alternar();
+      await esperarA(async () => (await avisos(page)).some((a) => /pausado/.test(a.texto)),
+        'pausar no dejó un aviso', 10_000);
+      const desde = Date.now();
+      await page.waitForTimeout(400);
+      await capturar(page, `exito-${medida.width}`);
+      const [bueno] = (await avisos(page)).filter((a) => /pausado/.test(a.texto));
+      const centro = (bueno.caja.left + bueno.caja.right) / 2;
+      if (bueno.papel !== 'status') problemas.push(`${donde}: lo que salió bien se anuncia como «${bueno.papel}»`);
+      if (bueno.caja.top < cabecera) problemas.push(`${donde}: el aviso empieza en ${Math.round(bueno.caja.top)} y la cabecera termina en ${Math.round(cabecera)}`);
+      if (bueno.caja.bottom > medida.height || medida.height - bueno.caja.bottom > 48) {
+        problemas.push(`${donde}: el aviso no está abajo: termina en ${Math.round(bueno.caja.bottom)} de ${medida.height}`);
+      }
+      if (Math.abs(centro - medida.width / 2) > 2) problemas.push(`${donde}: el aviso no está al centro: su centro está en ${Math.round(centro)} de ${medida.width}`);
+      if (bueno.mayusculas || /\b(ÉXITO|ERROR|LISTO)\b/.test(bueno.texto)) problemas.push(`${donde}: el aviso lleva un rótulo en mayúsculas: «${bueno.texto}»`);
+      await page.waitForTimeout(Math.max(0, 3_000 - (Date.now() - desde)));
+      if (!(await avisos(page)).some((a) => /pausado/.test(a.texto))) problemas.push(`${donde}: lo que salió bien se fue antes de los 3 s`);
+      let seFue = null;
+      await esperarA(async () => {
+        if (!(await avisos(page)).some((a) => /pausado/.test(a.texto))) seFue = Date.now() - desde;
+        return seFue !== null;
+      }, 'lo que salió bien no se fue', 8_000).catch(() => problemas.push(`${donde}: lo que salió bien sigue a los 8 s`));
+      if (seFue !== null && (seFue < 3_500 || seFue > 5_500)) problemas.push(`${donde}: lo que salió bien se fue a los ${seFue} ms`);
+
+      // A2. Con el mouse encima se pausa, y al salir sigue contando.
+      await alternar();
+      const activado = page.locator('[class*="_toastContainer_"] [role="status"]').filter({ hasText: /activado/ });
+      await activado.waitFor({ state: 'visible', timeout: 10_000 });
+      await activado.hover();
+      const pausadoDesde = Date.now();
+      await page.waitForTimeout(5_500);
+      if (!(await avisos(page)).some((a) => /activado/.test(a.texto))) {
+        problemas.push(`${donde}: con el mouse encima, lo que salió bien se fue antes de ${Date.now() - pausadoDesde} ms`);
+      }
+      await page.mouse.move(2, 2);
+      await esperarA(async () => !(await avisos(page)).some((a) => /activado/.test(a.texto)),
+        'al sacar el mouse, lo que salió bien no se fue', 8_000)
+        .catch(() => problemas.push(`${donde}: al sacar el mouse, lo que salió bien sigue a los 8 s`));
+
+      // --- B. El error se queda, y se cierra con el botón -------------------
+      await page.route(`**/api/products/${id}`, (ruta) => (ruta.request().method() === 'PATCH'
+        ? ruta.abort('failed') : ruta.continue()));
+      await alternar();
+      await esperarA(async () => (await avisos(page)).some((a) => a.papel === 'alert'), 'el error no dejó un aviso', 10_000);
+      const errorDesde = Date.now();
+      await page.waitForTimeout(6_000);
+      const elError = (await avisos(page)).filter((a) => a.papel === 'alert');
+      await capturar(page, `error-${medida.width}`);
+      if (elError.length !== 1) problemas.push(`${donde}: a los ${Date.now() - errorDesde} ms quedan ${elError.length} errores y tenía que quedar 1`);
+      else if (!/No se pudo|Error/.test(elError[0].texto)) problemas.push(`${donde}: el error dice «${elError[0].texto}»`);
+      if (elError.length) {
+        await page.locator('[class*="_toastContainer_"] [role="alert"]').getByRole('button', { name: 'Cerrar aviso' }).click();
+        await esperarA(async () => (await avisos(page)).length === 0, 'el botón no cerró el error', 5_000)
+          .catch(() => problemas.push(`${donde}: «Cerrar aviso» no cerró el error`));
+      }
+      // Cerrarlo con el mouse lo saca de debajo del puntero, y el navegador
+      // no avisa que el mouse salió: lo bueno que llega después se tiene que
+      // ir igual, y no quedar en pausa.
+      await page.unroute(`**/api/products/${id}`);
+      await alternar();
+      await esperarA(async () => (await avisos(page)).some((a) => /exitosamente/.test(a.texto)), 'después de cerrar, no hubo aviso', 10_000)
+        .catch(() => {});
+      await esperarA(async () => (await avisos(page)).length === 0, 'después de cerrar con el mouse, lo bueno no se fue', 8_000)
+        .catch(() => problemas.push(`${donde}: después de cerrar un aviso con el mouse, lo bueno que sigue no se va solo`));
+      await page.route(`**/api/products/${id}`, (ruta) => (ruta.request().method() === 'PATCH'
+        ? ruta.abort('failed') : ruta.continue()));
+
+      // --- C. Tres seguidos: apilados, sin encimar el texto -----------------
+      for (let i = 0; i < 3; i += 1) await alternar();
+      await esperarA(async () => (await avisos(page)).length === 3, 'no quedaron tres avisos', 10_000)
+        .catch(async () => problemas.push(`${donde}: tres errores seguidos dejan ${(await avisos(page)).length} avisos`));
+      await page.waitForTimeout(500);
+      const plegada = await avisos(page);
+      await capturar(page, `pila-${medida.width}`);
+      const adelante = plegada[plegada.length - 1];
+      if (!adelante?.seLee) problemas.push(`${donde}: plegada, el de adelante no se lee`);
+      const plegadaEncima = encimados(plegada);
+      if (plegadaEncima.length) problemas.push(`${donde}: plegada, se enciman ${plegadaEncima.join(', ')}`);
+      // Plegada de verdad: sólo se lee el de adelante, y los de atrás asoman
+      // apenas por arriba. Desplegada también cumpliría «sin encimar», así
+      // que esto es lo que distingue la pila de una columna.
+      const seLeen = plegada.filter((a) => a.seLee).length;
+      if (seLeen !== 1) problemas.push(`${donde}: plegada, se leen ${seLeen} de ${plegada.length} y tenía que leerse sólo el de adelante`);
+      if (plegada.length === 3 && !plegada.slice(0, 2).every((a) => a.caja.top < adelante.caja.top
+        && adelante.caja.top - a.caja.top < 40)) {
+        problemas.push(`${donde}: plegada, los de atrás no asoman apenas por arriba del de adelante: `
+          + `${JSON.stringify(plegada.map((a) => Math.round(a.caja.top)))}`);
+      }
+      await page.locator('[class*="_toastContainer_"] [role="alert"]').last().hover();
+      await page.waitForTimeout(500);
+      const desplegada = await avisos(page);
+      await capturar(page, `pila-desplegada-${medida.width}`);
+      const noSeLeen = desplegada.filter((a) => !a.seLee).length;
+      if (noSeLeen) problemas.push(`${donde}: con el mouse encima, ${noSeLeen} de ${desplegada.length} no se leen`);
+      const desplegadaEncima = encimados(desplegada);
+      if (desplegadaEncima.length) problemas.push(`${donde}: con el mouse encima, se enciman ${desplegadaEncima.join(', ')}`);
+      if (desplegada.some((a) => a.caja.top < cabecera)) problemas.push(`${donde}: desplegada, la pila sube hasta la cabecera`);
+      await page.mouse.move(2, 2);
+
+      // --- D. Con el teclado: Enter en «Cerrar aviso», y el foco pasa al
+      //        siguiente aviso en vez de perderse.
+      await page.locator('[class*="_toastContainer_"] [role="alert"]').last()
+        .getByRole('button', { name: 'Cerrar aviso' }).focus();
+      for (let quedan = 2; quedan >= 0; quedan -= 1) {
+        await page.keyboard.press('Enter');
+        await esperarA(async () => (await avisos(page)).length === quedan, `Enter no cerró el aviso (quedaban ${quedan + 1})`, 5_000)
+          .catch((e) => problemas.push(`${donde}: ${e.message.split('\n')[0]}`));
+        if (quedan > 0) {
+          const foco = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+          if (foco !== 'Cerrar aviso') {
+            problemas.push(`${donde}: al cerrar con el teclado, el foco quedó en «${foco}» y no en el aviso siguiente`);
+            break;
+          }
+        }
+      }
+      await page.unroute(`**/api/products/${id}`);
+      await contexto.close();
+
+      // --- E. «Ver carrito» al agregar desde la ficha -----------------------
+      querySql(`UPDATE products SET status = 'ACTIVE' WHERE id = ${sqlLiteral(id)}`);
+      const deCompra = await browser.newContext({ viewport: { width: medida.width, height: medida.height } });
+      await deCompra.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: compra.token, r: compra.refresco });
+      const ficha = await deCompra.newPage();
+      await ficha.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+      await ficha.getByRole('button', { name: 'Agregar al carrito' }).click({ timeout: 20_000 });
+      const verCarrito = ficha.locator('[class*="_toastContainer_"]').getByRole('button', { name: 'Ver carrito' });
+      await verCarrito.waitFor({ state: 'visible', timeout: 10_000 })
+        .then(async () => {
+          await verCarrito.click();
+          await ficha.getByRole('dialog', { name: 'Mi carrito' }).waitFor({ state: 'visible', timeout: 10_000 })
+            .catch(() => problemas.push(`${donde}: «Ver carrito» no abrió el carrito`));
+        })
+        .catch(() => problemas.push(`${donde}: agregar desde la ficha no ofrece «Ver carrito»`));
+      await deCompra.close();
+      medidos.push(`${donde}: abajo al centro y debajo de la cabecera; lo bueno se fue a los ${seFue} ms; el error sigue a los 6 s`);
+    }
+  } finally {
+    await browser.close();
+    querySql(`UPDATE products SET status = 'DELETED' WHERE id = ${sqlLiteral(id)}`);
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return `${medidos.join('; ')}; capturas en ${CAPTURAS}; tres seguidos se apilan sin encimar el texto, plegados y con el mouse encima; se cierran `
+    + 'con «Cerrar aviso» y con Enter, y el foco pasa al siguiente; «Ver carrito» abre el carrito';
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un

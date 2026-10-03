@@ -63,6 +63,10 @@ export const SUPERFICIES = [
   // paginador y declararlo revisado.
   { id: 'catálogo: paginador' },
   { id: 'detalle de producto' },
+  // El aviso de AVISOS-1, con su segunda línea y su acción: texto blanco,
+  // tenue y en cereal sobre el verde de la marca. Sale al agregar desde la
+  // ficha, y su marcador es el propio aviso con «Ver carrito».
+  { id: 'aviso con acción' },
   { id: 'carrito' },
   // La cabecera con la celda del carrito pero SIN sesión. No la alcanza
   // ninguna otra: sin sesión el catálogo no deja agregar nada —la tarjeta
