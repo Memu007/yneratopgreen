@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, ReactNode } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef, ReactNode } from 'react';
 import {
   ToastContext, type ToastType, type ConfirmOptions, type OpcionesDelAviso,
 } from '../../contexts/contextos';
@@ -23,6 +23,9 @@ const DURACION = 4000;
 const SALIDA = 200;
 // Cuántos se ven apilados; los de más atrás esperan su turno.
 const A_LA_VISTA = 3;
+// Cuántos se despliegan como máximo: más subirían por encima de la pantalla.
+// Los de más atrás aparecen a medida que se cierran los de adelante.
+const DESPLEGADOS = 5;
 // Lo que hay que deslizar con el dedo para cerrarlo.
 const DESLIZAR = 60;
 
@@ -160,7 +163,8 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       if (!nodos.current.has(id)) alturas.current.delete(id);
     }
     for (const [id, nodo] of nodos.current) {
-      const alto = nodo.firstElementChild?.getBoundingClientRect().height ?? 0;
+      // `offsetHeight` y no la caja dibujada: la de los de atrás está achicada.
+      const alto = (nodo.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0;
       if (alturas.current.get(id) !== alto) {
         alturas.current.set(id, alto);
         cambio = true;
@@ -169,11 +173,17 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     if (cambio) medir((n) => n + 1);
   }, [toasts]);
 
-  // Al cerrarse el que tenía el foco, el foco pasa al siguiente aviso y no se
-  // pierde en la página.
-  const cerrar = (id: number) => {
+  // Al cerrarse con el teclado el que tenía el foco, el foco pasa al siguiente
+  // aviso y no se pierde en la página. Con el mouse o el dedo no: dejarle el
+  // foco a otro aviso dejaba la pila desplegada y en pausa.
+  const cerrar = (id: number, conTeclado = false) => {
     const nodo = nodos.current.get(id);
     if (nodo?.contains(document.activeElement)) {
+      if (!conTeclado) {
+        (document.activeElement as HTMLElement | null)?.blur();
+        removeToast(id);
+        return;
+      }
       const quedan = toasts.filter(t => t.id !== id && !t.saliendo);
       const otro = quedan[quedan.length - 1];
       const destino = otro && nodos.current.get(otro.id)?.querySelector<HTMLButtonElement>('[data-cerrar]');
@@ -206,11 +216,12 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   };
 
   const visibles = toasts.filter(t => !t.saliendo);
+  const valor = useMemo(() => ({ showToast, showConfirm }), [showToast, showConfirm]);
   const posicion = (id: number) => visibles.length - 1 - visibles.findIndex(t => t.id === id);
 
   let subida = 0;
   const subidas = new Map<number, number>();
-  for (const t of [...visibles].reverse()) {
+  for (const t of [...visibles].reverse().slice(0, DESPLEGADOS)) {
     subidas.set(t.id, subida);
     subida += (alturas.current.get(t.id) ?? 0) + 8;
   }
@@ -219,7 +230,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     : (visibles.length ? (alturas.current.get(visibles[visibles.length - 1].id) ?? 0) : 0);
 
   return (
-    <ToastContext.Provider value={{ showToast, showConfirm }}>
+    <ToastContext.Provider value={valor}>
       {children}
 
       {/* Los avisos: abajo al centro, lejos de la cabecera. El más nuevo va
@@ -243,7 +254,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
               ? `translate(${arrastrado.dx}px, ${arrastrado.dy}px)`
               : desplegada
                 ? `translateY(-${subidas.get(toast.id) ?? 0}px)`
-                : `translateY(-${atras * 14}px) scale(${1 - atras * 0.06})`;
+                : `translateY(-${Math.min(atras, A_LA_VISTA) * 14}px) scale(${1 - Math.min(atras, A_LA_VISTA) * 0.06})`;
             return (
               <li
                 key={toast.id}
@@ -252,7 +263,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
                   else nodos.current.delete(toast.id);
                 }}
                 className={styles.lugar}
-                data-atras={!desplegada && atras > 0 ? Math.min(atras, A_LA_VISTA) : undefined}
+                data-atras={(!desplegada && atras > 0) || atras >= DESPLEGADOS ? Math.min(atras, A_LA_VISTA) : undefined}
                 style={{ transform, zIndex: 100 - atras }}
               >
                 <div
@@ -295,7 +306,8 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
                     className={styles.closeBtn}
                     aria-label="Cerrar aviso"
                     data-cerrar=""
-                    onClick={() => cerrar(toast.id)}
+                    // Un clic hecho con el teclado (Enter o espacio) llega con detail 0.
+                    onClick={(e) => cerrar(toast.id, e.detail === 0)}
                   >
                     <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
                       <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="2"

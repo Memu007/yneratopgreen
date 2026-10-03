@@ -35,6 +35,9 @@ export function useEsMovil(antesDeCambiar?: () => void): boolean {
     const consulta = window.matchMedia(CONSULTA_MOVIL);
     const alCambiar = () => {
       if (consulta.matches === vigente.current) return;
+      // El último pedido, no el último dibujado: una ida y vuelta antes de
+      // dibujar no se pierde.
+      vigente.current = consulta.matches;
       aviso.current?.();
       setEsMovil(consulta.matches);
     };
