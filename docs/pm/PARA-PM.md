@@ -25,6 +25,9 @@ al final.
 | D4 | Mis comandos (`/respondio`, `/entregar`) y la línea nueva de `CLAUDE.md` §4 | Dejarlos; si algo te sobra, decime qué saco |
 | D5 | Tu loop de espera de unos 30 min después de cada veredicto | Dejarlo: lo decidió Emi |
 | D6 | `DELIVERY_CHECKLIST.md`, en la raíz: es la entrega de la Fase I de junio, pero se llama como un checklist vigente (lo cita `REPO_MAP.md`) | Moverlo a `docs/pm/archivo/` y corregir la cita |
+| D7 | Controles automáticos en GitHub en cada push, que no dependen de ninguna IA: lint, tipos, build, compilación, `alembic check` y unos casos rápidos; la suite completa, una vez por semana. Hoy el repositorio no tiene ninguno | Pieza propia antes del lanzamiento. Necesita el visto bueno de Emi por los minutos de GitHub (el plan gratis alcanza para la parte rápida) |
+| D8 | Que la API no se pueda congelar entera. En producción corre un solo proceso (`railway-entrypoint.sh`, sin `--workers`), y 17 rutas `async` hacen consultas bloqueantes a la base: 9 de `orders.py`, 7 de `products.py`, el webhook y el vínculo de Mercado Pago, contacto y documentación. Si una se traba, se traba todo. Es la causa del P0 de FILTROS, que arreglé sólo para las marcas | Pieza propia de confiabilidad antes del lanzamiento, con la suite completa: toca órdenes y cobros |
+| D9 | Un revisor distinto para la auditoría de seguridad final, otro modelo o una persona: vos y yo somos el mismo modelo y podemos compartir puntos ciegos | Sí. Lo decide Emi |
 
 Lo que no adoptes se borra: al final, `.claude/propuestas/` no tiene que
 existir, y ninguna regla queda escrita en dos lugares.
@@ -244,6 +247,14 @@ hecho, con su rojo, pero **no está subido**.
 | 9 | Si la marca de las tres publicaciones del 239 no se creara, el caso cae con un error genérico y no con su mensaje | P3, de las pruebas | Sumarlo: una línea |
 
 Si decís que sí, lo subo con la suite y las puertas otra vez.
+
+El arreglo del punto 1 vive sólo en el contenedor de esta sesión. Si la Dev
+pasa a una sesión nueva, se rehace así: en «Editar», la opción extra sale de
+la marca **guardada** en la publicación (`brand` y `brand_label` de
+`/products/my`) cada vez que no está en la lista del alta, y no de la marca
+elegida en ese momento. El 239 abre «Editar», elige «Sin declarar» y
+comprueba que «AgroMec» se siga ofreciendo; sin el arreglo da rojo con «…
+quien elige otra ya no puede volver a elegir «AgroMec»».
 
 ## Emi decidió hoy (03/10): cómo nos comunicamos
 
