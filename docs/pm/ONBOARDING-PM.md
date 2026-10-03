@@ -224,10 +224,11 @@ Un subagente arranca con contexto nuevo, no carga el de la PM y devuelve sólo
 su conclusión. Sirve para hacer las preguntas que nadie hizo, también sobre el
 trabajo de la PM. Emi lo pidió el 03/10: no programa, y no puede repreguntar.
 
-**Cuándo:** cuando la pieza toca dinero, sesión, permisos, datos o es
+**Cuándo:** siempre que la PM crea que suma, no sólo en piezas difíciles
+(Emi, 03/10: «usarlos cuando consideres»; en dos pasadas encontraron muchos
+errores). Obligatorio cuando la pieza toca dinero, sesión, permisos, datos o es
 transversal; cuando la PM y la Dev coinciden demasiado rápido; antes de pedir
-una publicación con migración. No en piezas visuales chicas: ahí alcanzan los
-negativos y el navegador.
+una publicación con migración.
 
 **Cómo:**
 
@@ -237,7 +238,8 @@ negativos y el navegador.
   archivo, línea y cómo reproducirlos, no opiniones.
 - Modelo según la tarea, Opus o Sonnet; Fable no se usa para subagentes
   (Emi, 03/10). Sonnet aporta otros puntos ciegos que los de la PM y la Dev;
-  Opus, más profundidad. El veredicto dice cuál se usó.
+  Opus, más profundidad. El esfuerzo lo elige la PM; con Opus, nunca por
+  encima de alto (Emi, 03/10). El veredicto dice modelo y esfuerzo.
 - La revisión de la Dev con su propio subagente, antes de entregar, es
   autorrevisión: suma, pero no reemplaza este paso.
 - Lo que encuentra es una hipótesis. La PM lo reproduce o lo descarta con

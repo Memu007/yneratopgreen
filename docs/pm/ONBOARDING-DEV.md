@@ -69,14 +69,17 @@ No repitas una prueba hasta obtener verde sin explicar por qué falló antes. Un
 
 **Subagentes adversariales antes de entregar (Emi, 03/10).** En las piezas
 que tocan dinero, sesión, permisos o datos, antes de `/entregar` mandá dos
-subagentes con contexto nuevo, uno con Sonnet y otro con Opus. Cada uno recibe
+subagentes con contexto nuevo, uno con Sonnet 5.5 y otro con Opus 5.5. Cada uno recibe
 una consigna cerrada: el diff, qué afirma la pieza y «buscá cómo esto cobra
 mal, pierde datos, deja entrar a quien no debe o se traba, también alrededor
 de lo que cambiaste». Que devuelvan hallazgos con archivo, línea y cómo
 reproducirlos. Lo que encuentren lo reproducís: lo que es de la pieza lo
 corregís con su rojo; lo que no, lo informás. En el informe va una tabla:
 hallazgo, reproducido o no, y qué hiciste. Sigue siendo autorrevisión: no
-reemplaza la revisión de PM. Motivo: el 03/10, tres subagentes encontraron 16
+reemplaza la revisión de PM. En las demás piezas, mandalos cuando creas que
+suman, con el modelo que elijas (Emi, 03/10). El esfuerzo lo elegís vos en
+todos los casos; con Opus, nunca por encima de alto (Emi, 03/10, por costo).
+En el informe va qué modelo y qué esfuerzo usó cada uno. Motivo: el 03/10, tres subagentes encontraron 16
 problemas reproducibles en tres piezas ya aceptadas
 (`REPRODUCCION-SUBAGENTES-2026-10-03.md`).
 
