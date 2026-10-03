@@ -4,8 +4,8 @@
     python3 scripts/sabotajes_avisos_1.py               # todos
     python3 scripts/sabotajes_avisos_1.py error-se-va   # uno
 
-Cada uno rompe un solo lugar, corre el caso 241 y deja el archivo como estaba.
-Tiene que dar rojo por su motivo, y sólo por él.
+Cada uno rompe un solo lugar, corre su caso (241, 242 o 243) y deja el archivo
+como estaba. Tiene que dar rojo por su motivo, y sólo por él.
 
 El que pidió la PM:
 
@@ -29,6 +29,20 @@ Y los demás:
                         bueno de atrás no se va.
   sin-ver-carrito       Agregar desde la ficha no ofrece «Ver carrito».
 
+Los de la devolución (casos 242 y 243):
+
+  tapa-la-capa          Las capas no les dejan lugar a los avisos: el error
+                        vuelve a tapar «Publicar producto».
+  el-dedo-pausa         Tocar el aviso con el dedo vuelve a pausarlo, como
+                        con el mouse.
+  touch-none            Lo vertical sobre el aviso vuelve a no desplazar la
+                        página.
+  cierra-con-poco       40 px de costado alcanzan para cerrarlo.
+  teclado-se-va         Lo que tiene acción se va a los 4 s aunque haya
+                        llegado por el teclado.
+  foco-al-body          Al cerrar el último aviso con el teclado, el foco se
+                        pierde en la página.
+
 Son todos de pantalla: esperan a que el servidor de desarrollo sirva el
 archivo roto, y después el sano. Necesita la API en 8000 y el frontend de
 desarrollo en 5173.
@@ -51,11 +65,11 @@ CASO = 241
 
 ANCHOS = ["escritorio 1440px:", "celular 390px:"]
 
-# nombre: (archivo, [(viejo, nuevo), …], lo que tiene que decir, lo que no)
+# nombre: (archivo, [(viejo, nuevo), …], lo que tiene que decir, lo que no[, caso])
 SABOTAJES = {
     "error-se-va": (
         AVISOS,
-        [("    if (type !== 'error') {\n", "    if (type) {\n")],
+        [("    if (type !== 'error' && !(opciones.accion && conTeclado.current)) {\n", "    if (type) {\n")],
         [f"{a} a los " for a in ANCHOS] + ["quedan 0 errores y tenía que quedar 1"],
         ["no está abajo", "se enciman", "Ver carrito", "lo que salió bien"],
     ),
@@ -99,11 +113,61 @@ SABOTAJES = {
         [f"{a} agregar desde la ficha no ofrece «Ver carrito»" for a in ANCHOS],
         ["no está abajo", "se enciman", "se fue a los", "el foco quedó"],
     ),
+    "tapa-la-capa": (
+        AVISOS,
+        [("      raiz.setAttribute('data-avisos', '');\n", "      void raiz;\n")],
+        ["390px: con el error a la vista, en el centro de «Publicar producto» está",
+         "390px: tocar el centro de «Publicar producto» con el error a la vista no reintentó"],
+        ["no le llegó", "no siguió a la vista"],
+        243,
+    ),
+    "el-dedo-pausa": (
+        AVISOS,
+        [("        onPointerEnter={(e) => { if (e.pointerType !== 'touch') setConMouse(true); }}\n"
+          "        onPointerLeave={() => setConMouse(false)}\n",
+          "        onMouseEnter={() => setConMouse(true)}\n"
+          "        onMouseLeave={() => setConMouse(false)}\n")],
+        ["celular 390px táctil: tocado con el dedo, lo que salió bien seguía a los"],
+        ["de costado", "desplazó", "teclado"],
+        242,
+    ),
+    "touch-none": (
+        ESTILOS,
+        [("  touch-action: pan-y;\n", "  touch-action: none;\n")],
+        ["celular 390px táctil: deslizar en vertical sobre el aviso no desplazó la página"],
+        ["de costado", "tocado con el dedo", "teclado"],
+        242,
+    ),
+    "cierra-con-poco": (
+        AVISOS,
+        [("const DESLIZAR = 60;\n", "const DESLIZAR = 30;\n")],
+        ["celular 390px táctil: deslizar 40 px de costado cerró el aviso"],
+        ["desplazó", "tocado con el dedo", "teclado"],
+        242,
+    ),
+    "teclado-se-va": (
+        AVISOS,
+        [("    if (type !== 'error' && !(opciones.accion && conTeclado.current)) {\n",
+          "    if (type !== 'error') {\n")],
+        ["escritorio 1440px teclado: agregado con el teclado, el aviso se fue antes de los 6 s"],
+        ["táctil", "el foco quedó"],
+        242,
+    ),
+    "foco-al-body": (
+        AVISOS,
+        [("    const destino = [origen, previo].find((e) => e?.isConnected);\n",
+          "    const destino = null && [origen, previo].find((e) => e?.isConnected);\n")],
+        ["al cerrar el carrito abierto desde el aviso, el foco quedó en «BODY",
+         "al cerrar con el teclado el último aviso, el foco quedó en «BODY"],
+        ["táctil", "se fue antes"],
+        242,
+    ),
 }
 
 
 def sabotear(nombre):
-    ruta, cambios, deben, no_deben = SABOTAJES[nombre]
+    ruta, cambios, deben, no_deben, *resto = SABOTAJES[nombre]
+    caso = resto[0] if resto else CASO
     original = ruta.read_bytes()
     texto = original.decode("utf-8")
     for viejo, nuevo in cambios:
@@ -114,7 +178,7 @@ def sabotear(nombre):
         ruta.write_bytes(texto.encode("utf-8"))
         esperar_a_que_cambie([ruta], antes)
         durante = {ruta: servido(ruta)}
-        veredicto = veredicto_del_caso(CASO)
+        veredicto = veredicto_del_caso(caso)
     finally:
         ruta.write_bytes(original)
         if durante:
@@ -123,7 +187,7 @@ def sabotear(nombre):
     todo = "\n".join([veredicto[0].split(" — ", 1)[-1], *veredicto[1:]])
     faltan = [t for t in deben if t not in todo]
     sobran = [t for t in no_deben if t in todo]
-    dio = veredicto[0].startswith(f"[FAIL] {CASO}") and not faltan and not sobran
+    dio = veredicto[0].startswith(f"[FAIL] {caso}") and not faltan and not sobran
     return dio, veredicto, faltan, sobran
 
 

@@ -40830,6 +40830,322 @@ await runCase(241, 'Los avisos van abajo al centro, lo bueno se va a los 4 s y e
     + 'con «Cerrar aviso» y con Enter, y el foco pasa al siguiente; «Ver carrito» abre el carrito';
 });
 
+// 242. Los avisos con el dedo y con el teclado (devolución de AVISOS-1).
+//
+// Con el dedo: tocar un aviso para leerlo no lo deja quieto; se cierra
+// deslizándolo de costado, y deslizar en vertical encima de él desplaza la
+// página. Los toques van por el protocolo del navegador y no por eventos
+// armados en la página: así el navegador decide, como en un celular, qué es
+// desplazar y qué es arrastrar.
+//
+// Con el teclado: quien agrega con Enter llega a «Ver carrito» aunque tarde
+// más que los 4 s; y al cerrar el último aviso, o al abrir el carrito desde
+// él, el foco vuelve a «Agregar al carrito» y no al principio de la página.
+await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se deslizan de costado, lo vertical desplaza la página) y con el teclado (se llega a «Ver carrito» y el foco vuelve a donde estaba)', async () => {
+  const problemas = [];
+  const sello = Date.now();
+  const NOMBRE = `Aviso 242 ${sello}`;
+  const vende = await sesionDe('vendedor@ejemplo.com', 'vendedor123');
+  const compra = await sesionDe('cliente@ejemplo.com', 'cliente123');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const alta = await apiRequest('/products', {
+    method: 'POST', token: vende.token,
+    body: {
+      name: NOMBRE, description: 'Publicación del caso 242.',
+      category_id: tractores.categoriaId, subcategory_id: tractores.id,
+      price: 2420, stock: 50, unit: 'unidad', locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+      publication_type: 'producto', operation_kind: 'activo', condition: 'usado',
+    },
+  });
+  assert(alta.data?.id, `no se pudo publicar la publicación del caso: HTTP ${alta.status}`);
+  const id = alta.data.id;
+  const AVISO = '[class*="_toastContainer_"] [role]';
+  const avisos = (page) => page.evaluate((sel) => [...document.querySelectorAll(sel)]
+    .filter((n) => !/_saliendo_/.test(n.className))
+    .map((n) => {
+      const caja = n.getBoundingClientRect();
+      return {
+        papel: n.getAttribute('role'), texto: (n.textContent || '').replace(/\s+/g, ' ').trim(),
+        x: caja.left, y: caja.top, ancho: caja.width, alto: caja.height,
+      };
+    }), AVISO);
+  const sesion = async (contexto, quien) => contexto.addInitScript(({ a, r }) => {
+    window.localStorage.setItem('access_token', a);
+    window.localStorage.setItem('refresh_token', r);
+  }, { a: quien.token, r: quien.refresco });
+  // Se mide dónde está el aviso cuando terminó de entrar, no a mitad.
+  const quietos = (page) => page.waitForFunction(() => document.getAnimations()
+    .every((a) => a.playState !== 'running'), null, { timeout: 5_000 });
+  const foco = (page) => page.evaluate(() => {
+    const e = document.activeElement;
+    return e ? `${e.tagName} ${(e.getAttribute('aria-label') || e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40)}` : 'nada';
+  });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    // --- A. Con el dedo, en un celular -------------------------------------
+    {
+      const donde = 'celular 390px táctil';
+      const contexto = await browser.newContext({
+        viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2,
+      });
+      await sesion(contexto, compra);
+      const page = await contexto.newPage();
+      const cdp = await contexto.newCDPSession(page);
+      const dedo = (type, x, y) => cdp.send('Input.dispatchTouchEvent', {
+        type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+      });
+      // Un deslizamiento con el dedo, en pasos, como lo manda un celular.
+      const deslizar = async (x0, y0, x1, y1) => {
+        await dedo('touchStart', x0, y0);
+        for (let i = 1; i <= 10; i += 1) await dedo('touchMove', x0 + ((x1 - x0) * i) / 10, y0 + ((y1 - y0) * i) / 10);
+        await dedo('touchEnd');
+      };
+      await page.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+      const agregar = page.getByRole('button', { name: 'Agregar al carrito' });
+
+      // A1. Tocar el texto de lo que salió bien no lo deja quieto.
+      await agregar.tap({ timeout: 20_000 });
+      await esperarA(async () => (await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'agregar no dejó un aviso', 10_000);
+      const desde = Date.now();
+      const [bueno] = (await avisos(page)).filter((a) => /Agregado/.test(a.texto));
+      await page.touchscreen.tap(bueno.x + 60, bueno.y + bueno.alto / 2);
+      await esperarA(async () => !(await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'tocado con el dedo, no se fue', 8_000)
+        .catch(() => {});
+      const seFue = Date.now() - desde;
+      if (seFue > 5_500) problemas.push(`${donde}: tocado con el dedo, lo que salió bien seguía a los ${seFue} ms`);
+
+      // A2. Deslizar de costado: 40 px no lo cierra, 100 px sí. Se mide con
+      //     lo que salió bien, apenas llega: 4 s alcanzan para dos gestos.
+      await agregar.tap();
+      await esperarA(async () => (await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'agregar no dejó otro aviso', 10_000);
+      await quietos(page);
+      let [aviso] = (await avisos(page)).filter((a) => /Agregado/.test(a.texto));
+      const yMedio = aviso.y + aviso.alto / 2;
+      await deslizar(aviso.x + 60, yMedio, aviso.x + 100, yMedio);
+      if (!(await avisos(page)).some((a) => /Agregado/.test(a.texto))) problemas.push(`${donde}: deslizar 40 px de costado cerró el aviso`);
+      await deslizar(aviso.x + 60, yMedio, aviso.x + 160, yMedio);
+      await esperarA(async () => !(await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'no se cerró', 2_000)
+        .catch(() => problemas.push(`${donde}: deslizar 100 px de costado no cerró el aviso`));
+
+      // A3. Deslizar en vertical encima del aviso desplaza la página.
+      await agregar.tap();
+      await esperarA(async () => (await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'agregar no dejó el tercer aviso', 10_000);
+      await quietos(page);
+      [aviso] = (await avisos(page)).filter((a) => /Agregado/.test(a.texto));
+      const alto = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+      if (alto < 300) problemas.push(`${donde}: la ficha mide ${alto} px más que la pantalla y no alcanza para medir el desplazamiento`);
+      const antes = await page.evaluate(() => window.scrollY);
+      await deslizar(aviso.x + 120, aviso.y + aviso.alto / 2, aviso.x + 120, aviso.y + aviso.alto / 2 - 250);
+      await esperarA(async () => (await page.evaluate(() => window.scrollY)) > antes + 50, 'no se desplazó', 2_000)
+        .catch(async () => problemas.push(`${donde}: deslizar en vertical sobre el aviso no desplazó la página (scrollY ${antes} → ${await page.evaluate(() => window.scrollY)})`));
+      await contexto.close();
+    }
+
+    // --- B. Con el teclado, en la computadora ------------------------------
+    {
+      const donde = 'escritorio 1440px teclado';
+      const contexto = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await sesion(contexto, compra);
+      const page = await contexto.newPage();
+      await page.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+      const agregar = page.getByRole('button', { name: 'Agregar al carrito' });
+      await agregar.waitFor({ state: 'visible', timeout: 20_000 });
+
+      // B1. Agregar con Enter y llegar a «Ver carrito» a paso de persona: a
+      //     los 6 s el aviso tiene que seguir ahí.
+      await agregar.focus();
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'Enter no agregó', 10_000);
+      await page.waitForTimeout(6_000);
+      if (!(await avisos(page)).some((a) => /Agregado/.test(a.texto))) {
+        problemas.push(`${donde}: agregado con el teclado, el aviso se fue antes de los 6 s y no se llega a «Ver carrito»`);
+      } else {
+        let tabs = 0;
+        for (; tabs < 80; tabs += 1) {
+          if ((await foco(page)) === 'BUTTON Ver carrito') break;
+          await page.keyboard.press('Tab');
+        }
+        if (tabs === 80) problemas.push(`${donde}: con Tab no se llega a «Ver carrito»`);
+        else {
+          // B2. Enter en «Ver carrito» abre el carrito; al cerrarlo, el foco
+          //     vuelve a «Agregar al carrito».
+          await page.keyboard.press('Enter');
+          const carrito = page.getByRole('dialog', { name: 'Mi carrito' });
+          await carrito.waitFor({ state: 'visible', timeout: 10_000 });
+          await page.keyboard.press('Escape');
+          await carrito.waitFor({ state: 'hidden', timeout: 10_000 });
+          const despues = await foco(page);
+          if (despues !== 'BUTTON Agregar al carrito') problemas.push(`${donde}: al cerrar el carrito abierto desde el aviso, el foco quedó en «${despues}»`);
+        }
+      }
+
+      // B3. Cerrar con Enter el último aviso: el foco vuelve a «Agregar al
+      //     carrito», y el Tab siguiente no arranca desde el logo.
+      await agregar.focus();
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await avisos(page)).length === 1, 'Enter no dejó un solo aviso', 10_000);
+      let tabs = 0;
+      for (; tabs < 80; tabs += 1) {
+        if ((await foco(page)) === 'BUTTON Cerrar aviso') break;
+        await page.keyboard.press('Tab');
+      }
+      if (tabs === 80) problemas.push(`${donde}: con Tab no se llega a «Cerrar aviso»`);
+      else {
+        await page.keyboard.press('Enter');
+        await esperarA(async () => (await avisos(page)).length === 0, 'Enter no cerró el aviso', 5_000)
+          .catch(async () => problemas.push(`${donde}: Enter en «Cerrar aviso» no cerró el último aviso: quedan ${JSON.stringify((await avisos(page)).map((x) => x.texto))}`));
+        const despues = await foco(page);
+        if (despues !== 'BUTTON Agregar al carrito') problemas.push(`${donde}: al cerrar con el teclado el último aviso, el foco quedó en «${despues}»`);
+      }
+
+      // B4. Agregar con el mouse: lo bueno se va solo, aunque tenga acción.
+      await agregar.click();
+      await page.mouse.move(2, 2);
+      await esperarA(async () => (await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'el clic no agregó', 10_000);
+      await esperarA(async () => (await avisos(page)).length === 0, 'agregado con el mouse, no se fue', 6_000)
+        .catch(() => problemas.push(`${donde}: agregado con el mouse, el aviso sigue a los 6 s`));
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+    querySql(`UPDATE products SET status = 'DELETED' WHERE id = ${sqlLiteral(id)}`);
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return 'con el dedo: tocar no lo deja quieto, 40 px de costado no lo cierra y 100 px sí, lo vertical desplaza la página; '
+    + 'con el teclado: a los 6 s se llega a «Ver carrito», y al cerrar el carrito o el último aviso el foco vuelve a «Agregar al carrito»; '
+    + 'con el mouse, lo bueno se va solo';
+});
+
+// 243. Un aviso no tapa los botones de una capa (devolución de AVISOS-1).
+//
+// Los avisos van encima de todo y abajo, que es donde las capas tienen sus
+// botones. Con un error presente: en «Vender», el centro de «Publicar
+// producto» es el botón y tocarlo reintenta; y con ese mismo error todavía
+// ahí, en el carrito y en el checkout el centro del botón principal es el
+// botón y el clic le llega.
+await runCase(243, 'Con un error a la vista, «Publicar producto», «Continuar compra» y «Continuar al pago» se tocan y reintentan, en 1440, 390 y 320', async () => {
+  const problemas = [];
+  const medidos = [];
+  const sello = Date.now();
+  const NOMBRE = `Aviso 243 ${sello}`;
+  const vende = await sesionDe('vendedor@ejemplo.com', 'vendedor123');
+  const compra = await sesionDe('cliente@ejemplo.com', 'cliente123');
+  const tractores = subrubroDe('maquinaria-agricola', 'tractores');
+  const alta = await apiRequest('/products', {
+    method: 'POST', token: vende.token,
+    body: {
+      name: NOMBRE, description: 'Publicación del caso 243.',
+      category_id: tractores.categoriaId, subcategory_id: tractores.id,
+      price: 2430, stock: 50, unit: 'unidad', locality_id: localidadDelPadron('Pergamino', 'Buenos Aires'),
+      publication_type: 'producto', operation_kind: 'activo', condition: 'usado',
+    },
+  });
+  assert(alta.data?.id, `no se pudo publicar la publicación del caso: HTTP ${alta.status}`);
+  const id = alta.data.id;
+  // Qué hay en el centro del botón, y si un clic ahí le llega.
+  const alCentro = async (page, boton) => {
+    await boton.scrollIntoViewIfNeeded();
+    const caja = await boton.boundingBox();
+    const x = caja.x + caja.width / 2;
+    const y = caja.y + caja.height / 2;
+    const encima = await boton.evaluate((b, [px, py]) => {
+      const e = document.elementFromPoint(px, py);
+      if (!e || b.contains(e)) return null;
+      return `${e.tagName} «${(e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 50)}»`;
+    }, [x, y]);
+    return { x, y, encima };
+  };
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const medida of [{ width: 1440, height: 900 }, { width: 390, height: 844 }, { width: 320, height: 568 }]) {
+      const donde = `${medida.width}px`;
+      const contexto = await browser.newContext({ viewport: medida });
+      await contexto.addInitScript(({ a, r }) => {
+        window.localStorage.setItem('access_token', a);
+        window.localStorage.setItem('refresh_token', r);
+      }, { a: compra.token, r: compra.refresco });
+      const page = await contexto.newPage();
+      await page.goto(`${FRONTEND_URL}/?section=product&id=${id}`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'Agregar al carrito' }).click({ timeout: 20_000 });
+      await page.mouse.move(2, 2);
+
+      // --- A. «Vender»: falla la publicación, y el error se queda ----------
+      let pedidos = 0;
+      await page.route('**/api/products', (ruta) => {
+        if (ruta.request().method() !== 'POST') return ruta.continue();
+        pedidos += 1;
+        return ruta.abort('failed');
+      });
+      await page.getByRole('button', { name: /^Vender/ }).first().click();
+      const vender = page.getByRole('dialog', { name: 'Publicar' });
+      await vender.waitFor({ state: 'visible', timeout: 15_000 });
+      await vender.locator('#name').fill(`No se publica ${sello}`);
+      await vender.locator('#category').selectOption({ index: 1 });
+      await vender.locator('#description').fill('Descripción del caso 243: el pedido se corta a propósito.');
+      await vender.locator('#price').fill('100');
+      await vender.locator('#stock').fill('2');
+      await vender.locator('#province').selectOption({ index: 1 });
+      await page.waitForFunction(() => document.querySelectorAll('#locality option').length > 1, null, { timeout: 15_000 });
+      await vender.locator('#locality').selectOption({ index: 1 });
+      const publicar = vender.getByRole('button', { name: 'Publicar producto' });
+      await publicar.click();
+      const error = page.locator('[class*="_toastContainer_"] [role="alert"]');
+      await error.first().waitFor({ state: 'visible', timeout: 10_000 });
+      await page.mouse.move(2, 2);
+      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'), null, { timeout: 5_000 });
+      const enVender = await alCentro(page, publicar);
+      if (enVender.encima) problemas.push(`${donde}: con el error a la vista, en el centro de «Publicar producto» está ${enVender.encima}`);
+      const antes = pedidos;
+      await page.mouse.click(enVender.x, enVender.y);
+      await esperarA(async () => pedidos > antes, 'no reintentó', 5_000)
+        .catch(() => problemas.push(`${donde}: tocar el centro de «Publicar producto» con el error a la vista no reintentó (${antes} pedidos antes, ${pedidos} después)`));
+      await page.unroute('**/api/products');
+      await page.mouse.move(2, 2);
+
+      // Se descarta el formulario; el error queda.
+      await vender.getByRole('button', { name: 'Cancelar' }).click();
+      await page.getByRole('button', { name: 'Descartar cambios' }).click({ timeout: 10_000 });
+      await vender.waitFor({ state: 'hidden', timeout: 10_000 });
+      if (await error.count() === 0) problemas.push(`${donde}: el error no siguió a la vista después de cerrar «Vender»`);
+
+      // --- B. El carrito y el checkout, con el error todavía ahí -----------
+      const llega = async (boton, nombre) => {
+        const punto = await alCentro(page, boton);
+        if (punto.encima) {
+          problemas.push(`${donde}: con el error a la vista, en el centro de «${nombre}» está ${punto.encima}`);
+          return false;
+        }
+        await boton.evaluate((b) => b.addEventListener('click', () => { b.dataset.llego = '1'; }, { once: true, capture: true }));
+        await page.mouse.click(punto.x, punto.y);
+        return true;
+      };
+      await page.getByRole('button', { name: /Carrito/ }).first().click();
+      const carrito = page.getByRole('dialog', { name: 'Mi carrito' });
+      await carrito.waitFor({ state: 'visible', timeout: 10_000 });
+      const checkout = page.getByRole('dialog', { name: 'Checkout' });
+      if (!(await llega(carrito.getByRole('button', { name: 'Continuar compra' }), 'Continuar compra'))) {
+        await carrito.getByRole('button', { name: 'Continuar compra' }).evaluate((b) => b.click());
+      }
+      await checkout.waitFor({ state: 'visible', timeout: 20_000 });
+      const pagar = checkout.getByRole('button', { name: 'Continuar al pago' });
+      await pagar.waitFor({ state: 'visible', timeout: 20_000 });
+      if (await error.count() === 0) problemas.push(`${donde}: el error no siguió a la vista en el checkout`);
+      if (await llega(pagar, 'Continuar al pago')) {
+        if (await pagar.evaluate((b) => b.dataset.llego) !== '1') problemas.push(`${donde}: el clic en el centro de «Continuar al pago» no le llegó al botón`);
+      }
+      medidos.push(`${donde}: «Publicar producto» reintentó (${pedidos} pedidos)`);
+      await contexto.close();
+    }
+  } finally {
+    await browser.close();
+    querySql(`UPDATE products SET status = 'DELETED' WHERE id = ${sqlLiteral(id)}`);
+  }
+  assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
+  return `${medidos.join('; ')}; en el carrito y en el checkout el centro del botón principal es el botón y el clic le llega`;
+});
+
 // La cuenta se hace ACÁ, después del último `runCase`, y no en el medio del
 // archivo. Estaba calculada antes de que corriera el último caso, así que ese
 // caso alcanzaba a imprimir su `[PASS]` y no entraba en el total: pidiendo un
