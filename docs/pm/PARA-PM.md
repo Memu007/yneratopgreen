@@ -314,3 +314,43 @@ al día”» de `ONBOARDING-PM`, que ya está paso a paso.
 La tercera idea, informes más cortos, la dejé afuera: ya es regla en
 `CLAUDE.md`, y acortar más podría sacarte evidencia que necesitás para
 verificar.
+
+## Para que no se pierda: el resto de la charla con Emi (03/10)
+
+No pide decisiones. Es lo que quedaba sólo en el chat.
+
+- **Punto de partida, medido en git** (del 20/09 al 03/10: 47 informes de la
+  Dev y 36 vueltas completas). Entre la entrega de la Dev y tu respuesta, la
+  mediana es 1,1 h y la más larga 11 h. De vos a la Dev, 0,9 h y 13,3 h. Es
+  casi todo trabajo real; las esperas largas son cuando Emi no estaba.
+- **Se vuelve a medir en 5 piezas**, con el mismo cálculo: commits «Informe a
+  PM…» contra commits «PM …» en los dos canales. Se suman tres conteos:
+  - horas entre la entrega y el veredicto;
+  - vueltas por pieza hasta que aceptás;
+  - fallas que se escapan: lo que encontrás vos y la Dev no vio, y lo que
+    Emi encuentra en el sitio después de publicar.
+  Si no mejoran, se saca lo que no sirvió. Lo corre la Dev cuando Emi lo
+  pide; vos no tenés que hacer nada extra.
+- **Estimación de la Dev, sin medir:** entre 10 y 20 % menos errores y
+  retrabajo, y poca ganancia de velocidad. Es una hipótesis; manda la
+  medición.
+- **Pasada mensual de Emi:**
+  1. repetir la medición;
+  2. ver si salió algo nuevo de Claude Code que convenga;
+  3. borrar las reglas o los comandos que nadie usó en el mes.
+- **La Dev pasa a una sesión nueva**, abierta sobre este repositorio: así los
+  comandos se cargan solos y el chat arranca liviano. Una sola Dev a la vez.
+- **Esfuerzo:** las dos sesiones son Opus 5.5; vos en alto, la Dev en medio.
+  La Dev recomienda alto en las piezas de dinero, sesión, permisos o datos.
+  Lo decide Emi.
+- **Cómo escribirse entre las dos**, según las guías de Anthropic:
+  - contexto, tarea, decisiones numeradas, límites y qué es «terminado»;
+  - SHA y rutas exactas;
+  - el porqué de cada pedido.
+  Más precisión, no más jerga. Tus tareas ya siguen casi todo esto.
+- **Jev** (el modelo de decisiones de TypeSafe, del 15/09) no sirve para la PM
+  ni para la Dev: no razona ni escribe. Podría servir dentro del producto
+  después del lanzamiento: marcas parecidas en el panel, sugerir la categoría
+  al publicar o separar los errores importantes. Suma un proveedor con costo
+  y le manda datos a un tercero. Es una decisión de Emi y tuya, y no es para
+  ahora.
