@@ -42,6 +42,8 @@ interface ProductDetailPageProps {
       cerrar el ingreso —se complete o se cancele— la persona sigue en la
       misma publicación, y nada se agrega solo al carrito. */
   onRequiereIngreso?: () => void;
+  /** Abre el carrito: es la acción del aviso de «Agregado». */
+  onVerCarrito?: () => void;
 }
 
 /** Cómo se nombra el regreso según de dónde se vino. */
@@ -83,6 +85,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   onIrAlMercado,
   onSolicitarCotizacion,
   onRequiereIngreso,
+  onVerCarrito,
 }) => {
   const { addItem } = useCart();
   const { isAuthenticated, user } = useAuth();
@@ -224,7 +227,10 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               onRequiereIngreso={onRequiereIngreso}
               onAgregar={(cantidad) => {
                 addItem(product, cantidad);
-                showToast(`Agregado: ${product.name}`, 'success');
+                showToast(`Agregado: ${product.name}`, 'success', {
+                  detalle: `Cantidad: ${cantidad}`,
+                  accion: onVerCarrito && { rotulo: 'Ver carrito', alHacer: onVerCarrito },
+                });
               }}
               onAvisar={(mensaje) => showToast(mensaje, 'warning')}
             />

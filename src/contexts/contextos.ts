@@ -22,8 +22,14 @@ export interface ConfirmOptions {
   type?: 'danger' | 'warning' | 'info';
 }
 
+/** Una segunda línea, más tenue, y una acción que el producto ya tiene. */
+export interface OpcionesDelAviso {
+  detalle?: string;
+  accion?: { rotulo: string; alHacer: () => void };
+}
+
 export interface ToastContextType {
-  showToast: (message: string, type?: ToastType) => void;
+  showToast: (message: string, type?: ToastType, opciones?: OpcionesDelAviso) => void;
   showConfirm: (options: ConfirmOptions) => Promise<boolean>;
 }
 

@@ -870,6 +870,7 @@ function App() {
             onIrAlMercado={() => handleNavigate('marketplace')}
             onSolicitarCotizacion={pedirCotizacion}
             onRequiereIngreso={abrirLogin}
+            onVerCarrito={() => setIsCartOpen(true)}
           />
         ) : null;
       case 'account':

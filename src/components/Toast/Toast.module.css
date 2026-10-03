@@ -1,100 +1,181 @@
-/* Toast Container - esquina superior derecha */
+/* Avisos: la píldora verde de la marca (AVISOS-1, opción A de
+   docs/pm/maquetas/AVISOS-V2-2026-10-02.html, decisión de Emi del 02/10).
+   Abajo al centro, en la computadora y en el celular: nunca tapan la
+   cabecera. */
 .toastContainer {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  left: 50%;
+  bottom: calc(var(--tg-space-6) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(400px, calc(100vw - var(--tg-space-6)));
   z-index: 10000;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 400px;
+  pointer-events: none;
 }
 
-/* Individual Toast */
+/* La pila. Cada aviso se apoya abajo; los de atrás suben un poco, se achican
+   y se apagan. Desplegada (mouse o foco encima), cada uno sube lo que miden
+   los de adelante. */
+.pila {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lugar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform-origin: 50% 100%;
+  transition: transform 240ms var(--tg-ease-standard), opacity 240ms var(--tg-ease-standard);
+}
+
+.lugar[data-atras="1"] { opacity: 0.85; }
+.lugar[data-atras="2"] { opacity: 0.6; }
+.lugar[data-atras="3"] { opacity: 0; }
+
+/* Los de atrás asoman sólo por el borde: su texto no se dibuja debajo del de
+   adelante. Al desplegarse vuelven a verse enteros. */
+.lugar[data-atras] .toast > * { visibility: hidden; }
+.lugar[data-atras="3"] .toast { visibility: hidden; }
+
+/* El aviso. Las esquinas de la maqueta (14 px) son más redondas que los
+   radios de tokens.css, que son de tarjetas y controles: es lo aprobado para
+   lo que flota. */
 .toast {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  border-radius: var(--tg-radius-sm);
-  box-shadow: var(--tg-shadow-overlay);
-  cursor: pointer;
-  animation: slideIn 0.3s ease-out;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  gap: var(--tg-space-3);
+  min-height: 52px;
+  padding: var(--tg-space-3) var(--tg-space-3) var(--tg-space-3) var(--tg-space-3);
+  border-radius: 14px;
+  background: var(--tg-color-brand);
+  color: var(--tg-color-text-inverse);
+  box-shadow: 0 12px 30px rgba(20, 53, 38, 0.28), 0 2px 6px rgba(20, 53, 38, 0.18);
+  font-family: var(--tg-font-ui);
+  pointer-events: auto;
+  touch-action: none;
+  animation: entrar 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+@keyframes entrar {
+  from { transform: translateY(110%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
-.toast.success {
-  background: var(--tg-color-success-bg);
-  border-left: 4px solid var(--tg-color-brand);
-  color: var(--tg-color-brand);
+.toast.saliendo {
+  animation: salir 200ms ease-in forwards;
 }
 
-.toast.error {
-  background: var(--tg-color-error-bg);
-  border-left: 4px solid var(--tg-color-error);
-  color: var(--tg-color-error);
+@keyframes salir {
+  to { transform: translateY(110%); opacity: 0; }
 }
 
-.toast.warning {
-  background: var(--tg-color-warning-bg);
-  border-left: 4px solid var(--tg-color-warning);
-  color: var(--tg-color-warning);
+/* El ícono redondo: cereal con tilde; rojo con «!» si es un error. */
+.icono {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--tg-color-signal);
+  color: var(--tg-color-action-hover);
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1;
 }
 
-.toast.info {
-  background: var(--tg-color-border-control);
-  border-left: 4px solid var(--tg-color-info);
-  color: var(--tg-color-info);
+.toast.error .icono {
+  background: #e8746c;
+  color: #3b0f0c;
 }
 
-.rotulo {
-  flex-shrink: 0;
-  align-self: flex-start;
-  padding: 2px 7px;
-  border-left: 2px solid currentColor;
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.icon {
-  font-size: 1.3rem;
+.texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .message {
-  flex: 1;
-  font-size: 0.95rem;
-  font-weight: 500;
-  line-height: 1.4;
+  font-size: 14.5px;
+  font-weight: 550;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* La segunda línea, más tenue: blanco al 72 % sobre el verde mide 6,09:1. */
+.detalle {
+  margin-top: 1px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* La acción va en cereal con texto verde profundo, como «Vender» en la
+   cabecera: el cereal como texto sobre el verde mide 3,86:1 y no llega a
+   4,5:1; así mide 5,14:1. */
+.accion {
+  flex: none;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--tg-color-signal);
+  color: var(--tg-color-action-hover);
+  font: 650 13px/1 var(--tg-font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.accion:hover {
+  background: var(--tg-color-signal-hover);
 }
 
 .closeBtn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -4px -2px -4px 0;
+  border: 0;
+  border-radius: 8px;
   background: none;
-  border: none;
-  font-size: 1.4rem;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
   color: inherit;
-  padding: 0;
-  line-height: 1;
+  opacity: 0.8;
+  cursor: pointer;
 }
 
 .closeBtn:hover {
   opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Sobre el verde el foco es cereal (tokens.css: 3,86:1 contra el verde). */
+.accion:focus-visible,
+.closeBtn:focus-visible {
+  outline: 2px solid var(--tg-color-focus-sobre-marca);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+@media (max-width: 599px) {
+  .toastContainer {
+    bottom: calc(var(--tg-space-4) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Quien pidió menos movimiento: aparecen y se van sin animación. */
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast.saliendo,
+  .lugar {
+    animation: none;
+    transition: none;
+  }
 }
 
 /* Confirm Modal Overlay */
@@ -237,12 +318,6 @@
 
 /* Responsive */
 @media (max-width: 480px) {
-  .toastContainer {
-    left: 10px;
-    right: 10px;
-    max-width: none;
-  }
-  
   .confirmActions {
     flex-direction: column-reverse;
   }
