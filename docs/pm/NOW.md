@@ -314,6 +314,12 @@ adoptó 5 y uno era un error real (P2 de «Editar»).
 
 | Pieza | Modelo | Hallazgos | Reproducidos | Nadie más los vio |
 |---|---|---|---|---|
+| Cobro MP publicado (prueba, 03/10) | Sonnet | 8 | 6 (+1 parcial) | 6 |
+| Sesiones publicadas (prueba, 03/10) | Opus | 7 | 4 | 4 |
+| Marcas publicadas (prueba, 03/10) | Sonnet | 7 | 6 | 6 |
+
+Evidencia de la prueba: `REPRODUCCION-SUBAGENTES-2026-10-03.md`. Qué se
+hace con los hallazgos lo decide Emi (pendiente).
 
 ## Restricciones operativas
 
