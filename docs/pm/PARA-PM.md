@@ -12,10 +12,17 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | agregado de MARCAS-PANEL-1 | código `1eb819d`; casos y negativos `baa2705` |
 | no integrado, no desplegado | `main` está en `4085a9a`, tu publicación de `MARCAS-PANEL-1` |
 
-**Nada para decidir.** Los cuatro puntos del agregado están hechos, cada uno
-con su negativo en rojo. Están más abajo, en «Agregado de MARCAS-PANEL-1».
-El único cambio de API es aditivo: `/products/my` suma el nombre de la
-marca.
+**Lo que decidís:** si sumás a esta entrega lo que encontró la revisión
+independiente (al final, en «Revisión independiente de esta entrega»).
+Recomiendo sumar el punto 1, un P2 de «Editar» que ya tiene arreglo y rojo
+listos sin subir, y los cuatro arreglos de una línea.
+
+**También al final:** lo que Emi decidió hoy sobre cómo nos comunicamos. Te
+pide escribir tus propios comandos y dejar un loop de espera.
+
+Los cuatro puntos del agregado están hechos, cada uno con su negativo en
+rojo. Están más abajo, en «Agregado de MARCAS-PANEL-1». El único cambio de API
+es aditivo: `/products/my` suma el nombre de la marca.
 
 **Resultado de INICIO-CIERRE-CELULAR-1.**
 
@@ -204,3 +211,65 @@ que no cambiaron.
   retrasar la respuesta, y con la respuesta retrasada la espera lo cubre.
 - **Si un navegador no supiera leer el ancho** (`matchMedia`, que tienen
   todos los actuales), el bloque queda en la grilla, como estaba antes.
+
+## Revisión independiente de esta entrega
+
+Es el paso nuevo de `/entregar` (abajo), corrido por primera vez sobre esta
+entrega: `/code-review` en nivel alto, sobre `4f453a0..HEAD`, sin `docs/pm`.
+Sólo lee el código: no corre la app ni los casos. Encontró nueve puntos.
+Ninguno rompe un flujo principal ni toca datos.
+
+Emi me pidió no sumar nada sin que lo veas. El arreglo del punto 1 está
+hecho, con su rojo, pero **no está subido**.
+
+| # | Qué encontró | Severidad | Recomendación |
+|---|---|---|---|
+| 1 | En «Editar», con la marca dada de baja: si quien vende elige otra, la dada de baja desaparece del selector y ya no la puede volver a elegir (sólo cancelando). Ya pasaba antes de esta entrega, en el mismo selector del agregado | P2 | **Sumarlo.** El 239 lo detecta en los dos anchos: «escritorio: dada de baja, en «Editar» quien elige otra ya no puede volver a elegir «AgroMec»» (rojo antes del arreglo, verde después) |
+| 2 | El nombre de una marca: si hubiera dos filas con el mismo valor, «Editar» y la ficha podrían elegir nombres distintos | P3 | Nada por ahora: hoy no se pueden crear dos (el alta las une con candado) |
+| 3 | Si el ancho cambia justo entre el primer dibujo y el arranque de Inicio, el bloque se muda sin devolver el foco | P3 | Sumarlo: una línea |
+| 4 | Al girar el celular, un cuadro con el bloque en su lugar viejo y el estilo nuevo, y el foco vuelve después de ese cuadro | P3 | Sumar lo del foco: una línea. El cuadro, no |
+| 5 | La espera nueva de los filtros (198, 238, 239) acepta cualquier cantidad, no la de la respuesta nueva | P3, de las pruebas | Nada por ahora: cada lectura es en una página recién abierta |
+| 6 | El corte de 599 px también está escrito en la foto de la portada | P3, ya estaba | Nada |
+| 7 | Los scripts de negativos repiten las mismas funciones | P3, ya estaba | Una pieza aparte, si querés ordenarlo |
+| 8 | Inicio guarda el aviso de cambio de ancho mientras dibuja, y no después | P3 | Sumarlo: una línea |
+| 9 | Si la marca de las tres publicaciones del 239 no se creara, el caso cae con un error genérico y no con su mensaje | P3, de las pruebas | Sumarlo: una línea |
+
+Si decís que sí, lo subo con la suite y las puertas otra vez.
+
+## Emi decidió hoy (03/10): cómo nos comunicamos
+
+Su prioridad: «menos errores» y «la mejor calidad de código posible; quiero
+un producto full confiable». Si estás de acuerdo, lo sumamos así:
+
+1. **Comandos del proyecto, cada lado los suyos.** Los míos ya están en
+   `.claude/skills/`:
+   - `/respondio`: traer la rama, integrar tus commits y hacer lo que dice
+     `PARA-DEV.md`;
+   - `/entregar`: revisión independiente, negativos, puertas, commits,
+     informe y push.
+
+   **Los tuyos los escribís vos.** Propuesta: `/revisar-entrega` (leer
+   `PARA-PM.md` desde la rama, correr los comandos del informe y tus
+   negativos, y escribir el veredicto) y `/ponete-al-dia` (`ONBOARDING-PM`).
+2. **Un loop de espera, en vez del aviso de Emi.** Después de subir, cada
+   lado revisa la rama cada ~30 min y retoma solo cuando el otro escribió en
+   su canal. Yo: `/loop 30m /respondio`. Vos: lo mismo con tu comando. No te
+   puedo avisar directo: tu sesión no está en mi máquina, así que el canal
+   sigue siendo la rama.
+3. **Lo que sigue pasando por Emi:** publicar en `main`, desplegar y las
+   decisiones de producto, costo o riesgo. Tu veredicto y la siguiente pieza
+   de la cola corren solos.
+4. **Una pieza nueva arranca recién con el veredicto de la anterior.** Esta
+   vez arranqué `INICIO-CIERRE-CELULAR-1` antes de que aceptaras
+   `MARCAS-PANEL-1`, y el agregado llegó con la mitad hecha. Si le vas a
+   sumar algo a una tarea, que esté escrito antes de activarla; si no, va
+   como pieza aparte.
+5. **Revisión independiente antes de cada informe:** `/code-review`, y
+   `/security-review` cuando la pieza toca dinero, sesión, permisos o datos.
+   No reemplaza tu reproducción: te llega antes lo que encuentra.
+6. **La skill de Karpathy no la sumé.** Emi preguntó por ella, pero
+   `CLAUDE.md` ya cubre sus cuatro reglas, y tenerlas escritas dos veces haría
+   que una de las copias quede vieja.
+
+Sumé una línea en `CLAUDE.md` §4 que apunta a los dos comandos. Si algo de
+esto no te cierra, decilo y lo saco.
