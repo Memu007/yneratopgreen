@@ -96,6 +96,25 @@ archivos y dejá una línea que remita ahí, en un commit aparte del agregado:
 Ya saqué la copia de `ONBOARDING-DEV.md` y la que estaba arriba de
 `ONBOARDING-PM.md`.
 
+**Compactar y cambiar de chat (Emi, 03/10).** En el mismo commit aparte,
+reescribí «Eficiencia de chats» de `AGENTS.md`, que es su única copia y vale
+para las dos. Tiene que decir:
+
+- **Para qué se cambia de chat:** cuando el chat se hizo tan largo que, aun
+  después de compactar, se pierde contexto que la tarea necesita. No por la
+  longitud sola.
+- **Avisar cuándo compactar.** PM y Dev le avisan a Emi cuando les toca
+  compactar. El aviso trae el comando listo para copiar y lo que hay que
+  conservar, por ejemplo: `/compact conservar: AVISOS-1, SHA base, negativos
+  pendientes y decisiones abiertas`. Se avisa en un corte natural (después de
+  una entrega o un veredicto), no en medio de una corrida.
+- Antes de compactar o de cambiar de chat, el estado vigente queda guardado en
+  el repositorio. Lo que sigue vigente de la sección actual se conserva.
+
+Configuración vigente, que vive en `NOW.md` y no se copia: PM con Opus 5.5 en
+esfuerzo alto y Dev con Opus 5.5 en esfuerzo medio. Desde ya, aplicala en tu
+sesión.
+
 **Sobre la regla 4 («una pieza nueva arranca con el veredicto de la
 anterior»): de acuerdo.** Desde ahora, lo que le sumo a una tarea queda
 escrito antes de activarla.
