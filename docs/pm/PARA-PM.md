@@ -2,271 +2,189 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## AVISOS-1 y su agregado chico: entrega
+## AVISOS-1: devolución chica, entrega
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `b218412`; integré tus commits hasta `914c2b0`, que tocan sólo `docs/pm` |
-| AVISOS-1, producto | `98cc39f`, con los arreglos de la autorrevisión en `0958c76` y los finales de línea en `259f232` |
-| AVISOS-1, caso, negativos y puertas | `9900b55`, `a1397b9`, `5eb9ae1` y `5b1032d` |
-| agregado, producto | `8fe56f7`; `1066d4b` le saca un `useEffect` sin uso que rompía `tsc` |
-| agregado, casos y negativos | `cfeb23f` |
-| D6, `DELIVERY_CHECKLIST.md` | `d694763` |
-| reglas repetidas, aparte | `9f4d308` (`CLAUDE.md` §3 y `AGENTS.md`) y `ed34fb4` («Eficiencia de chats») |
+| base | `7f5fbaf` (mi entrega anterior); integré tus commits hasta `f38cd21`, que tocan sólo `docs/pm` |
+| producto | `1fa8516` (los cuatro puntos), `d3c31fc` y `cc689e5` (lo del subagente y de la autorrevisión), `a802eff` (saca un cambio que no se reprodujo) |
+| casos, negativos y arnés | `5cde33d`, `38bb62d`, `0afe394`, `e051df2`, `7b95bc2`, `e86bcd8`, `6aa82e1` y `3f6b65b` |
+| subagentes con esfuerzo, aparte | `80a1938` (`.claude/agents/`) |
 | no integrado, no desplegado | `main` sigue en `e5d592e` |
 
-**Resultado: terminado.** El producto quedó fijo en `259f232`, y la suite
-completa corrió sobre ese SHA. Después sólo cambiaron `a11y.mjs`,
-`contraste.mjs` y `guia-admin.mjs`, que se volvieron a correr sobre `5b1032d`.
+**Resultado: terminado.** El producto quedó fijo en `cc689e5`. Los focales,
+los 16 negativos y las puertas corrieron sobre ese producto.
 
-### Decisiones
+**Nada para decidir.** Supuestos, todos reversibles:
 
-| | Qué decidís | Recomiendo |
-|---|---|---|
-| D1 | En el celular, un aviso de abajo puede tapar un botón del pie de la pantalla. Con el dedo encima se pausa y no se va hasta que se cierra con «×» o se desliza. La guía del panel lo encontró en el paso 24, al guardar una opción de Configuración | **Una pieza chica aparte:** en pantallas táctiles, el aviso se pausa con el foco y no con el dedo encima. La alternativa es dejarlo así: se cierra con «×» o deslizándolo |
+1. **Las capas le dejan lugar al aviso (punto 1).** Mientras haya un aviso,
+   toda capa con `aria-modal` se achica y sube lo que mide la pila plegada.
+   El costo: cuando aparece o se va un aviso con una capa abierta, la capa
+   salta unos 100 px. La alternativa, bajar el aviso detrás de las capas,
+   escondía el error que se queda.
+2. **Un aviso con acción que llegó por el teclado no se va solo (punto 4).**
+   Espera a que la persona llegue con Tab, o lo cierre. Empieza a contar los
+   4 s si el foco entra a una capa (desde ahí el teclado no llega) o si la
+   persona pasa al mouse o al dedo. Hoy el único aviso con acción es
+   «Agregado», en la ficha.
+3. **El foco vuelve al botón que provocó el aviso** («Agregar al carrito»),
+   no a lo último antes de entrar a los avisos: con Tab se pasa por toda la
+   página, y lo último antes de los avisos era el enlace de WhatsApp del pie.
+   Si ese botón ya no está, va a lo último antes de los avisos. Con una capa
+   abierta, siempre a la capa.
+4. **Deslizar: tu sugerencia.** Sólo de costado, y `pan-y pinch-zoom`, así
+   que lo vertical desplaza la página y se puede ampliar con dos dedos.
 
-**Supuestos, todos reversibles:**
+## Los cuatro puntos
 
-1. **Esquinas de 14 px,** como la maqueta. `tokens.css` llega a 6 px, que es
-   para tarjetas y controles.
-2. **El ícono rojo del error** usa los dos colores de la maqueta (`#e8746c`
-   y `#3b0f0c`), que no están en `tokens.css`. El «!» mide 5,67:1 sobre el
-   rojo, y el rojo mide 3,43:1 contra el verde.
-3. **La acción va en un botón cereal con texto verde profundo,** como
-   «Vender». En la maqueta es texto cereal, y el cereal como texto sobre el
-   verde mide 3,86:1, debajo de 4,5. Así mide 5,14:1.
-4. **Los cuatro tipos:**
-   - éxito: tilde cereal;
-   - error: «!» rojo;
-   - atención: «!» cereal;
-   - información: «i» cereal.
+| # | Qué cambió | Caso | Negativo |
+|---|---|---|---|
+| 1 | Con un aviso a la vista, las capas se achican y suben: ninguna parte de «Publicar producto», «Continuar compra» ni «Continuar al pago» queda debajo | 243, en 1440, 390 y 320 | `tapa-la-capa` |
+| 2 | Con el dedo no se pausa: sólo el mouse o el foco | 242 A1 | `el-dedo-pausa` |
+| 3 | Se cierra sólo de costado, con más de 60 px; lo vertical desplaza la página; si el navegador cancela el gesto, el aviso vuelve a su lugar | 242 A2 y A3 | `cierra-con-poco`, `touch-none` |
+| 4 | Con el teclado: el aviso con acción espera (B1); el foco vuelve a «Agregar al carrito» al cerrar el carrito abierto desde el aviso (B2) y al cerrar el último aviso (B3) | 242 B1 a B3 | `teclado-se-va`, `foco-al-body` |
 
-   Todo lo que no es error se va a los 4 s.
-5. **La segunda línea** la usa sólo el aviso de «Agregado»: dice
-   «Cantidad: N».
-6. **«Ver carrito» va sólo en la ficha,** que es el único lugar donde hoy se
-   agrega con aviso. La tarjeta del Mercado agrega sin aviso, y no se lo
-   sumé. «Deshacer» y «Reintentar» no los puse: no hay ningún aviso cuya
-   acción ya exista.
-7. **Plegada se ven tres; desplegada, cinco como máximo.** Los de más atrás
-   aparecen a medida que se cierran los de adelante.
-8. **A mano, sin librería.**
+**Más de lo mismo, que salió de la revisión:**
 
-## AVISOS-1
+- Con el carrito abierto, el aviso que esperaba al teclado se va solo (B5), y
+  cerrar con el teclado el último aviso deja el foco en el carrito, no detrás
+  (B6). Negativos `capa-no-arranca` y `foco-detras`.
+- Después de agregar con el teclado, un clic en la página hace que el aviso
+  cuente (B7). Negativo `mouse-no-arranca`.
+- El aviso que se está yendo (200 ms) ya no se alcanza con Tab ni atrapa el
+  puntero. Lo encontró el 242: con el teclado rápido, el foco caía en el que
+  se iba y Enter no cerraba nada. No tiene negativo propio: depende de
+  apretar Tab dentro de esos 200 ms.
 
-- **Cómo se ve:** píldora verde, texto blanco, ícono redondo, segunda línea
-  tenue y sin rótulo en mayúsculas.
-- **Dónde y cómo se mueve:**
-  - abajo al centro en los dos anchos;
-  - entra desde abajo con un rebote corto y sale bajando;
-  - con `prefers-reduced-motion`, sin animación.
-- **Pila:** los de atrás, más chicos y asomando, no dibujan su texto. Con el
-  mouse o el foco encima, la pila se despliega.
-- **Tiempos:**
-  - lo bueno se va a los 4 s y se pausa con el mouse o el foco encima;
-  - el error se queda, con `role="alert"`; lo demás lleva
-    `role="status"`.
-- **Cerrar:**
-  - con «Cerrar aviso», también con Enter. Con el teclado, el foco pasa al
-    aviso siguiente;
-  - en el celular, deslizándolo de costado o hacia abajo.
+**Una diferencia con tu reproducción del punto 1.** En mi recorrido, a 390,
+el error tapa sólo 7 px del borde de abajo de «Publicar producto», no el
+centro, y tocar el centro reintenta aun sin el arreglo. Por eso el 243 mide
+todo el alto del botón y no sólo el centro. Con el sabotaje, el rojo sale en
+los tres anchos:
 
-Capturas de éxito, error, pila y pila desplegada, en 1440 y 390:
-`docs/pm/capturas/avisos-1/`.
-
-**Caso 241, nuevo, en 1440 y 390:**
-
-- **Posición:** abajo, centrado al píxel y debajo de la cabecera.
-- **Lo bueno:** sigue a los 3 s y se va entre 3,5 y 5,5 s; en la última
-  corrida, a los 3986 y 4040 ms. Con el mouse encima sigue a los 5,5 s, y al
-  sacarlo se va.
-- **El error:** sigue a los 6 s, con `role="alert"`, y «Cerrar aviso» lo
-  cierra.
-- **Tres seguidos, plegados:** se lee sólo el de adelante y los de atrás
-  asoman menos de 40 px. Desplegados, se leen los tres, no se enciman y no
-  suben hasta la cabecera.
-- **Teclado:** Enter cierra uno por uno, y el foco pasa al siguiente.
-- **Con el mouse:** cerrar el de adelante con un aviso bueno detrás no deja
-  la pila en pausa; el bueno se va solo.
-- **«Ver carrito»,** al agregar desde la ficha, abre el carrito.
-
-`python3 scripts/sabotajes_avisos_1.py` → «todos dieron el rojo esperado»:
-
-| sabotaje | rojo del 241 |
-|---|---|
-| `error-se-va` (el tuyo) | «escritorio 1440px: a los 6057 ms quedan 0 errores y tenía que quedar 1», y lo mismo en celular |
-| `arriba`: los avisos vuelven arriba | «el aviso empieza en 20 y la cabecera termina en 64», «el aviso no está abajo: termina en 72 de 900» |
-| `texto-encimado`: los de atrás dibujan su texto | «plegada, se enciman…» y «plegada, se leen 3 de 3 y tenía que leerse sólo el de adelante» |
-| `sin-pausa`: el mouse encima no pausa | «con el mouse encima, lo que salió bien se fue antes de 5509 ms» |
-| `foco-perdido`: con el teclado, el foco no pasa al siguiente | «al cerrar con el teclado, el foco quedó en «null» y no en el aviso siguiente» |
-| `foco-al-cerrar-con-mouse` | «al cerrar con el mouse el de adelante, el bueno de atrás no se fue solo» |
-| `sin-ver-carrito` | «agregar desde la ficha no ofrece «Ver carrito»» |
-
-**Los casos que leen avisos no hubo que ajustarlos.** Los que buscan
-`[role="status"]` o `[role="alert"]` siguen verdes en la suite completa.
-
-**a11y y contraste miden el aviso.** Agregué la superficie «aviso con acción»
-en `lib/superficies.mjs`, así que las dos puertas la exigen. El Fertilizante
-se agrega desde su ficha y se mide el aviso con el mouse encima. Después
-«Ver carrito» abre el carrito, que queda igual que antes.
-
-## Agregado chico
-
-1. **El 204: la causa no es la carrera del 195, es un dato.**
-   - En toda la siembra hay un solo tractor con marca, el Pauny. Si no está
-     en el Mercado, «Marca» no se dibuja.
-   - Pausándolo, el 204 da exactamente tu rojo: «el panel va [… "Potencia",
-     "Año" …] y el acordado es [… "Potencia", "Marca", "Año" …]», en los dos
-     anchos.
-   - Retrasar 3 s el catálogo no lo hace caer: el panel aparece junto con la
-     respuesta.
-   - **Arreglo:** el 204 publica su propio tractor John Deere y lo retira al
-     final. Antes de leer el orden, espera «Marca».
-   - **Qué caso saca a Pauny en tu entorno: no lo sé.** Corrí una suite
-     completa con un vigía que miraba los tractores con marca cada segundo, y
-     Pauny no salió nunca: 239/240, con el 131 de entorno. El 198 desactiva
-     y reactiva una marca en un `finally`. Es la sospecha que me queda, sin
-     confirmar.
-   - **Otros casos que leen el filtro de marca:** el 198, el 238, el 239 y
-     la guía de uso. Todos publican sus propias marcas; ninguno depende de
-     Pauny.
-2. **El paso 28 de `guia-admin.mjs`: la misma clase de causa.** Tras dar de
-   baja la marca, si Tractores no tiene otra, «Marca» no se dibuja, y la guía
-   esperaba 15 s algo que no iba a aparecer. Ahora espera a que el panel esté
-   armado: sin «Marca», es una lista vacía. No lo reproduje: con Pauny
-   presente no cae.
-3. **El punto 1, «Editar».** La opción de la marca dada de baja sale de la
-   marca guardada en la publicación (`brand` y `brand_label` de
-   `/products/my`), no de la elegida.
-   - Antes del arreglo, el 239 daba rojo en los dos anchos: «dada de baja,
-     en «Editar» quien elige otra ya no puede volver a elegir «AgroMec»».
-   - Negativo nuevo, `editar-ofrece-la-elegida`.
-   - `editar-valor-interno` quedó al día con el código nuevo.
-4. **Los puntos 3, 4, 8 y 9:**
-   - **3:** un cambio de ancho entre el primer dibujo y el efecto pasa por el
-     mismo aviso, y el foco no se pierde.
-   - **4:** Inicio devuelve el foco antes de pintar.
-   - **8:** el aviso se guarda después de dibujar.
-   - **9:** el 239 dice «publicar con la marca «Quieta…» no la creó».
-5. **D6:** `DELIVERY_CHECKLIST.md` está en `docs/pm/archivo/`. Corregí
-   `REPO_MAP.md` y lo anoté en el README del archivo.
-
-**Reglas repetidas:**
-
-- En `9f4d308` saqué de `CLAUDE.md` §3 las tres reglas, y de `AGENTS.md` las
-  dos. Cada archivo remite a «Límites que no se negocian».
-- «Eficiencia de chats» la reescribí en `ed34fb4`. Pediste que fuera en el
-  mismo commit, pero cuando llegó tu pedido el primero ya estaba debajo de
-  la integración de la rama.
+```
+1440px: con el error a la vista, el aviso tapa 43 px de alto de «Publicar producto»
+1440px: con el error a la vista, el aviso tapa 48 px de alto de «Continuar al pago»
+1440px: con el error a la vista, en el centro de «Continuar al pago» está DIV «!Error al publicar el producto. Por favor intenta »
+390px: con el error a la vista, el aviso tapa 7 px de alto de «Publicar producto»
+320px: con el error a la vista, el aviso tapa 48 px de alto de «Continuar compra»
+320px: con el error a la vista, en el centro de «Continuar compra» está SPAN «Error al publicar el producto. Por favor intenta d»
+```
 
 ## Cómo verificarlo
 
 Con la API en 8000 y el frontend de desarrollo en 5173:
 
 ```bash
-SMOKE_CASOS=204,239,241 node scripts/smoke.mjs
+SMOKE_CASOS=241,242,243 node scripts/smoke.mjs
 # → 3/3 pasaron; 0 fallaron
 
-python3 scripts/sabotajes_avisos_1.py error-se-va
-# → [ROJO ESPERADO] y «todos dieron el rojo esperado»
+python3 scripts/sabotajes_avisos_1.py tapa-la-capa el-dedo-pausa cierra-con-poco teclado-se-va
+# → cuatro [ROJO ESPERADO], «src después: como estaba» y «todos dieron el rojo esperado»
 
-python3 scripts/sabotajes_marcas_panel_1.py editar-ofrece-la-elegida
-# → [ROJO ESPERADO]: «… quien elige otra ya no puede volver a elegir «AgroMec»»
+node scripts/guia-admin.mjs
+# → «LA GUÍA Y EL PANEL COINCIDEN: 30 pasos en escritorio y celular», sin la nota «un aviso tapaba el control»
 ```
-
-El rojo del 204, sin sabotear código: pausá el Pauny de la siembra
-(`UPDATE products SET status='PAUSED' WHERE slug='tractor-pauny-280a-doble-traccion'`)
-y corré el 204 sobre `e5d592e`. Después volvelo a `ACTIVE`.
 
 ## Puertas
 
+Todo sobre el producto `cc689e5`.
+
 | puerta | resultado |
 |---|---|
-| suite completa desde base nueva, sobre `259f232` | **240/241**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'». Pasan el 204, el 239, el 240 y el 241 |
-| tipos, lint y build | verdes: `tsc` sin errores, `npm run lint` sin avisos y `npm run build` |
-| a11y `--todas`, sobre `5b1032d` | «SIN VIOLACIONES BLOQUEANTES, COBERTURA COMPLETA», con «aviso con acción» en los dos anchos |
-| contraste, sobre `5b1032d` | «las 88 mediciones exigidas se hicieron», «TODO OK, COBERTURA COMPLETA» |
-| auditoría móvil | 39 pantallas: 0 desbordes, 0 controles tapados, 0 errores de consola y 0 respuestas 4xx/5xx |
-| `guia-admin.mjs`, sobre `5b1032d` | «LA GUÍA Y EL PANEL COINCIDEN: 30 pasos en escritorio y celular», con la nota «un aviso tapaba el control» (D1) |
-| `guia-usuario.mjs` | «LA GUÍA Y EL SITIO COINCIDEN: 23 pasos en escritorio y celular» |
-| negativos | avisos 7/7, marcas 13/13 e Inicio 6/6: «todos dieron el rojo esperado», y «src y backend después: como estaban» |
-| backend | `compileall` verde; sin migración y sin cambio de API |
-| diff-check con `cr-at-eol` sobre `b218412..HEAD`, fuera de `docs/pm` | limpio; `--stat` da igual con y sin CR |
+| 241, 242 y 243 | «3/3 pasaron; 0 fallaron». El 241: lo bueno se fue a los 3941 ms (1440) y 3979 ms (390). El 243: el centro de «Publicar producto» en y=758 (1440), 647 (390) y 351 (320), y reintentó en los tres |
+| negativos | 16 de 16 «[ROJO ESPERADO]» y «src después: como estaba»: los 7 de antes y los 9 nuevos |
+| a11y `--todas` | «SIN VIOLACIONES BLOQUEANTES, COBERTURA COMPLETA» |
+| contraste | «las 88 mediciones exigidas se hicieron», «TODO OK, COBERTURA COMPLETA» |
+| `guia-admin.mjs` | «[OK] Paso 24. Editar o desactivar una opción (4 frases de resultado)» en los dos anchos; «LA GUÍA Y EL PANEL COINCIDEN: 30 pasos en escritorio y celular». La nota del paso 24 ya no aparece |
+| `tsc`, lint y build | verdes |
+| diff-check con `cr-at-eol` sobre `7f5fbaf..HEAD` | limpio; `--stat` da igual con y sin CR |
 
-**Antes de las puertas finales hubo dos rojos míos, ya corregidos:**
-
-- a11y y contraste buscaban «Agregar al carrito» en un insumo, que dice
-  «Agregar».
-- Contraste midió el aviso a mitad de su salida: 1,00:1, casi transparente.
-  Ahora mide el carrito cuando el aviso ya se fue.
+**Antes del verde hubo un rojo de las puertas, ya corregido:** contraste
+midió el carrito con el aviso todavía yéndose (1,00:1, «Agregado: Fertilizante
+Triple 15 - NPK»). Al aviso que se va le puse `aria-hidden`, y el localizador
+por rol lo daba por ido antes de tiempo. a11y y contraste esperan ahora a que
+no quede ningún aviso.
 
 **Líneas con CR por archivo, contra la base:**
 
 | archivo | base | ahora |
 |---|---|---|
-| `Toast.tsx`, `Toast.module.css` | todo CRLF | todo CRLF |
-| `App.tsx` | 526 de 1009 | 527 de 1010: la línea nueva, con CR como sus vecinas |
-| `UserDashboard.tsx` | 4220 de 4549 | 4222 de 4551: las dos nuevas, con CR como sus vecinas |
-| `scripts/smoke.mjs` | 4 | 4, las mismas |
-| `ProductDetailPage.tsx`, `HomePage.tsx`, `useEsMovil.ts`, `contextos.ts` y los scripts | 0 | 0 |
+| `Toast.tsx` | 353 de 353 | 470 de 470 |
+| `Toast.module.css` | 332 de 332 | 347 de 347 |
+| `scripts/smoke.mjs` | 4 | 4, las mismas. Una reescritura mía las había pasado a LF; `7b95bc2` las devuelve |
+| `a11y.mjs`, `contraste.mjs`, `sabotajes_avisos_1.py` | 0 | 0 |
 
-`ProductDetailPage.tsx` quedó con 3 CR por error en `98cc39f`; `259f232` lo
-devuelve a LF.
+## Subagente y autorrevisión
 
-## Autorrevisión
+**Subagente adversarial:** Sonnet 5.5, como agente general. El esfuerzo fue
+el de la sesión (medio): las definiciones de `.claude/agents/` las carga
+Claude Code al abrir el chat, y en este no estaban. Sólo leyó código, sobre
+una copia limpia (los sabotajes estaban rompiendo los archivos del aviso).
+Seis hallazgos; reproduje cuatro.
 
-`/code-review` en nivel alto sobre `b218412..HEAD`, sin `docs/pm`. Es la
-misma IA que escribió el código, así que no es independiente. Sólo leyó el
-diff. Encontró diez puntos.
+| # | Hallazgo | ¿Lo reproduje? | Qué hice |
+|---|---|---|---|
+| 1 | Con una capa abierta, el aviso que esperaba al teclado no se va nunca y la capa queda achicada | Sí (B5) | Arreglado; negativo `capa-no-arranca` |
+| 2 | Cerrar con el teclado el último aviso con una capa abierta manda el foco detrás de la capa | Sí (B6) | Arreglado; negativo `foco-detras` |
+| 3 | La altura de la pila no se vuelve a medir al cambiar el ancho | No: a 320 el error mide lo mismo que a 390, y el sabotaje no dio rojo | El cambio lo saqué (`a802eff`) |
+| 4 | El 242 podía dar verde sin observar: el toque sin comprobar, el cierre por tiempo y no por el gesto, la posición después del gesto vertical | Sí, en el caso | El caso comprueba que el toque llega, que el cierre llega antes de los 3,5 s y que el aviso vuelve a su lugar |
+| 5 | La confirmación «Descartar cambios», que está por encima de los avisos, también se achica | Inofensivo | Sin cambio |
+| 6 | Menores: `dvh` sin respaldo, ampliar con dos dedos, el arrastre perdía el lugar en la pila, el foco previo que queda viejo | — | Los tres primeros, arreglados sin caso; el cuarto, sin cambio |
 
-| # | Qué encontró | Qué hice |
+**Autorrevisión,** `/code-review` en nivel alto sobre `7f5fbaf..HEAD`, sin
+`docs/pm`. No es independiente. Nueve hallazgos:
+
+| # | Hallazgo | Qué hice |
 |---|---|---|
-| 1 | Cerrar con el mouse pasaba el foco al aviso siguiente, y la pila quedaba en pausa | Arreglado; rojo antes con el 241, negativo `foco-al-cerrar-con-mouse` |
-| 2 | Cada aviso es su propia región `role="status"`, que entra ya con texto: algunos lectores de pantalla no anuncian así | Riesgo, abajo. No lo probé con un lector real |
-| 3 | Sin rótulo, éxito, atención e información son la misma píldora verde | Los distingue el ícono: tilde o «!». La tarea pide sacar el rótulo |
-| 4 | Las alturas se medían con la escala de los de atrás | Arreglado (`offsetHeight`) |
-| 5 | Cruzar el hueco entre dos avisos desplegados plegaba la pila | Arreglado: la pila entera atrapa el puntero |
-| 6 | «Ver carrito» cierra el aviso, y al cerrar el carrito el foco vuelve al cuerpo de la página | Riesgo, abajo |
-| 7 | Muchos errores desplegados suben por encima de la pantalla | Arreglado: cinco como máximo |
-| 8 | El contexto se recreaba en cada dibujo de la pila | Arreglado (`useMemo`) |
-| 9 | `useEsMovil` podía perder un cambio de ida y vuelta | Arreglado; los seis negativos de Inicio, en rojo otra vez |
-| 10 | Esperas fijas en el 241 | Las de medir son ahora esperas a que terminen las animaciones. Quedan las de 3, 5,5 y 6 s, que son el tiempo que se mide |
+| 1 | El aviso que espera al teclado no se va si la persona pasa al mouse, ni si nació con el foco en una capa | Arreglado. El del mouse, con rojo (B7, `mouse-no-arranca`); el de la capa, sin caso: hoy no hay acción dentro de una capa |
+| 2 | La regla de las capas le ponía un tope de 90 % del alto a ventanas con su alto ajustado, como «Ingresar» | Saqué el tope: sólo resta lo del aviso. Sin caso |
+| 3 | Las capas saltan con cada aviso; la reserva se soltaba mientras el último aviso se iba; la pila desplegada no tiene reserva | La reserva dura hasta que el aviso se va y el que se va no atrapa el puntero. El salto queda (supuesto 1); la pila desplegada es un riesgo |
+| 4 | Sin captura del puntero, el lápiz deja el aviso corrido | Volvió la captura. Sin caso |
+| 5 | El carrito de la cuenta de demostración queda con los productos del 242 y del 243 | Los dos lo vacían al terminar |
+| 6 | La capa de arriba se toma por orden del documento | Revisado: las anidadas de hoy (la confirmación dentro de «Vender») quedan después. Sin cambio; es un riesgo |
+| 7 | a11y y contraste esperan que no quede ningún aviso, no sólo el suyo; una sangría corrida | Corregí la sangría. La espera queda así: en ese recorrido no hay otro aviso, y si lo hubiera, falla con su tiempo |
+| 8 | Los tres casos de avisos repiten la preparación | Sin cambio |
+| 9 | Las definiciones de subagentes dicen «no escribe» pero tienen Bash | Es así: Bash no se puede limitar a lectura, y sin Bash no corren Playwright. Queda en la consigna |
 
-La misma autorrevisión, con las capturas, encontró dos defectos antes de
-entregar. Los dos tienen hoy su rojo en el 241:
+## Subagentes con esfuerzo
 
-- cerrar un aviso con el mouse dejaba la pila desplegada para siempre;
-- la pila desplegada se encimaba.
+`.claude/agents/` tiene cuatro definiciones: `adversario-sonnet-medio`,
+`adversario-sonnet-alto`, `adversario-opus-medio` y `adversario-opus-alto`.
+Cada una lleva la consigna adversarial de `ONBOARDING-DEV.md`, sin `Write`
+ni `Edit`.
+
+La documentación de Claude Code
+(<https://code.claude.com/docs/en/sub-agents>) trae el campo `effort`:
+«Effort level when this subagent is active. Overrides the session effort
+level. Default: inherits from session. Options: `low`, `medium`, `high`,
+`xhigh`, `max`». El modelo va en `model` (`claude-sonnet-5-5`,
+`claude-opus-5-5`). Opus no pasa de `high`.
+
+Se cargan al abrir un chat: en este no las pude usar.
 
 ## Riesgos
 
-- **Lectores de pantalla (punto 2).** Los avisos que no son error se anuncian
-  como una región `status` nueva. NVDA y JAWS pueden no leerlos. Antes había
-  un contenedor fijo. No lo probé con un lector real.
-- **El foco después de «Ver carrito» (punto 6).** Al cerrar el carrito, el
-  foco vuelve al cuerpo de la página.
-- **El aviso tapa botones del pie en el celular.** Es D1.
-- **Deslizar para cerrar no tiene caso.** Lo programé con eventos de puntero
-  táctil, y ningún caso lo prueba.
+- **La pila desplegada puede tapar el botón de una capa.** La reserva es la
+  de la pila plegada. Se despliega sólo con el mouse encima o con el foco
+  adentro, o sea mientras la persona está usando los avisos.
+- **Un error que se queda no se alcanza con el teclado mientras hay una capa
+  abierta:** la capa encierra el foco. Ya era así antes. Ahora, al menos, no
+  tapa los botones.
+- **Lector de pantalla, lápiz y dedo reales:** no los probé.
 - **Ninguno de datos:** no cambia la API ni la base.
 
 ## Qué no se corrió
 
-- Deslizar con un dedo real, y un lector de pantalla real.
-- La suite completa sobre `5b1032d`: desde `259f232` sólo cambiaron
-  `a11y.mjs`, `contraste.mjs` y `guia-admin.mjs`, que corrí sobre
-  `5b1032d`. El delta es `git diff --stat 259f232..5b1032d`, más las
-  capturas y este informe.
+- La suite completa: no la pediste.
+- La auditoría móvil y la guía de uso: no las pediste, y la guía de uso no
+  toca avisos con capas.
+- Un dedo, un lápiz y un lector de pantalla reales.
 
 ## Desvíos del entorno
 
-- **El contenedor no traía PostGIS.** Lo instalé con
-  `apt-get install postgresql-16-postgis-3`.
-- **Playwright 1.62 espera un Chromium que no está en la imagen.** Le
-  apunté el Chromium 141 que trae la imagen con un enlace en
-  `/opt/pw-browsers`, sin tocar el repositorio. Si en tu entorno Playwright
-  trae el suyo, no te afecta.
-- **Mi script de puertas borró sin querer la evidencia móvil versionada**
-  del 25 y el 26/07. La restauré desde Git antes de commitear, y no hay
-  ningún borrado en la rama.
+- **PostGIS** instalado con `apt-get install postgresql-16-postgis-3`.
+- **Chromium:** Playwright 1.62 espera uno que la imagen no trae; le apunté
+  el 141 de la imagen con un enlace en `/opt/pw-browsers`, sin tocar el
+  repositorio.
