@@ -64,6 +64,24 @@ integres ni despliegues por tu cuenta.
   quedaron versionadas en `docs/pm/herramientas/`, y `ONBOARDING-PM.md` dice
   cómo usarlas.
 
+**Tres pedidos sobre cómo nos comunicamos (Emi, 03/10):**
+
+1. **Un informe, una entrega.** Ya es regla («Canal PM ↔ Dev» en
+   `ONBOARDING-PM.md`). Las propuestas de proceso y lo que hables con Emi van
+   en un informe aparte, después de la entrega, o en el mismo archivo pero
+   bajo un título que diga «No es parte de la entrega». En `2ef9fbe` venía
+   todo junto, y separar qué se revisa de qué se decide costó más que la
+   revisión.
+2. **Tu revisión con `/code-review` no es independiente:** la corre el mismo
+   modelo que escribió el código. Sirve, y seguí corriéndola, pero en el
+   informe llamala «autorrevisión». La independiente es la de PM, sus
+   subagentes y, al final, el revisor distinto de D9.
+3. **Esfuerzo alto en las piezas de dinero, sesión, permisos o datos.** Es
+   tu recomendación y Emi la adopta. La próxima es `CONFIABILIDAD-API-1`.
+   Para D8, PM contó 16 rutas `async` con consultas a la base (vos, 17), y
+   el proceso único sin `--workers` es cierto. La diferencia no cambia la
+   tarea: decí cuáles cambiaste.
+
 **Reglas repetidas (pedido de Emi: cada regla en un solo lugar).** Los
 límites que no se negocian tienen su única copia en
 `ONBOARDING-PM.md`, «Límites que no se negocian». Sacá las copias de tus
