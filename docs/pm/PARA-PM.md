@@ -2,355 +2,271 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## INICIO-CIERRE-CELULAR-1 y el agregado de MARCAS-PANEL-1: entrega
+## AVISOS-1 y su agregado chico: entrega
 
 | | |
 |---|---|
 | rama | `claude/dev-role-repo-3l0kp3` |
-| base | `4f453a0`; después integré tus `4085a9a` y `4b1eee4`, sólo `docs/pm` |
-| INICIO-CIERRE-CELULAR-1 | código `666bbf1`; caso, 232 ajustado y negativos `8fbd0aa` |
-| agregado de MARCAS-PANEL-1 | código `1eb819d`; casos y negativos `baa2705` |
-| no integrado, no desplegado | `main` está en `4085a9a`, tu publicación de `MARCAS-PANEL-1` |
+| base | `b218412`; integré tus commits hasta `914c2b0`, que tocan sólo `docs/pm` |
+| AVISOS-1, producto | `98cc39f`, con los arreglos de la autorrevisión en `0958c76` y los finales de línea en `259f232` |
+| AVISOS-1, caso, negativos y puertas | `9900b55`, `a1397b9`, `5eb9ae1` y `5b1032d` |
+| agregado, producto | `8fe56f7`; `1066d4b` le saca un `useEffect` sin uso que rompía `tsc` |
+| agregado, casos y negativos | `cfeb23f` |
+| D6, `DELIVERY_CHECKLIST.md` | `d694763` |
+| reglas repetidas, aparte | `9f4d308` (`CLAUDE.md` §3 y `AGENTS.md`) y `ed34fb4` («Eficiencia de chats») |
+| no integrado, no desplegado | `main` sigue en `e5d592e` |
+
+**Resultado: terminado.** El producto quedó fijo en `259f232`, y la suite
+completa corrió sobre ese SHA. Después sólo cambiaron `a11y.mjs`,
+`contraste.mjs` y `guia-admin.mjs`, que se volvieron a correr sobre `5b1032d`.
 
 ### Decisiones
 
-Contestalas en `PARA-DEV.md` con el mismo número. El detalle de cada una está
-al final.
-
 | | Qué decidís | Recomiendo |
 |---|---|---|
-| D1 | Qué hallazgos de la revisión independiente se suman a esta entrega | El 1 (un P2 de «Editar», con arreglo y rojo listos sin subir), el 3, el 4 (sólo lo del foco), el 8 y el 9: los cuatro últimos son de una línea |
-| D2 | `/como-venimos` (borrador en `.claude/propuestas/`, para Emi) | Adoptarlo: Emi pregunta el estado a cada lado por separado |
-| D3 | `/revisar-entrega` (borrador de tu comando) | Adoptarlo y adaptarlo a tu gusto: es tu método de `ONBOARDING-PM` en orden |
-| D4 | Mis comandos (`/respondio`, `/entregar`) y la línea nueva de `CLAUDE.md` §4 | Dejarlos; si algo te sobra, decime qué saco |
-| D5 | Tu loop de espera de unos 30 min después de cada veredicto | Dejarlo: lo decidió Emi |
-| D6 | `DELIVERY_CHECKLIST.md`, en la raíz: es la entrega de la Fase I de junio, pero se llama como un checklist vigente (lo cita `REPO_MAP.md`) | Moverlo a `docs/pm/archivo/` y corregir la cita |
-| D7 | Controles automáticos en GitHub en cada push, que no dependen de ninguna IA: lint, tipos, build, compilación, `alembic check` y unos casos rápidos; la suite completa, una vez por semana. Hoy el repositorio no tiene ninguno | Pieza propia antes del lanzamiento. Necesita el visto bueno de Emi por los minutos de GitHub (el plan gratis alcanza para la parte rápida) |
-| D8 | Que la API no se pueda congelar entera. En producción corre un solo proceso (`railway-entrypoint.sh`, sin `--workers`), y 17 rutas `async` hacen consultas bloqueantes a la base: 9 de `orders.py`, 7 de `products.py`, el webhook y el vínculo de Mercado Pago, contacto y documentación. Si una se traba, se traba todo. Es la causa del P0 de FILTROS, que arreglé sólo para las marcas | Pieza propia de confiabilidad antes del lanzamiento, con la suite completa: toca órdenes y cobros |
-| D9 | Un revisor distinto para la auditoría de seguridad final, otro modelo o una persona: vos y yo somos el mismo modelo y podemos compartir puntos ciegos | Sí. Lo decide Emi |
+| D1 | En el celular, un aviso de abajo puede tapar un botón del pie de la pantalla. Con el dedo encima se pausa y no se va hasta que se cierra con «×» o se desliza. La guía del panel lo encontró en el paso 24, al guardar una opción de Configuración | **Una pieza chica aparte:** en pantallas táctiles, el aviso se pausa con el foco y no con el dedo encima. La alternativa es dejarlo así: se cierra con «×» o deslizándolo |
 
-Lo que no adoptes se borra: al final, `.claude/propuestas/` no tiene que
-existir, y ninguna regla queda escrita en dos lugares.
+**Supuestos, todos reversibles:**
 
-Los cuatro puntos del agregado están hechos, cada uno con su negativo en
-rojo. Están más abajo, en «Agregado de MARCAS-PANEL-1». El único cambio de API
-es aditivo: `/products/my` suma el nombre de la marca.
+1. **Esquinas de 14 px,** como la maqueta. `tokens.css` llega a 6 px, que es
+   para tarjetas y controles.
+2. **El ícono rojo del error** usa los dos colores de la maqueta (`#e8746c`
+   y `#3b0f0c`), que no están en `tokens.css`. El «!» mide 5,67:1 sobre el
+   rojo, y el rojo mide 3,43:1 contra el verde.
+3. **La acción va en un botón cereal con texto verde profundo,** como
+   «Vender». En la maqueta es texto cereal, y el cereal como texto sobre el
+   verde mide 3,86:1, debajo de 4,5. Así mide 5,14:1.
+4. **Los cuatro tipos:**
+   - éxito: tilde cereal;
+   - error: «!» rojo;
+   - atención: «!» cereal;
+   - información: «i» cereal.
 
-**Resultado de INICIO-CIERRE-CELULAR-1.**
+   Todo lo que no es error se va a los 4 s.
+5. **La segunda línea** la usa sólo el aviso de «Agregado»: dice
+   «Cantidad: N».
+6. **«Ver carrito» va sólo en la ficha,** que es el único lugar donde hoy se
+   agrega con aviso. La tarjeta del Mercado agrega sin aviso, y no se lo
+   sumé. «Deshacer» y «Reintentar» no los puse: no hay ningún aviso cuya
+   acción ya exista.
+7. **Plegada se ven tres; desplegada, cinco como máximo.** Los de más atrás
+   aparecen a medida que se cierran los de adelante.
+8. **A mano, sin librería.**
 
-- **En el celular,** «¿Te interesa alguno?» va al final de Inicio, después de
-  «Principio de AgroBoeda», con los mismos textos y el mismo botón.
-- **El crédito de las fotos** queda inmediatamente después de la tarjeta 07.
-- **En la computadora no cambia nada.** Capturé Inicio entero antes y
-  después del cambio. En 1440 las dos capturas son idénticas píxel por píxel.
-  En 600 y 768 también, salvo las primeras 300 filas (cabecera y portada):
-  esas cambian igual entre dos capturas seguidas del mismo código, así que es
-  ruido de la captura y no el cambio.
+## AVISOS-1
 
-**Desde qué ancho cambia: 599 px o menos.** Es el corte de celular del
-contrato. Con ese mismo corte la grilla ya pasaba a una columna, y la cabecera
-cambia el texto de la búsqueda. Sólo en una columna el bloque queda en el
-medio:
+- **Cómo se ve:** píldora verde, texto blanco, ícono redondo, segunda línea
+  tenue y sin rótulo en mayúsculas.
+- **Dónde y cómo se mueve:**
+  - abajo al centro en los dos anchos;
+  - entra desde abajo con un rebote corto y sale bajando;
+  - con `prefers-reduced-motion`, sin animación.
+- **Pila:** los de atrás, más chicos y asomando, no dibujan su texto. Con el
+  mouse o el foco encima, la pila se despliega.
+- **Tiempos:**
+  - lo bueno se va a los 4 s y se pausa con el mouse o el foco encima;
+  - el error se queda, con `role="alert"`; lo demás lleva
+    `role="status"`.
+- **Cerrar:**
+  - con «Cerrar aviso», también con Enter. Con el teclado, el foco pasa al
+    aviso siguiente;
+  - en el celular, deslizándolo de costado o hacia abajo.
 
-- de 600 a 1023 px la grilla tiene dos columnas, y con el bloque son ocho
-  piezas: cuatro filas completas;
-- desde 1024 px son cuatro columnas: dos filas completas.
+Capturas de éxito, error, pila y pila desplegada, en 1440 y 390:
+`docs/pm/capturas/avisos-1/`.
 
-**Por qué no se hizo sólo con estilos.** Con estilos sólo cambia lo que se ve.
-El lector de pantalla y el Tab seguirían encontrando el bloque en el medio.
-Por eso el bloque cambia de lugar en el documento, según el ancho. Está una
-sola vez en cada ancho.
+**Caso 241, nuevo, en 1440 y 390:**
 
-Tres supuestos, todos reversibles:
+- **Posición:** abajo, centrado al píxel y debajo de la cabecera.
+- **Lo bueno:** sigue a los 3 s y se va entre 3,5 y 5,5 s; en la última
+  corrida, a los 3986 y 4040 ms. Con el mouse encima sigue a los 5,5 s, y al
+  sacarlo se va.
+- **El error:** sigue a los 6 s, con `role="alert"`, y «Cerrar aviso» lo
+  cierra.
+- **Tres seguidos, plegados:** se lee sólo el de adelante y los de atrás
+  asoman menos de 40 px. Desplegados, se leen los tres, no se enciman y no
+  suben hasta la cabecera.
+- **Teclado:** Enter cierra uno por uno, y el foco pasa al siguiente.
+- **Con el mouse:** cerrar el de adelante con un aviso bueno detrás no deja
+  la pila en pausa; el bueno se va solo.
+- **«Ver carrito»,** al agregar desde la ficha, abre el carrito.
 
-1. **Al final, el título «¿Te interesa alguno?» pasa a nivel 2.** En la
-   grilla sigue de nivel 3, como las tarjetas. Si quedara en 3, en el índice
-   de títulos del lector de pantalla caería dentro de «Cómo funciona». Se ve
-   igual.
-2. **Separación en el celular:** 24 px entre el principio y el bloque, y
-   48 px debajo del bloque, el margen que antes tenía el principio. No había
-   maqueta para esto.
-3. **Si cambia el ancho con la página abierta** (girar el celular, achicar la
-   ventana), el bloque se muda. Si el foco estaba en «Escribinos», lo
-   conserva.
+`python3 scripts/sabotajes_avisos_1.py` → «todos dieron el rojo esperado»:
 
-## Caso y negativos de INICIO-CIERRE-CELULAR-1
-
-**Caso 240, nuevo, en 390, 599, 600, 768 y 1440:**
-
-- en 390 y 599, el bloque está después de «Principio de AgroBoeda» y Inicio
-  no dice nada más después de él. Después de la tarjeta 07 viene el crédito,
-  a menos de 40 px;
-- en 600, 768 y 1440 es la octava pieza de la grilla, en la fila de la
-  tarjeta 07 y a su derecha;
-- en todos los anchos, el título, el texto y «Escribinos» están una sola vez
-  en el documento;
-- lo que se lee va en el orden en que se ve: cada tarjeta, el bloque, el
-  crédito y el principio, debajo de lo anterior o a su derecha en la misma
-  fila;
-- con Tab, desde «Entrar al Mercado»: en el celular, los cinco enlaces del
-  crédito y después «Escribinos», y ahí termina Inicio. En la computadora,
-  primero «Escribinos» y después los enlaces;
-- abierta en 1440 con el foco en «Escribinos», al pasar a 390 el bloque va
-  al final y el foco sigue en «Escribinos». Al volver a 1440, lo mismo.
-
-**El 232 se ajustó sin cambiar lo que mide.** Buscaba el bloque dentro de la
-sección del ecosistema, y en el celular ya no está ahí. Ahora lo busca en la
-página, comprueba que esté una sola vez, y mide lo mismo que antes: sus
-textos y su botón. **El 233 no cambió** y sigue verde.
-
-`python3 scripts/sabotajes_inicio_cierre_celular_1.py` → «todos dieron el rojo
-esperado» (seis) y «src después: como estaba»:
-
-| sabotaje | rojo del 240 |
+| sabotaje | rojo del 241 |
 |---|---|
-| `en-el-medio` (pedido): en el celular el bloque vuelve a la grilla | 13 problemas, sólo en 390 y 599 y al pasar a 390: «390: «¿Te interesa alguno?» no está después de «Principio de AgroBoeda»: es la 8.ª de la grilla», «390: después de la tarjeta 07 viene el cierre, y no el crédito», «el crédito no se ve junto a la tarjeta 07: 316 px» y el Tab en el orden viejo |
-| `dos-veces`: el bloque se dibuja en la grilla y al final | «390: el cierre está más de una vez o falta en el documento: 2 título(s), 2 «Escribinos», 2 texto(s)», y lo mismo en 599 |
-| `en-todos-los-anchos`: el bloque va al final también en la computadora | «1440: «¿Te interesa alguno?» no es la octava de la grilla: está al final de Inicio», y lo mismo en 600 y 768. Nada en 390 ni en 599 |
-| `sin-escuchar`: el ancho se lee al abrir y no se escucha | 1 problema: «al pasar de 1440 a 390, el cierre no fue al final» |
-| `foco-perdido`: al mudarse, el bloque no devuelve el foco | 2 problemas: «al pasar de 1440 a 390 con el foco en «Escribinos», el foco quedó en BODY», y lo mismo de vuelta |
-| `titulo-h3`: al final, el título sigue de nivel 3 | 2 problemas: «390: al final, el cierre es un H3 y en el índice de títulos queda dentro de «Cómo funciona»», y lo mismo en 599 |
+| `error-se-va` (el tuyo) | «escritorio 1440px: a los 6057 ms quedan 0 errores y tenía que quedar 1», y lo mismo en celular |
+| `arriba`: los avisos vuelven arriba | «el aviso empieza en 20 y la cabecera termina en 64», «el aviso no está abajo: termina en 72 de 900» |
+| `texto-encimado`: los de atrás dibujan su texto | «plegada, se enciman…» y «plegada, se leen 3 de 3 y tenía que leerse sólo el de adelante» |
+| `sin-pausa`: el mouse encima no pausa | «con el mouse encima, lo que salió bien se fue antes de 5509 ms» |
+| `foco-perdido`: con el teclado, el foco no pasa al siguiente | «al cerrar con el teclado, el foco quedó en «null» y no en el aviso siguiente» |
+| `foco-al-cerrar-con-mouse` | «al cerrar con el mouse el de adelante, el bueno de atrás no se fue solo» |
+| `sin-ver-carrito` | «agregar desde la ficha no ofrece «Ver carrito»» |
 
-## Agregado de MARCAS-PANEL-1
+**Los casos que leen avisos no hubo que ajustarlos.** Los que buscan
+`[role="status"]` o `[role="alert"]` siguen verdes en la suite completa.
 
-En dos commits aparte: el código en `1eb819d`, y los casos y los negativos en
-`baa2705`.
+**a11y y contraste miden el aviso.** Agregué la superficie «aviso con acción»
+en `lib/superficies.mjs`, así que las dos puertas la exigen. El Fertilizante
+se agrega desde su ficha y se mide el aviso con el mouse encima. Después
+«Ver carrito» abre el carrito, que queda igual que antes.
 
-1. **Unir con pausadas y eliminadas.** El 239 crea una marca con tres
-   publicaciones (una activa, una pausada y una eliminada), la une a John
-   Deere y comprueba que las tres quedan con John Deere. La respuesta dice
-   «movidas 2», las que no están eliminadas. **Tu negativo
-   `unir-solo-activas` ahora da rojo:** «API: unir una marca con una
-   publicación activa, una pausada y una eliminada respondió 200 (movidas 2),
-   y la pausada quedó con «quieta-…», la eliminada quedó con «quieta-…»».
-2. **Configuración no renombra una marca.** El 239 pide
-   `PUT /admin/form-options/{id}` sobre una marca y espera 400 con el nombre
-   intacto. **Tu negativo `configuracion-renombra` ahora da rojo:** «API:
-   Configuración renombró una marca por la ruta genérica (HTTP 200)». Lo
-   pruebo antes que el borrado: con el borrado roto, renombrar después daría
-   404 y no diría nada del cambio de nombre.
-3. **«Editar» muestra el nombre de una marca dada de baja.** La causa:
-   «Editar» lee la lista de publicaciones propias (`/products/my`), que
-   traía sólo el valor interno, y la marca ya no venía en la lista del alta.
-   - **Arreglo:** `/products/my` suma `brand_label`, con una sola consulta
-     para todas las publicaciones, y «Editar» lo usa. Si no hay nombre,
-     muestra el valor, como antes.
-   - **Caso:** en el 239, en los dos anchos, con «AgroMec» dada de baja,
-     quien vende abre «Editar» y el selector dice «AgroMec».
-   - **Negativos, los dos en rojo** con «escritorio: dada de baja, «Editar»
-     muestra la marca como «agromec»» y lo mismo en celular:
-     `editar-valor-interno` (la pantalla vuelve a mostrar el valor) y
-     `mis-publicaciones-sin-nombre` (la API deja de mandar el nombre).
-4. **El 195 espera las opciones del tipo.** Las relee hasta que coinciden con
-   la base, por 20 s como máximo, y si no llegan dice qué ofreció. Reproduje
-   la carrera retrasando 3 s la respuesta del catálogo: leídas enseguida dan
-   `["Todos"]`; con la espera, `["Todos","Rastras (1)"]`.
-   - **Otros casos que leían igual:** el 198, el 238 y el 239 leen el filtro
-     de marca apenas aparece. Ahora esperan a que alguna opción diga «(n)».
-     Los demás que leen opciones (el alta y «Editar») leen listas que no
-     dependen de la respuesta del catálogo, y ya esperaban sus opciones.
+## Agregado chico
 
-`python3 scripts/sabotajes_marcas_panel_1.py` → «todos dieron el rojo
-esperado» con los doce: los cuatro nuevos y los ocho de antes. Los repetí
-porque el 239 cambió. Siguen en rojo, algunos con más problemas: por
-ejemplo, `unir-sin-mover` pasa de 8 a 9, porque ahora también falla la marca
-de las tres publicaciones. «src y backend después: como estaban», y la base
-sigue con las 44 marcas de la lista.
+1. **El 204: la causa no es la carrera del 195, es un dato.**
+   - En toda la siembra hay un solo tractor con marca, el Pauny. Si no está
+     en el Mercado, «Marca» no se dibuja.
+   - Pausándolo, el 204 da exactamente tu rojo: «el panel va [… "Potencia",
+     "Año" …] y el acordado es [… "Potencia", "Marca", "Año" …]», en los dos
+     anchos.
+   - Retrasar 3 s el catálogo no lo hace caer: el panel aparece junto con la
+     respuesta.
+   - **Arreglo:** el 204 publica su propio tractor John Deere y lo retira al
+     final. Antes de leer el orden, espera «Marca».
+   - **Qué caso saca a Pauny en tu entorno: no lo sé.** Corrí una suite
+     completa con un vigía que miraba los tractores con marca cada segundo, y
+     Pauny no salió nunca: 239/240, con el 131 de entorno. El 198 desactiva
+     y reactiva una marca en un `finally`. Es la sospecha que me queda, sin
+     confirmar.
+   - **Otros casos que leen el filtro de marca:** el 198, el 238, el 239 y
+     la guía de uso. Todos publican sus propias marcas; ninguno depende de
+     Pauny.
+2. **El paso 28 de `guia-admin.mjs`: la misma clase de causa.** Tras dar de
+   baja la marca, si Tractores no tiene otra, «Marca» no se dibuja, y la guía
+   esperaba 15 s algo que no iba a aparecer. Ahora espera a que el panel esté
+   armado: sin «Marca», es una lista vacía. No lo reproduje: con Pauny
+   presente no cae.
+3. **El punto 1, «Editar».** La opción de la marca dada de baja sale de la
+   marca guardada en la publicación (`brand` y `brand_label` de
+   `/products/my`), no de la elegida.
+   - Antes del arreglo, el 239 daba rojo en los dos anchos: «dada de baja,
+     en «Editar» quien elige otra ya no puede volver a elegir «AgroMec»».
+   - Negativo nuevo, `editar-ofrece-la-elegida`.
+   - `editar-valor-interno` quedó al día con el código nuevo.
+4. **Los puntos 3, 4, 8 y 9:**
+   - **3:** un cambio de ancho entre el primer dibujo y el efecto pasa por el
+     mismo aviso, y el foco no se pierde.
+   - **4:** Inicio devuelve el foco antes de pintar.
+   - **8:** el aviso se guarda después de dibujar.
+   - **9:** el 239 dice «publicar con la marca «Quieta…» no la creó».
+5. **D6:** `DELIVERY_CHECKLIST.md` está en `docs/pm/archivo/`. Corregí
+   `REPO_MAP.md` y lo anoté en el README del archivo.
+
+**Reglas repetidas:**
+
+- En `9f4d308` saqué de `CLAUDE.md` §3 las tres reglas, y de `AGENTS.md` las
+  dos. Cada archivo remite a «Límites que no se negocian».
+- «Eficiencia de chats» la reescribí en `ed34fb4`. Pediste que fuera en el
+  mismo commit, pero cuando llegó tu pedido el primero ya estaba debajo de
+  la integración de la rama.
 
 ## Cómo verificarlo
 
-Con el entorno arriba (API en 8000 y frontend de desarrollo en 5173):
+Con la API en 8000 y el frontend de desarrollo en 5173:
 
 ```bash
-SMOKE_CASOS=239,240 node scripts/smoke.mjs
-# → 2/2 pasaron; 0 fallaron
+SMOKE_CASOS=204,239,241 node scripts/smoke.mjs
+# → 3/3 pasaron; 0 fallaron
 
-python3 scripts/sabotajes_inicio_cierre_celular_1.py en-el-medio
+python3 scripts/sabotajes_avisos_1.py error-se-va
 # → [ROJO ESPERADO] y «todos dieron el rojo esperado»
 
-REINICIAR_API="<tu reinicio>" python3 scripts/sabotajes_marcas_panel_1.py unir-solo-activas configuracion-renombra
-# → dos [ROJO ESPERADO] y «todos dieron el rojo esperado»
+python3 scripts/sabotajes_marcas_panel_1.py editar-ofrece-la-elegida
+# → [ROJO ESPERADO]: «… quien elige otra ya no puede volver a elegir «AgroMec»»
 ```
 
-Los negativos de Inicio son de pantalla y no reinician la API. Los dos tuyos
-de marcas sí: usan `REINICIAR_API`.
+El rojo del 204, sin sabotear código: pausá el Pauny de la siembra
+(`UPDATE products SET status='PAUSED' WHERE slug='tractor-pauny-280a-doble-traccion'`)
+y corré el 204 sobre `e5d592e`. Después volvelo a `ACTIVE`.
 
 ## Puertas
 
 | puerta | resultado |
 |---|---|
-| suite completa desde base nueva, sobre `baa2705` (todo lo entregado) | **239/240**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'». Pasan el 195, el 198, el 232, el 233, el 238, el 239 y el 240 |
-| la corrida anterior, sobre `8fbd0aa` (sólo Inicio) | también 239/240, con el mismo 131 |
-| 232 | el ajustado lo corrí también sobre el código de antes del cambio, y pasó: no depende de dónde esté el bloque, eso lo mide el 240 |
-| tipos, lint, build | verdes: `npm run lint` sin avisos y `npm run build` con `tsc` |
-| diff-check con `cr-at-eol` sobre `4f453a0..baa2705`, fuera de `docs/pm` | limpio; ninguna línea cambia sólo por el final |
-| a11y `--todas` | 82 de 82 pantallas, «SIN VIOLACIONES BLOQUEANTES, COBERTURA COMPLETA» |
-| contraste | «las 86 mediciones exigidas se hicieron», «TODO OK, COBERTURA COMPLETA» |
-| auditoría móvil | 12 de 12 recorridos y 39 pantallas: 0 desbordes, 0 controles tapados, 0 errores de consola y 0 respuestas 4xx/5xx |
-| `guia-admin.mjs` | «LA GUÍA Y EL PANEL COINCIDEN: 30 pasos en escritorio y celular» |
+| suite completa desde base nueva, sobre `259f232` | **240/241**. Sólo cae el **131**, de entorno: «puente docker: sólo se traduce 'docker exec'». Pasan el 204, el 239, el 240 y el 241 |
+| tipos, lint y build | verdes: `tsc` sin errores, `npm run lint` sin avisos y `npm run build` |
+| a11y `--todas`, sobre `5b1032d` | «SIN VIOLACIONES BLOQUEANTES, COBERTURA COMPLETA», con «aviso con acción» en los dos anchos |
+| contraste, sobre `5b1032d` | «las 88 mediciones exigidas se hicieron», «TODO OK, COBERTURA COMPLETA» |
+| auditoría móvil | 39 pantallas: 0 desbordes, 0 controles tapados, 0 errores de consola y 0 respuestas 4xx/5xx |
+| `guia-admin.mjs`, sobre `5b1032d` | «LA GUÍA Y EL PANEL COINCIDEN: 30 pasos en escritorio y celular», con la nota «un aviso tapaba el control» (D1) |
 | `guia-usuario.mjs` | «LA GUÍA Y EL SITIO COINCIDEN: 23 pasos en escritorio y celular» |
-| backend | `compileall` verde; sin migración. Un solo cambio de API: `brand_label` en `/products/my`, aditivo |
+| negativos | avisos 7/7, marcas 13/13 e Inicio 6/6: «todos dieron el rojo esperado», y «src y backend después: como estaban» |
+| backend | `compileall` verde; sin migración y sin cambio de API |
+| diff-check con `cr-at-eol` sobre `b218412..HEAD`, fuera de `docs/pm` | limpio; `--stat` da igual con y sin CR |
 
-Las auditorías y las dos guías son de la corrida sobre `baa2705`. Las guías
-no mencionan el bloque de Inicio ni el selector de marca de «Editar», así
-que no cambiaron.
+**Antes de las puertas finales hubo dos rojos míos, ya corregidos:**
+
+- a11y y contraste buscaban «Agregar al carrito» en un insumo, que dice
+  «Agregar».
+- Contraste midió el aviso a mitad de su salida: 1,00:1, casi transparente.
+  Ahora mide el carrito cuando el aviso ya se fue.
 
 **Líneas con CR por archivo, contra la base:**
 
 | archivo | base | ahora |
 |---|---|---|
-| `HomePage.module.css` | todo CRLF (818) | todo CRLF (825) |
-| `HomePage.tsx` | 0 de 296 | 0 de 327 |
-| `Header.tsx` | 0 de 278 | 0 de 254 |
-| `scripts/smoke.mjs` | 4 | 4 (las mismas) |
-| `backend/app/api/products.py` | 931 de 933 | 942 de 944: las 11 agregadas, con CR como sus vecinas |
-| `UserDashboard.tsx` | 4209 de 4538 | 4220 de 4549: las 11 agregadas, con CR como sus vecinas |
-| `src/hooks/useEsMovil.ts` y los dos scripts de negativos | nuevos o en 0 | 0 |
+| `Toast.tsx`, `Toast.module.css` | todo CRLF | todo CRLF |
+| `App.tsx` | 526 de 1009 | 527 de 1010: la línea nueva, con CR como sus vecinas |
+| `UserDashboard.tsx` | 4220 de 4549 | 4222 de 4551: las dos nuevas, con CR como sus vecinas |
+| `scripts/smoke.mjs` | 4 | 4, las mismas |
+| `ProductDetailPage.tsx`, `HomePage.tsx`, `useEsMovil.ts`, `contextos.ts` y los scripts | 0 | 0 |
 
-## Lo que cambió además
+`ProductDetailPage.tsx` quedó con 3 CR por error en `98cc39f`; `259f232` lo
+devuelve a LF.
 
-- **La consulta del ancho de celular pasó a un archivo compartido**
-  (`src/hooks/useEsMovil.ts`). La cabecera ya la tenía para el texto de la
-  búsqueda, e Inicio ahora la usa también. La cabecera hace lo mismo que
-  antes: el 128, que mide ese texto en la computadora («Buscar producto,
-  servicio o ubicación») y en el celular («Buscar»), sigue verde.
+## Autorrevisión
+
+`/code-review` en nivel alto sobre `b218412..HEAD`, sin `docs/pm`. Es la
+misma IA que escribió el código, así que no es independiente. Sólo leyó el
+diff. Encontró diez puntos.
+
+| # | Qué encontró | Qué hice |
+|---|---|---|
+| 1 | Cerrar con el mouse pasaba el foco al aviso siguiente, y la pila quedaba en pausa | Arreglado; rojo antes con el 241, negativo `foco-al-cerrar-con-mouse` |
+| 2 | Cada aviso es su propia región `role="status"`, que entra ya con texto: algunos lectores de pantalla no anuncian así | Riesgo, abajo. No lo probé con un lector real |
+| 3 | Sin rótulo, éxito, atención e información son la misma píldora verde | Los distingue el ícono: tilde o «!». La tarea pide sacar el rótulo |
+| 4 | Las alturas se medían con la escala de los de atrás | Arreglado (`offsetHeight`) |
+| 5 | Cruzar el hueco entre dos avisos desplegados plegaba la pila | Arreglado: la pila entera atrapa el puntero |
+| 6 | «Ver carrito» cierra el aviso, y al cerrar el carrito el foco vuelve al cuerpo de la página | Riesgo, abajo |
+| 7 | Muchos errores desplegados suben por encima de la pantalla | Arreglado: cinco como máximo |
+| 8 | El contexto se recreaba en cada dibujo de la pila | Arreglado (`useMemo`) |
+| 9 | `useEsMovil` podía perder un cambio de ida y vuelta | Arreglado; los seis negativos de Inicio, en rojo otra vez |
+| 10 | Esperas fijas en el 241 | Las de medir son ahora esperas a que terminen las animaciones. Quedan las de 3, 5,5 y 6 s, que son el tiempo que se mide |
+
+La misma autorrevisión, con las capturas, encontró dos defectos antes de
+entregar. Los dos tienen hoy su rojo en el 241:
+
+- cerrar un aviso con el mouse dejaba la pila desplegada para siempre;
+- la pila desplegada se encimaba.
 
 ## Riesgos
 
-- **Ninguno nuevo de datos:** lo de Inicio es sólo de pantalla, y la API
-  sólo suma un campo de lectura. Nada que ya existía cambia ni sale.
-- **El 195 que te cayó** ahora espera. No lo puedo hacer caer a voluntad sin
-  retrasar la respuesta, y con la respuesta retrasada la espera lo cubre.
-- **Si un navegador no supiera leer el ancho** (`matchMedia`, que tienen
-  todos los actuales), el bloque queda en la grilla, como estaba antes.
+- **Lectores de pantalla (punto 2).** Los avisos que no son error se anuncian
+  como una región `status` nueva. NVDA y JAWS pueden no leerlos. Antes había
+  un contenedor fijo. No lo probé con un lector real.
+- **El foco después de «Ver carrito» (punto 6).** Al cerrar el carrito, el
+  foco vuelve al cuerpo de la página.
+- **El aviso tapa botones del pie en el celular.** Es D1.
+- **Deslizar para cerrar no tiene caso.** Lo programé con eventos de puntero
+  táctil, y ningún caso lo prueba.
+- **Ninguno de datos:** no cambia la API ni la base.
 
-## Revisión independiente de esta entrega
+## Qué no se corrió
 
-Es el paso nuevo de `/entregar` (abajo), corrido por primera vez sobre esta
-entrega: `/code-review` en nivel alto, sobre `4f453a0..HEAD`, sin `docs/pm`.
-Sólo lee el código: no corre la app ni los casos. Encontró nueve puntos.
-Ninguno rompe un flujo principal ni toca datos.
+- Deslizar con un dedo real, y un lector de pantalla real.
+- La suite completa sobre `5b1032d`: desde `259f232` sólo cambiaron
+  `a11y.mjs`, `contraste.mjs` y `guia-admin.mjs`, que corrí sobre
+  `5b1032d`. El delta es `git diff --stat 259f232..5b1032d`, más las
+  capturas y este informe.
 
-Emi me pidió no sumar nada sin que lo veas. El arreglo del punto 1 está
-hecho, con su rojo, pero **no está subido**.
+## Desvíos del entorno
 
-| # | Qué encontró | Severidad | Recomendación |
-|---|---|---|---|
-| 1 | En «Editar», con la marca dada de baja: si quien vende elige otra, la dada de baja desaparece del selector y ya no la puede volver a elegir (sólo cancelando). Ya pasaba antes de esta entrega, en el mismo selector del agregado | P2 | **Sumarlo.** El 239 lo detecta en los dos anchos: «escritorio: dada de baja, en «Editar» quien elige otra ya no puede volver a elegir «AgroMec»» (rojo antes del arreglo, verde después) |
-| 2 | El nombre de una marca: si hubiera dos filas con el mismo valor, «Editar» y la ficha podrían elegir nombres distintos | P3 | Nada por ahora: hoy no se pueden crear dos (el alta las une con candado) |
-| 3 | Si el ancho cambia justo entre el primer dibujo y el arranque de Inicio, el bloque se muda sin devolver el foco | P3 | Sumarlo: una línea |
-| 4 | Al girar el celular, un cuadro con el bloque en su lugar viejo y el estilo nuevo, y el foco vuelve después de ese cuadro | P3 | Sumar lo del foco: una línea. El cuadro, no |
-| 5 | La espera nueva de los filtros (198, 238, 239) acepta cualquier cantidad, no la de la respuesta nueva | P3, de las pruebas | Nada por ahora: cada lectura es en una página recién abierta |
-| 6 | El corte de 599 px también está escrito en la foto de la portada | P3, ya estaba | Nada |
-| 7 | Los scripts de negativos repiten las mismas funciones | P3, ya estaba | Una pieza aparte, si querés ordenarlo |
-| 8 | Inicio guarda el aviso de cambio de ancho mientras dibuja, y no después | P3 | Sumarlo: una línea |
-| 9 | Si la marca de las tres publicaciones del 239 no se creara, el caso cae con un error genérico y no con su mensaje | P3, de las pruebas | Sumarlo: una línea |
-
-Si decís que sí, lo subo con la suite y las puertas otra vez.
-
-El arreglo del punto 1 vive sólo en el contenedor de esta sesión. Si la Dev
-pasa a una sesión nueva, se rehace así: en «Editar», la opción extra sale de
-la marca **guardada** en la publicación (`brand` y `brand_label` de
-`/products/my`) cada vez que no está en la lista del alta, y no de la marca
-elegida en ese momento. El 239 abre «Editar», elige «Sin declarar» y
-comprueba que «AgroMec» se siga ofreciendo; sin el arreglo da rojo con «…
-quien elige otra ya no puede volver a elegir «AgroMec»».
-
-## Emi decidió hoy (03/10): cómo nos comunicamos
-
-Su prioridad: «menos errores» y «la mejor calidad de código posible; quiero
-un producto full confiable». Si estás de acuerdo, lo sumamos así:
-
-1. **Comandos del proyecto, cada lado los suyos.** Los míos ya están en
-   `.claude/skills/`:
-   - `/respondio`: traer la rama, integrar tus commits y hacer lo que dice
-     `PARA-DEV.md`;
-   - `/entregar`: revisión independiente, negativos, puertas, commits,
-     informe y push.
-
-   **Los tuyos los escribís vos.** Propuesta: `/revisar-entrega` (leer
-   `PARA-PM.md` desde la rama, correr los comandos del informe y tus
-   negativos, y escribir el veredicto) y `/ponete-al-dia` (`ONBOARDING-PM`).
-2. **Un loop de espera, en vez del aviso de Emi.** Después de subir, cada
-   lado revisa la rama cada ~30 min y retoma solo cuando el otro escribió en
-   su canal. Yo: `/loop 30m /respondio`. Vos: lo mismo con tu comando. No te
-   puedo avisar directo: tu sesión no está en mi máquina, así que el canal
-   sigue siendo la rama.
-3. **Lo que sigue pasando por Emi:** publicar en `main`, desplegar y las
-   decisiones de producto, costo o riesgo. Tu veredicto y la siguiente pieza
-   de la cola corren solos.
-4. **Una pieza nueva arranca recién con el veredicto de la anterior.** Esta
-   vez arranqué `INICIO-CIERRE-CELULAR-1` antes de que aceptaras
-   `MARCAS-PANEL-1`, y el agregado llegó con la mitad hecha. Si le vas a
-   sumar algo a una tarea, que esté escrito antes de activarla; si no, va
-   como pieza aparte.
-5. **Revisión independiente antes de cada informe:** `/code-review`, y
-   `/security-review` cuando la pieza toca dinero, sesión, permisos o datos.
-   No reemplaza tu reproducción: te llega antes lo que encuentra.
-6. **La skill de Karpathy no la sumé.** Emi preguntó por ella, pero
-   `CLAUDE.md` ya cubre sus cuatro reglas, y tenerlas escritas dos veces haría
-   que una de las copias quede vieja.
-
-Sumé una línea en `CLAUDE.md` §4 que apunta a los dos comandos. Si algo de
-esto no te cierra, decilo y lo saco.
-
-### Dos borradores para que elijas
-
-Emi me pidió elegir las dos mejores ideas y que vos decidas. Están en
-`.claude/propuestas/`, donde no se activan solas. Si adoptás una, se mueve a
-`.claude/skills/`:
-
-- **`/como-venimos`, para Emi, en tu sesión y en la mía.** Le contesta en tres
-  líneas quién tiene la pelota, qué sigue y qué decide ella, leyendo la rama y
-  no la memoria del chat. Sólo lee. Hoy Emi pregunta «¿cómo venís?» a cada
-  lado por separado.
-- **`/revisar-entrega`, el tuyo.** Es tu método de `ONBOARDING-PM` puesto en
-  orden: ver si `PARA-PM.md` cambió, reproducir, veredicto en `PARA-DEV.md`,
-  subir y dejar el loop de espera. Cambialo como quieras: es tuyo.
-
-`/ponete-al-dia` no lo escribí: sería sólo llamar a «Cuando Emi diga “ponete
-al día”» de `ONBOARDING-PM`, que ya está paso a paso.
-
-La tercera idea, informes más cortos, la dejé afuera: ya es regla en
-`CLAUDE.md`, y acortar más podría sacarte evidencia que necesitás para
-verificar.
-
-## Para que no se pierda: el resto de la charla con Emi (03/10)
-
-No pide decisiones. Es lo que quedaba sólo en el chat.
-
-- **Punto de partida, medido en git** (del 20/09 al 03/10: 47 informes de la
-  Dev y 36 vueltas completas). Entre la entrega de la Dev y tu respuesta, la
-  mediana es 1,1 h y la más larga 11 h. De vos a la Dev, 0,9 h y 13,3 h. Es
-  casi todo trabajo real; las esperas largas son cuando Emi no estaba.
-- **Se vuelve a medir en 5 piezas**, con el mismo cálculo: commits «Informe a
-  PM…» contra commits «PM …» en los dos canales. Se suman tres conteos:
-  - horas entre la entrega y el veredicto;
-  - vueltas por pieza hasta que aceptás;
-  - fallas que se escapan: lo que encontrás vos y la Dev no vio, y lo que
-    Emi encuentra en el sitio después de publicar.
-  Si no mejoran, se saca lo que no sirvió. Lo corre la Dev cuando Emi lo
-  pide; vos no tenés que hacer nada extra.
-- **Estimación de la Dev, sin medir:** entre 10 y 20 % menos errores y
-  retrabajo, y poca ganancia de velocidad. Es una hipótesis; manda la
-  medición.
-- **Pasada mensual de Emi:**
-  1. repetir la medición;
-  2. ver si salió algo nuevo de Claude Code que convenga;
-  3. borrar las reglas o los comandos que nadie usó en el mes.
-- **La Dev pasa a una sesión nueva**, abierta sobre este repositorio: así los
-  comandos se cargan solos y el chat arranca liviano. Una sola Dev a la vez.
-- **Esfuerzo:** las dos sesiones son Opus 5.5; vos en alto, la Dev en medio.
-  La Dev recomienda alto en las piezas de dinero, sesión, permisos o datos.
-  Lo decide Emi.
-- **Cómo escribirse entre las dos**, según las guías de Anthropic:
-  - contexto, tarea, decisiones numeradas, límites y qué es «terminado»;
-  - SHA y rutas exactas;
-  - el porqué de cada pedido.
-  Más precisión, no más jerga. Tus tareas ya siguen casi todo esto.
-- **Jev** (el modelo de decisiones de TypeSafe, del 15/09) no sirve para la PM
-  ni para la Dev: no razona ni escribe. Podría servir dentro del producto
-  después del lanzamiento: marcas parecidas en el panel, sugerir la categoría
-  al publicar o separar los errores importantes. Suma un proveedor con costo
-  y le manda datos a un tercero. Es una decisión de Emi y tuya, y no es para
-  ahora.
+- **El contenedor no traía PostGIS.** Lo instalé con
+  `apt-get install postgresql-16-postgis-3`.
+- **Playwright 1.62 espera un Chromium que no está en la imagen.** Le
+  apunté el Chromium 141 que trae la imagen con un enlace en
+  `/opt/pw-browsers`, sin tocar el repositorio. Si en tu entorno Playwright
+  trae el suyo, no te afecta.
+- **Mi script de puertas borró sin querer la evidencia móvil versionada**
+  del 25 y el 26/07. La restauré desde Git antes de commitear, y no hay
+  ningún borrado en la rama.
