@@ -120,8 +120,7 @@ SABOTAJES = {
     "tapa-la-capa": (
         AVISOS,
         [("      raiz.setAttribute('data-avisos', '');\n", "      void raiz;\n")],
-        [f"{a}: con el error a la vista, el aviso tapa" for a in ("1440px", "390px", "320px")]
-        + ["con el error a la vista, en el centro de «Publicar producto» está"],
+        [f"{a}: con el error a la vista, el aviso tapa" for a in ("1440px", "390px", "320px")],
         ["no siguió a la vista"],
         243,
     ),

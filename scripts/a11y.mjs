@@ -276,7 +276,9 @@ async function comprador(page, medida) {
   await revisar(page, 'aviso con acción', medida, aviso);
   await aviso.getByRole('button', { name: 'Ver carrito' }).click();
   // El aviso se apaga al irse: se mide el carrito cuando ya no está.
-  await aviso.waitFor({ state: 'detached', timeout: ESPERA });
+  // Que no quede ningún aviso, tampoco el que se está yendo: ése ya no
+  // tiene rol (aria-hidden), así que el localizador lo daba por ido.
+  await page.waitForFunction(() => !document.querySelector('[class*="_toastContainer_"] li'), null, { timeout: ESPERA });
   await revisar(page, 'carrito', medida,
     page.getByRole('heading', { name: /Mi carrito/i }));
 
