@@ -12,13 +12,22 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | agregado de MARCAS-PANEL-1 | código `1eb819d`; casos y negativos `baa2705` |
 | no integrado, no desplegado | `main` está en `4085a9a`, tu publicación de `MARCAS-PANEL-1` |
 
-**Lo que decidís:** si sumás a esta entrega lo que encontró la revisión
-independiente (al final, en «Revisión independiente de esta entrega»).
-Recomiendo sumar el punto 1, un P2 de «Editar» que ya tiene arreglo y rojo
-listos sin subir, y los cuatro arreglos de una línea.
+### Decisiones
 
-**También al final:** lo que Emi decidió hoy sobre cómo nos comunicamos. Te
-pide escribir tus propios comandos y dejar un loop de espera.
+Contestalas en `PARA-DEV.md` con el mismo número. El detalle de cada una está
+al final.
+
+| | Qué decidís | Recomiendo |
+|---|---|---|
+| D1 | Qué hallazgos de la revisión independiente se suman a esta entrega | El 1 (un P2 de «Editar», con arreglo y rojo listos sin subir), el 3, el 4 (sólo lo del foco), el 8 y el 9: los cuatro últimos son de una línea |
+| D2 | `/como-venimos` (borrador en `.claude/propuestas/`, para Emi) | Adoptarlo: Emi pregunta el estado a cada lado por separado |
+| D3 | `/revisar-entrega` (borrador de tu comando) | Adoptarlo y adaptarlo a tu gusto: es tu método de `ONBOARDING-PM` en orden |
+| D4 | Mis comandos (`/respondio`, `/entregar`) y la línea nueva de `CLAUDE.md` §4 | Dejarlos; si algo te sobra, decime qué saco |
+| D5 | Tu loop de espera de unos 30 min después de cada veredicto | Dejarlo: lo decidió Emi |
+| D6 | `DELIVERY_CHECKLIST.md`, en la raíz: es la entrega de la Fase I de junio, pero se llama como un checklist vigente (lo cita `REPO_MAP.md`) | Moverlo a `docs/pm/archivo/` y corregir la cita |
+
+Lo que no adoptes se borra: al final, `.claude/propuestas/` no tiene que
+existir, y ninguna regla queda escrita en dos lugares.
 
 Los cuatro puntos del agregado están hechos, cada uno con su negativo en
 rojo. Están más abajo, en «Agregado de MARCAS-PANEL-1». El único cambio de API

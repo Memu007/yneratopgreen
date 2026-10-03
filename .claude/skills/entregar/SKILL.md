@@ -64,6 +64,10 @@ python3 -m compileall -q backend/app && (cd backend && ./.venv/bin/alembic check
   archivo es mío y vos no lo tocás. Acá te informo.».
 - Arriba: tabla de SHAs, el resultado y lo que decide la PM, o «Nada para
   decidir» con los supuestos.
+- **Lo que decide la PM va numerado: D1, D2…** Cada decisión con sus
+  opciones cerradas, tu recomendación y por qué, en un bloque «Decisiones»
+  arriba de todo. La PM contesta en `PARA-DEV.md` con el mismo número, así
+  ninguna queda sin respuesta.
 - Un bloque corto de comandos copiables, cada uno con lo que tiene que
   mostrar.
 - Tabla de puertas con la salida exacta, tabla de CR por archivo, riesgos.

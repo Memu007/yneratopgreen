@@ -37,6 +37,9 @@ git diff <SHA de antes>..HEAD -- docs/pm/PARA-DEV.md
 - **Cambió:** si te disparó el loop, frenalo ahora. Arriba de `PARA-DEV.md`
   está la decisión sobre tu última entrega. Leé también la «Tarea activa»
   entera: la PM puede haberle sumado un agregado.
+- Si tu informe tenía decisiones numeradas (D1, D2…), comprobá que la PM
+  contestó cada una. Si falta alguna, preguntala en tu próximo informe; no la
+  des por decidida.
 
 ## 4. Qué hacer según lo que dice
 
