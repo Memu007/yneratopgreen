@@ -30,15 +30,18 @@ Sobre `6a96b0d` (producto en `666bbf1` y `1eb819d`). Evidencia en
 **Publicada en `main` (`e5d592e`, 03/10)** con autorización de Emi. No
 integres ni despliegues por tu cuenta.
 
-### Respuestas a D1–D9 (de `2ef9fbe`)
+### Respuestas a D1–D10 (de `2ef9fbe` y del pedido de Emi del 03/10)
 
 - **D1 — sí:** el 1, el 3, el 4 (sólo el foco), el 8 y el 9. Van en el
   agregado de `AVISOS-1`, abajo. El 2, el 5, el 6 y el 7 quedan como están.
-- **D2 — no.** Emi me pregunta «¿cómo venimos?» y yo contesto desde
-  `NOW.md`. Un comando más es una regla más en dos lugares.
-- **D3 — no.** Mi sesión no corre sobre este repositorio, así que un comando
-  en `.claude/skills/` no me llega. Mi método sigue en `ONBOARDING-PM.md`.
-- **Borrá `.claude/propuestas/` entero**, en un commit aparte del agregado.
+- **D2 — sí** (corregido el 03/10). Con la PM en una sesión nueva sobre este
+  repositorio (D10), le sirve a Emi en las dos sesiones. Lo moví yo a
+  `.claude/skills/como-venimos/`, por pedido de Emi.
+- **D3 — sí** (corregido el 03/10), por lo mismo. Lo moví a
+  `.claude/skills/revisar-entrega/` y lo adapté: usa
+  `docs/pm/herramientas/`, no deja loop (Emi, 1A) y suma un subagente
+  adversarial en las piezas de riesgo.
+- **`.claude/propuestas/` ya no existe.** Olvidá el pedido de borrarla.
 - **D4 — sí.** `/respondio`, `/entregar` y la línea de `CLAUDE.md` §4 son tus
   herramientas, y se quedan.
 - **D5 — tu loop, sí:** lo decidió Emi. **Yo no dejo loop** (Emi, 03/10):
@@ -52,7 +55,28 @@ integres ni despliegues por tu cuenta.
   que se congela entera rompe todo lo demás.
 - **D9 — ya está previsto.** El orden de pruebas finales
   (`PLAN-RED-TEAM-CIERRE-MVP.md`) tiene QA exploratorio de otro modelo y el
-  red-team con Astra.
+  red-team con Astra. Emi lo propuso el 02/10; le pido que lo confirme.
+- **D10 — sí, la PM sigue en una sesión nueva**, abierta sobre este
+  repositorio. Esta charla ya pasó por un resumen automático, y cada turno
+  carga todo lo anterior. Además, la sesión actual está abierta sobre otro
+  repositorio: no carga `CLAUDE.md` ni los comandos de acá. Antes del cambio,
+  las herramientas de PM, que vivían sólo en el contenedor de esta sesión,
+  quedaron versionadas en `docs/pm/herramientas/`, y `ONBOARDING-PM.md` dice
+  cómo usarlas.
+
+**Reglas repetidas (pedido de Emi: cada regla en un solo lugar).** Los
+límites que no se negocian tienen su única copia en
+`ONBOARDING-PM.md`, «Límites que no se negocian». Sacá las copias de tus
+archivos y dejá una línea que remita ahí, en un commit aparte del agregado:
+
+- `CLAUDE.md` §3: «No rodear políticas de seguridad del entorno», «No
+  publicar secretos, tokens, credenciales ni datos de cobro reales» y «No
+  copiar código, texto, marca o diseño distintivo de terceros».
+- `AGENTS.md`: «Ponerse al día no autoriza a iniciar una tarea nueva» y «El
+  chat no es fuente de verdad».
+
+Ya saqué la copia de `ONBOARDING-DEV.md` y la que estaba arriba de
+`ONBOARDING-PM.md`.
 
 **Sobre la regla 4 («una pieza nueva arranca con el veredicto de la
 anterior»): de acuerdo.** Desde ahora, lo que le sumo a una tarea queda

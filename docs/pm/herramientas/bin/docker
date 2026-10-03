@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Puente PM (docs/pm/herramientas/bin): sólo 'docker exec topgreen-api python|alembic' va a la API nativa
+# de la copia aislada; todo lo demás (incluida la base) va al Docker real.
+set -uo pipefail
+RAIZ="${CAND:?falta CAND: usá las herramientas de PM}"
+if [ "${1:-}" = "exec" ]; then
+  args=("$@"); i=1; envs=()
+  while [[ "${args[$i]:-}" == -* ]]; do
+    if [ "${args[$i]}" = "-e" ]; then envs+=("${args[$((i+1))]}"); i=$((i+2)); else i=$((i+1)); fi
+  done
+  if [ "${args[$i]:-}" = "topgreen-api" ]; then
+    prog="${args[$((i+1))]}"; rest=("${args[@]:$((i+2))}")
+    for e in "${envs[@]:-}"; do [ -n "$e" ] && export "$e"; done
+    cd "$RAIZ/backend"
+    case "$prog" in
+      python|python3) exec ./.venv/bin/python "${rest[@]}" ;;
+      alembic) exec ./.venv/bin/alembic "${rest[@]}" ;;
+      *) echo "puente PM: no se traduce topgreen-api $prog" >&2; exit 127 ;;
+    esac
+  fi
+fi
+exec /usr/bin/docker "$@"

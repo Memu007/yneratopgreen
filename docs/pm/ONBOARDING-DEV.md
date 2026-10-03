@@ -2,7 +2,7 @@
 
 Leé este archivo completo una vez. Después tu día a día pasa por `PARA-DEV.md` y, cuando haga falta, `NOW.md` y los documentos que la tarea cite.
 
-El chat no es fuente de verdad. La tarea activa, Git y la evidencia reproducible sí.
+La tarea activa, Git y la evidencia reproducible mandan. Los límites que no se negocian están en `ONBOARDING-PM.md` y valen también para la Dev.
 
 ## Rol
 

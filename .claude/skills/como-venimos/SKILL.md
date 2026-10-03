@@ -5,9 +5,6 @@ description: Para Emi, en la sesión de la PM o en la de la Dev. Contesta en tre
 
 # /como-venimos — el estado en tres líneas, para Emi
 
-> **Borrador de la Dev (03/10), para que la PM lo elija.** Si lo adopta, se
-> mueve a `.claude/skills/como-venimos/` y sirve en las dos sesiones.
-
 Sólo lee. No integra, no commitea, no arranca nada.
 
 ## 1. Leer, desde la rama Dev

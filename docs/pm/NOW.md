@@ -6,7 +6,15 @@ Actualizado: 2026-10-03.
 
 ## Resumen ejecutivo
 
-- **PM vuelve a esta sesión (01/10, Emi):** la PM de la otra cuenta deja de escribir en el repositorio. Un solo PM escribe `PARA-DEV.md`.
+- **Relevo de PM (03/10, D10):** la PM sigue en una sesión nueva, abierta sobre este repositorio. Un solo PM escribe `PARA-DEV.md`. Arrancar por `ONBOARDING-PM.md`: las herramientas de PM están en `docs/pm/herramientas/` y los comandos en `.claude/skills/` (`/revisar-entrega`, `/como-venimos`). PM no deja loop: retoma con el «respondió» de Emi. En piezas de dinero, sesión, permisos o datos, un subagente adversarial («Subagentes adversariales» en `ONBOARDING-PM.md`).
+- **Espera a Emi (03/10), en orden de urgencia:**
+  1. verificar en el celular lo publicado en `e5d592e` («¿Te interesa alguno?» al final de Inicio);
+  2. confirmar D9: un revisor distinto (otro modelo o Astra) para la auditoría de seguridad final. PM recomienda sí;
+  3. UptimeRobot (lo crea Emi, sin código);
+  4. Mercado Pago, etapa 1 (`PASOS-MERCADO-PAGO-2026-09-30.md`);
+  5. mostrarle a la clienta la maqueta v3 de Inicio y hacer la reunión: categorías, «Producción», «Origen y Destino», clasificación automática fuera del MVP;
+  6. crear la cuenta de la clienta, el teléfono de contacto (abajo), el correo (#15), `FRONTEND_URL`, backups en producción y Railway antes del 01/12 (abajo).
+- **Próximo control de PM: 15/10.** Si la Dev no entregó al menos hasta `FILTROS-VISUAL-1`, la cola va atrasada para el congelamiento (~27/10): proponerle a Emi un segundo dev sólo para lo visual, o pasar `CUENTA-VISUAL-1` a después del lanzamiento. Lanzamiento: 12/11.
 - **Fase contractual:** Fase 3 — Buscador y catálogo, semanas 6–8 (25/09–15/10). La puerta de la Fase 2 quedó verificada el 23/09 (`REPRODUCCION-FASE-2-2026-09-23.md`). La puerta de la Fase 3 y el hito intermedio ya se aceptaron por adelantado con `npm run hito` (cierre `3580faa`, ver `MATRIZ.md`). Presentarlo a la clienta y facturarlo es decisión comercial de Emi. Las fechas no cambian.
 - **`main`:** `e5d592e`, publicado el 03/10 con autorización de Emi («Te autorizo»), por fast-forward desde `4085a9a`. Suma `INICIO-CIERRE-CELULAR-1` (en el celular, «¿Te interesa alguno?» cierra Inicio) y el agregado de `MARCAS-PANEL-1` («Editar» muestra el nombre de una marca dada de baja; `/products/my` suma `brand_label`). Sin migraciones. La verificación previa fue sobre el mismo código (`6a96b0d`, que difiere sólo en `docs/pm`): suite 238/240 (169 de entorno y 204 por una carrera del caso), veinte negativos en rojo, puertas verdes, sin secretos ni archivos prohibidos. **Falta que Emi lo verifique en el celular.** Antes, `4085a9a` sumó `MARCAS-PANEL-1`, verificado por Emi (02/10).
 - **Rama Dev:** `claude/dev-role-repo-3l0kp3`. `CAMBIAR-CONTRASENA-1` está publicada en `c21fb9d`. `SESIONES-AL-CAMBIAR-1` está publicada en `d6fa79b`. `FILTROS-DE-PUBLICACIONES-1` está publicada en `dc377d9`. `MARCAS-PANEL-1` está publicada en `4085a9a`. `INICIO-CIERRE-CELULAR-1` está publicada en `e5d592e`.
@@ -47,20 +55,6 @@ Actualizado: 2026-10-03.
   El #3 quedó sin asignar entre el 20/09 y el 27/09 por un descuido de PM.
 - **Escalado a Emi:** la regla «el teléfono no sale de la API sin suscripción activa» choca con la decisión del 05/08, que pasó suscripciones y candados por plan a Fase 6. Hoy el teléfono no se publica en el Mercado ni en las fichas, pero sí lo ven las dos partes de una orden y quien compra al elegir transportista, sin suscripción. El transportista no recibe el de quien compra.
 
-## Última aceptación PM — COBRO-CONCURRENTE-1
-
-Ninguna confirmación de Mercado Pago, «Cancelar», «Rechazar», edición de una
-publicación, foto o documentación espera una fila tomada frenando la API.
-Si la fila no se suelta en 10 s, cada camino contesta algo que se puede
-reintentar. El link se apaga antes de consolidar el stock, siempre con la fila
-de la orden tomada. Aceptada sobre `599dded` y publicada en `58bb62b`.
-
-## Aceptación anterior — AVISOS-DE-PAGO-1
-
-Quien compra se entera cuando le rechazan o le aprueban la transferencia, y
-las dos partes cuando Mercado Pago acredita el pago, una sola vez por orden.
-Publicada en `a7e2237`.
-
 ## Aceptaciones anteriores
 
 Cada pieza tiene su evidencia en `docs/pm/REPRODUCCION-<PIEZA>-<fecha>.md` y
@@ -69,6 +63,8 @@ riesgos que dejaron abiertos están en «Pendientes canónicos adoptados».
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
+| `INICIO-CIERRE-CELULAR-1` y agregado de `MARCAS-PANEL-1` | publicadas en `e5d592e` | `REPRODUCCION-INICIO-CIERRE-CELULAR-1-2026-10-02.md` |
+| `MARCAS-PANEL-1` | publicada en `4085a9a` | `REPRODUCCION-MARCAS-PANEL-1-2026-10-02.md` |
 | `FILTROS-DE-PUBLICACIONES-1` | publicada en `dc377d9` | `REPRODUCCION-FILTROS-DE-PUBLICACIONES-1-2026-10-02.md` |
 | `SESIONES-AL-CAMBIAR-1` | publicada en `d6fa79b` | `REPRODUCCION-SESIONES-AL-CAMBIAR-1-2026-10-02.md` |
 | `CAMBIAR-CONTRASENA-1` | publicada en `c21fb9d` | `REPRODUCCION-CAMBIAR-CONTRASENA-1-2026-10-01.md` |

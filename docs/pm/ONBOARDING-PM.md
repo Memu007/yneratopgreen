@@ -2,8 +2,6 @@
 
 Leé este archivo completo una vez. Después el trabajo diario pasa por `NOW.md`, `CRONOGRAMA.md`, `PARA-PM.md` y `PARA-DEV.md`.
 
-El chat no es fuente de verdad. Git, contrato, decisiones y evidencia reproducible sí.
-
 ## Cuando Emi diga “ponete al día”
 
 1. Revisá `git status` y el commit actual. Si el árbol está limpio, actualizá `main`; si no, preservá los cambios y reportalos.
@@ -165,6 +163,92 @@ Después de una migración de esquema no se hace rollback ciego sólo de código
 - **Las dos guías** (`guia-admin.mjs` y `guia-usuario.mjs`) se corren después de la suite. Un negativo útil rompe el producto sin tocar la guía, para ver que el programa controla lo que la guía afirma y no sólo el texto.
 - **Toda lista nueva** tiene que decir cómo llega a producción. Ver la regla
   en `ONBOARDING-DEV.md`, «Producción y Railway».
+
+## Herramientas de PM
+
+Viven en `docs/pm/herramientas/` y usan valores inventados. El trabajo va en
+`PM_DIR` (por omisión `~/pm-entorno`), fuera del repositorio.
+
+| Comando | Qué hace |
+|---|---|
+| `levantar.sh <SHA>` | worktree en el SHA, `.env` inventados, dependencias, navegador, base nueva, API y frontend |
+| `base-nueva.sh` | base PostGIS recién creada, migraciones, siembra y API |
+| `reiniciar-api.sh` | reinicia la API y dice cuántos procesos quedaron (tiene que ser 1) |
+| `revivir.sh` | después de un reinicio del contenedor: Docker, base nueva, API y frontend |
+| `suite-y-puertas.sh <base> <SHA>` | suite completa, repetición de los rojos, auditorías, las dos guías y las puertas |
+| `negativos-pm.sh` | plantilla de los negativos propios: copiala a `PM_DIR` y cambiá los sabotajes |
+| `negativos-dev.py <script>` | corre los negativos viejos de la Dev con el reinicio de PM. Los nuevos aceptan `REINICIAR_API=docs/pm/herramientas/reiniciar-api.sh` |
+| `bin/docker` | puente: `docker exec topgreen-api python…` va a la API nativa. Lo pone en el `PATH` `comun.sh` |
+
+Los casos se corren desde el worktree con las variables de `comun.sh`:
+
+```bash
+source docs/pm/herramientas/comun.sh; cd "$CAND"
+SMOKE_CASOS=239,240 node scripts/smoke.mjs
+```
+
+**El contenedor de PM se reinicia entre turnos**, y los procesos en segundo
+plano tienen tiempo límite. Lo largo (la suite tarda unos 45 minutos) se
+corre separado, y se consulta el registro en esperas de 10 minutos:
+
+```bash
+(setsid nohup docs/pm/herramientas/suite-y-puertas.sh <base> <SHA> > "$PM_DIR/suite.out" 2>&1 < /dev/null &)
+for i in $(seq 1 58); do grep -q '^fin' "$PM_DIR/suite.out" && break; sleep 10; done; cat "$PM_DIR/suite.out"
+```
+
+Si un reinicio corta una corrida, se levanta con `revivir.sh` y se repite
+entera. Sólo cuenta la repetición, y la reproducción lo dice.
+
+**Git.** Para traer la rama Dev usá un refspec explícito: una vez un `git
+fetch origin <rama>` dejó la referencia en un commit viejo.
+
+```bash
+git fetch -q origin +refs/heads/<rama Dev>:refs/remotes/origin/<rama Dev>
+```
+
+### Comandos del proyecto
+
+Cargan sólo si la sesión está abierta sobre este repositorio.
+
+- `/revisar-entrega`: el orden de una revisión, de «respondió» al veredicto.
+- `/como-venimos`: para Emi, el estado en tres líneas. Sirve también en la
+  sesión de la Dev.
+
+**Loop de espera de PM: no.** Emi decidió el 03/10 que PM retoma con su
+«respondió», porque cada vuelta de PM carga la revisión entera y gasta tokens
+aunque no haya nada nuevo. La Dev sí deja el suyo.
+
+## Subagentes adversariales
+
+Un subagente arranca con contexto nuevo, no carga el de la PM y devuelve sólo
+su conclusión. Sirve para hacer las preguntas que nadie hizo, también sobre el
+trabajo de la PM. Emi lo pidió el 03/10: no programa, y no puede repreguntar.
+
+**Cuándo:** cuando la pieza toca dinero, sesión, permisos, datos o es
+transversal; cuando la PM y la Dev coinciden demasiado rápido; antes de pedir
+una publicación con migración. No en piezas visuales chicas: ahí alcanzan los
+negativos y el navegador.
+
+**Cómo:**
+
+- Un solo subagente por pieza, con una consigna cerrada: el SHA, el diff a
+  mirar, qué afirma el informe y «buscá cómo esto pierde datos, cobra mal,
+  deja entrar a quien no debe o se traba». Que devuelva hallazgos con
+  archivo, línea y cómo reproducirlos, no opiniones.
+- Si es posible, otro modelo que el de la PM y la Dev: comparten puntos
+  ciegos.
+- Lo que encuentra es una hipótesis. La PM lo reproduce o lo descarta con
+  evidencia antes de llevarlo a `PARA-DEV.md`.
+
+## Hablar con Emi
+
+Emi no programa: cada punto que se le cuenta lleva qué es.
+
+- **Rompe:** algo deja de funcionar, se pierde o se cobra mal. Bloquea.
+- **Riesgo:** puede pasar en un caso borde; se dice cuándo y cuánto cuesta
+  arreglarlo.
+- **Prueba:** el sitio está bien; lo que falla es una prueba. No se ve.
+- **Se ve:** estética o texto. Lo decide Emi por gusto.
 
 ## Publicar
 
