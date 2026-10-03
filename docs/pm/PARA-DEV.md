@@ -31,6 +31,35 @@ La publicación a `main` la decide Emi. No integres ni despliegues.
 
 `MARCAS-PANEL-1` está publicada en `4085a9a`.
 
+### Respuestas a D1–D9 (de `2ef9fbe`)
+
+- **D1 — sí:** el 1, el 3, el 4 (sólo el foco), el 8 y el 9. Van en el
+  agregado de `AVISOS-1`, abajo. El 2, el 5, el 6 y el 7 quedan como están.
+- **D2 — no.** Emi me pregunta «¿cómo venimos?» y yo contesto desde
+  `NOW.md`. Un comando más es una regla más en dos lugares.
+- **D3 — no.** Mi sesión no corre sobre este repositorio, así que un comando
+  en `.claude/skills/` no me llega. Mi método sigue en `ONBOARDING-PM.md`.
+- **Borrá `.claude/propuestas/` entero**, en un commit aparte del agregado.
+- **D4 — sí.** `/respondio`, `/entregar` y la línea de `CLAUDE.md` §4 son tus
+  herramientas, y se quedan.
+- **D5 — tu loop, sí:** lo decidió Emi. **El mío lo decide Emi** por costo:
+  cada vuelta mía carga toda la revisión. Hasta que diga otra cosa, sigo con
+  su «respondió».
+- **D6 — sí.** Mové `DELIVERY_CHECKLIST.md` a `docs/pm/archivo/` y corregí la
+  cita de `docs/pm/REPO_MAP.md`. Va en el agregado.
+- **D7 — de acuerdo; espera el visto bueno de Emi** por los minutos de
+  GitHub. No lo empieces.
+- **D8 — sí, y antes de lo visual.** Es `CONFIABILIDAD-API-1`, abajo,
+  después de `AVISOS-1`. Emi pidió «un producto full confiable», y una API
+  que se congela entera rompe todo lo demás.
+- **D9 — ya está previsto.** El orden de pruebas finales
+  (`PLAN-RED-TEAM-CIERRE-MVP.md`) tiene QA exploratorio de otro modelo y el
+  red-team con Astra.
+
+**Sobre la regla 4 («una pieza nueva arranca con el veredicto de la
+anterior»): de acuerdo.** Desde ahora, lo que le sumo a una tarea queda
+escrito antes de activarla.
+
 ---
 
 ## En espera — HERO-COMPACTO-1 (no empezar)
@@ -154,9 +183,59 @@ Va en un commit aparte, dentro de esta entrega:
 Demostrá el 1 como el 195: con el catálogo retrasado, rojo antes y verde
 después.
 
+**De tu revisión independiente (D1) y D6:**
+
+3. **El punto 1, el P2 de «Editar».** La opción de la marca dada de baja
+   sale de la marca guardada en la publicación, no de la elegida en ese
+   momento. Con el rojo del 239 que describiste: elegir «Sin declarar» y
+   volver a ofrecer «AgroMec».
+4. **Los puntos 3, 4 (sólo el foco), 8 y 9**, como los describiste.
+5. **`DELIVERY_CHECKLIST.md` a `docs/pm/archivo/`,** con la cita de
+   `docs/pm/REPO_MAP.md` corregida.
+
 ---
 
-## Después — FILTROS-VISUAL-1 (apenas entregues AVISOS-1)
+## Después — CONFIABILIDAD-API-1 (apenas entregues AVISOS-1)
+
+**Decisión PM (03/10), por tu D8.** En producción la API corre en un solo
+proceso (`backend/railway-entrypoint.sh`, sin `--workers`). Según tu
+informe, 17 rutas `async` hacen consultas bloqueantes a la base: 9 de
+`orders.py`, 7 de `products.py`, el webhook y el vínculo de Mercado Pago,
+contacto y documentación. Si una se traba, se traba todo el sitio. Fue la
+causa del congelamiento de `FILTROS-DE-PUBLICACIONES-1`, que arreglaste sólo
+para las marcas. Entregala por separado.
+
+### Qué entra
+
+1. **Que una consulta lenta no frene a las demás.** La forma la elegís vos,
+   dentro del mismo proceso y sin más recursos de Railway.
+2. **Las 17 rutas,** y cualquier otra que encuentres de la misma clase.
+   Decí cuáles cambiaste.
+3. **Ningún cambio de conducta:** mismas respuestas, mismos códigos, mismas
+   transacciones.
+
+### Aceptación verificable
+
+1. **Caso nuevo:** con una consulta trabada a propósito (por ejemplo, el
+   candado de marcas tomado desde otra conexión, o un `pg_sleep`), la salud
+   y el catálogo siguen respondiendo en menos de un segundo. Una ruta de
+   órdenes y una de publicaciones, al menos.
+2. **Negativo:** volver una de las rutas a como estaba da rojo en ese caso.
+3. **Órdenes, cobros, webhook, stock y Mercado Pago:** todos sus casos en
+   verde. Decí cuáles son.
+4. **Suite completa desde base nueva**, las auditorías, las dos guías y las
+   puertas.
+
+### Frená y consultá
+
+- Si hace falta más de un proceso, más memoria o cualquier cambio en
+  Railway: tiene costo y lo decide Emi.
+- Si algún cambio toca cómo se confirma o se revierte una transacción de
+  dinero o de stock.
+
+---
+
+## Después — FILTROS-VISUAL-1 (apenas entregues CONFIABILIDAD-API-1)
 
 **Decisión de Emi (02/10): aprobó `maquetas/FILTROS-V1-2026-10-02.html`**
 (y `.jpg`). El panel de filtros de hoy, con ocho desplegables iguales, se ve

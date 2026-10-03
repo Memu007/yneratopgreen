@@ -10,6 +10,14 @@ Formato: fecha, decisión, motivo.
 
 
 
+## 2026-10-03 — La API no se puede congelar entera, antes de lo visual
+
+La Dev midió (D8 de `2ef9fbe`) que en producción la API corre en un solo proceso y que 17 rutas
+`async` consultan la base de forma bloqueante: si una se traba, se traba todo el sitio. PM lo
+pone como `CONFIABILIDAD-API-1`, después de `AVISOS-1` y antes de `FILTROS-VISUAL-1`, sin más
+recursos de Railway. Motivo: Emi pidió «menos errores» y «un producto full confiable» (03/10), y
+un congelamiento rompe todo lo demás. PM no adopta `/como-venimos` ni `/revisar-entrega`.
+
 ## 2026-10-02 — Tarjetas, publicación, ingreso, carrito y Mi cuenta: aprobadas
 
 Emi aprobó («Dale») `maquetas/MERCADO-FICHA-V1-2026-10-02.html` y
