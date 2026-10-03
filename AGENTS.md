@@ -36,4 +36,16 @@ negocian» de `docs/pm/ONBOARDING-PM.md`. Además:
 
 ## Eficiencia de chats
 
-Avisale a Emi cuando convenga continuar en un chat nuevo para no cargar contexto innecesario, especialmente al cerrar una tarea, cambiar de rol o empezar un bloque que ya no necesita el historial actual. No interrumpas una tarea activa sólo por la longitud del chat. Antes de recomendar el cambio, dejá el estado vigente guardado en el repositorio y entregá un relevo breve listo para retomar.
+Vale para PM y Dev; esta es su única copia.
+
+- **Para qué se cambia de chat:** cuando el chat se hizo tan largo que, aun
+  después de compactar, se pierde contexto que la tarea necesita. No por la
+  longitud sola, y no en medio de una tarea activa.
+- **Avisar cuándo compactar.** PM y Dev le avisan a Emi cuando les toca
+  compactar, en un corte natural (después de una entrega o un veredicto), no
+  en medio de una corrida. El aviso trae el comando listo para copiar y lo que
+  hay que conservar, por ejemplo: `/compact conservar: AVISOS-1, SHA base,
+  negativos pendientes y decisiones abiertas`.
+- **Antes de compactar o de cambiar de chat,** el estado vigente queda guardado
+  en el repositorio, y al cambiar de chat se entrega un relevo breve listo para
+  retomar.
