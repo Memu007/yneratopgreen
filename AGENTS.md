@@ -13,8 +13,6 @@ decisiones locales. El contexto institucional de Inera vive en
 Leé completo `docs/pm/ONBOARDING-PM.md`. Ahí está el «ponete al día» paso a
 paso, qué manda para cada tipo de pregunta y qué documento abrir en cada caso.
 
-Ponerse al día no autoriza a iniciar una tarea nueva.
-
 ## Si el rol es Dev
 
 Leé `CLAUDE.md` y, una vez, `docs/pm/ONBOARDING-DEV.md`. Después, la tarea
@@ -28,7 +26,9 @@ ni aceptación por sí solo: la PM contrasta los hallazgos y decide qué adopta.
 
 ## Lo único que este archivo afirma
 
-- El chat no es fuente de verdad.
+Las reglas que valen para todos los roles están en «Límites que no se
+negocian» de `docs/pm/ONBOARDING-PM.md`. Además:
+
 - Cuando la entrega pendiente vive en una rama Dev sin integrar, se lee
   `PARA-PM.md` **desde esa rama**; la copia de `main` puede no ser la última.
 - Cuando un documento y Git se contradicen sobre qué está implementado, manda

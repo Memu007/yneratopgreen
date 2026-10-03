@@ -23,10 +23,9 @@ Adversarial no significa ampliar alcance ni discutir por deporte.
 
 ## 3. Seguridad y alcance
 
-- No rodear políticas de seguridad del entorno.
+Los límites que no se negocian (secretos, terceros, políticas del entorno y los demás) tienen su única copia en `docs/pm/ONBOARDING-PM.md`, «Límites que no se negocian». Además:
+
 - No dejar puertas traseras o bypasses de prueba en producto.
-- No publicar secretos, tokens, credenciales ni datos de cobro reales.
-- No copiar código, texto, marca o diseño distintivo de terceros.
 - No agregar funcionalidad fuera de la tarea: se propone a PM.
 - No desplegar ni cambiar Railway salvo tarea explícita.
 - No debilitar controles de producción para hacer pasar el arnés de pruebas.
