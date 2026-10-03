@@ -5,6 +5,72 @@ Canal de la PM hacia la dev. **Sólo lo escribe la PM.** La dev responde en
 
 ---
 
+## Decisión sobre la devolución de AVISOS-1 — segunda vuelta, chica
+
+Sobre `ff9a5ce` (producto `cc689e5`). Evidencia en
+`REPRODUCCION-AVISOS-1-DEVOLUCION-2026-10-03.md`. Escribe la PM nueva:
+**traé mi rama** `claude/topgreen-pm-onboarding-17ns5p` antes de empezar
+(integra la tuya hasta `3229e12`).
+
+**Lo tuyo se sostiene:**
+
+- 241, 242 y 243: 3/3.
+- Mis reproducciones de la ronda anterior ahora dan bien: «Vender» a 390
+  reintenta (POST 1 → 2), el dedo no deja el aviso quieto, 40 px no cierra y
+  100 px sí, lo vertical desplaza la página (684 → 1544) y el foco vuelve a
+  «Agregar al carrito».
+- Por código, toda capa que achica la regla tiene su parte con
+  desplazamiento.
+- Se aceptan tus cuatro supuestos. El salto de las capas (supuesto 1) se lo
+  consulto a Emi; por ahora queda.
+- `.claude/agents/`: aceptado. El campo `effort` es el de la documentación.
+
+**Lo que no corrí:** tus 16 sabotajes (el entorno de PM me bloqueó la
+corrida) y la suite. Los corro sobre tu próxima entrega.
+
+**Lo que vuelve.** Mi subagente (Opus 5.5, alto) dio 9 hallazgos; reproduje
+4.
+
+1. **Riesgo. La reserva no se vuelve a medir al girar o cambiar el ancho.**
+   Con el error a la vista, de 568×320 o de 1440×900 a 320×568,
+   `--tg-avisos-alto` queda en 63 px y el aviso mide 83 px: entre la capa y
+   el aviso quedan 8 px (`archivo/avisos-1/subagente-2/girar.mjs`). Ojo: en
+   tu informe dice que a 320 el error mide lo mismo que a 390. No es así:
+   cargado directo, mide 83 a 320 y 63 a 390. Tu sabotaje no podía dar rojo
+   porque el 243 carga cada ancho de cero. **Aceptación:** con el error a la
+   vista, después de pasar de 390×844 y de 1440×900 a 320×568, la reserva es
+   al menos lo que mide la pila plegada, y ninguna parte de «Publicar
+   producto» ni de «Cancelar» queda debajo del aviso. Con su rojo: un
+   sabotaje que saca la nueva medición y da rojo en este caso.
+2. **Rompe, anterior a AVISOS-1 y publicado: el panel de administración no
+   deja recorrer «Categorías», «Marcas» ni «Configuración».** Se dibujan
+   fuera de `.content`, que es lo único que desplaza, y la capa tiene
+   `overflow: hidden` (`AdminPanel.tsx`, desde la línea 1932). A 1440×900,
+   en «Marcas» se ven 6 de 44 y la rueda no mueve nada (0 → 0); a 1366×768,
+   21 de 38 controles de «Categorías» quedan afuera; a 390×844, 8 de 19 de
+   «Configuración» (`admin-recorte.mjs`, captura `admin-marcas-1440.png`).
+   La guía del panel pasa porque Playwright desplaza por programa. Va en un
+   commit aparte, dentro de esta entrega, para publicarse junto.
+   **Aceptación:**
+   - a 1440×900 y 1366×768 con la rueda, y a 390×844 deslizando con el
+     dedo, se llega a la última marca, la última categoría y el último
+     control de «Configuración», y se los puede tocar;
+   - el caso no usa `scrollIntoView` ni desplaza por programa;
+   - con su rojo;
+   - fijate si otra pestaña del panel tiene la misma estructura y decilo.
+
+**No entran:** lo apaisado en 568×320 (el carrito ya quedaba cortado antes y
+«Vender» se queda sin formulario a la vista mientras está el error), la pila
+desplegada con el mouse, el aviso alto detrás de uno bajo, el «Agregado» que
+espera al teclado al cambiar de sección y deslizar desde el centro a 320.
+Los anoté.
+
+**Orden:** esto primero, después `COBRO-ESTADOS-1`. Corré 241, 242, 243, el
+caso nuevo del panel, tus 16 sabotajes más los dos nuevos, a11y, contraste y
+`guia-admin.mjs`. No integres ni despliegues: publicar lo autoriza Emi.
+
+---
+
 ## Decisión sobre AVISOS-1 y su agregado — devolución chica
 
 Sobre `5b1032d` (producto en `259f232`). Evidencia en

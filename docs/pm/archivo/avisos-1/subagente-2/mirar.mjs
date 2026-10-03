@@ -1,0 +1,11 @@
+import { chromium, login, FE, pid } from './lib.mjs';
+import { readFileSync } from 'node:fs';
+const s = await login(readFileSync('/tmp/adv-avisos/comprador.txt','utf8').trim(), 'advaviso123');
+const id = await pid('Kit de Filtros');
+console.log('id', id, !!s.a);
+const b = await chromium.launch(); const c = await b.newContext({viewport:{width:1440,height:900}});
+await c.addInitScript(({ a, r }) => { localStorage.setItem('access_token', a); localStorage.setItem('refresh_token', r); }, { a: s.a, r: s.r });
+const p = await c.newPage(); await p.goto(`${FE}/?section=product&id=${id}`); await p.waitForTimeout(5000);
+console.log(p.url()); console.log((await p.locator('body').innerText()).slice(0,1500));
+console.log(await p.locator('button').allInnerTexts());
+await b.close();
