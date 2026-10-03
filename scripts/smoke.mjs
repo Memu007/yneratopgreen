@@ -40908,8 +40908,16 @@ await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se desliz
       await agregar.tap({ timeout: 20_000 });
       await esperarA(async () => (await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'agregar no dejó un aviso', 10_000);
       const desde = Date.now();
+      await quietos(page);
       const [bueno] = (await avisos(page)).filter((a) => /Agregado/.test(a.texto));
+      // Que el toque le llegue al aviso: si cae afuera, «se fue solo» no
+      // prueba nada.
+      await page.evaluate((sel) => {
+        window.__tocado = false;
+        document.querySelector(sel).addEventListener('pointerdown', () => { window.__tocado = true; }, { once: true });
+      }, AVISO);
       await page.touchscreen.tap(bueno.x + 60, bueno.y + bueno.alto / 2);
+      if (!(await page.evaluate(() => window.__tocado))) problemas.push(`${donde}: el toque no le llegó al aviso`);
       await esperarA(async () => !(await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'tocado con el dedo, no se fue', 8_000)
         .catch(() => {});
       const seFue = Date.now() - desde;
@@ -40919,13 +40927,18 @@ await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se desliz
       //     lo que salió bien, apenas llega: 4 s alcanzan para dos gestos.
       await agregar.tap();
       await esperarA(async () => (await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'agregar no dejó otro aviso', 10_000);
+      const llego = Date.now();
       await quietos(page);
       let [aviso] = (await avisos(page)).filter((a) => /Agregado/.test(a.texto));
       const yMedio = aviso.y + aviso.alto / 2;
       await deslizar(aviso.x + 60, yMedio, aviso.x + 100, yMedio);
       if (!(await avisos(page)).some((a) => /Agregado/.test(a.texto))) problemas.push(`${donde}: deslizar 40 px de costado cerró el aviso`);
       await deslizar(aviso.x + 60, yMedio, aviso.x + 160, yMedio);
-      await esperarA(async () => !(await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'no se cerró', 2_000)
+      // Lo tiene que cerrar el gesto, y no los 4 s: se mide cuándo se fue.
+      await esperarA(async () => !(await avisos(page)).some((a) => /Agregado/.test(a.texto)), 'no se cerró', 1_000)
+        .then(() => {
+          if (Date.now() - llego > 3_500) problemas.push(`${donde}: deslizar 100 px de costado: se fue a los ${Date.now() - llego} ms, que pueden ser los 4 s y no el gesto`);
+        })
         .catch(() => problemas.push(`${donde}: deslizar 100 px de costado no cerró el aviso`));
 
       // A3. Deslizar en vertical encima del aviso desplaza la página.
@@ -40939,6 +40952,10 @@ await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se desliz
       await deslizar(aviso.x + 120, aviso.y + aviso.alto / 2, aviso.x + 120, aviso.y + aviso.alto / 2 - 250);
       await esperarA(async () => (await page.evaluate(() => window.scrollY)) > antes + 50, 'no se desplazó', 2_000)
         .catch(async () => problemas.push(`${donde}: deslizar en vertical sobre el aviso no desplazó la página (scrollY ${antes} → ${await page.evaluate(() => window.scrollY)})`));
+      await quietos(page);
+      const [quieto] = (await avisos(page)).filter((a) => /Agregado/.test(a.texto));
+      if (!quieto) problemas.push(`${donde}: deslizar en vertical cerró el aviso`);
+      else if (Math.abs(quieto.x - aviso.x) > 2) problemas.push(`${donde}: después de deslizar en vertical, el aviso quedó corrido ${Math.round(quieto.x - aviso.x)} px`);
       await contexto.close();
     }
 
@@ -40999,6 +41016,40 @@ await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se desliz
         if (despues !== 'BUTTON Agregar al carrito') problemas.push(`${donde}: al cerrar con el teclado el último aviso, el foco quedó en «${despues}»`);
       }
 
+      // B5. Con una capa abierta, el teclado no llega a los avisos (la capa
+      //     lo encierra): el que esperaba empieza a contar y se va solo.
+      const carrito = page.getByRole('dialog', { name: 'Mi carrito' });
+      const abrirCarrito = async () => {
+        await page.getByRole('button', { name: /Carrito/ }).first().focus();
+        await page.keyboard.press('Enter');
+        await carrito.waitFor({ state: 'visible', timeout: 10_000 });
+      };
+      const cerrarCarrito = async () => {
+        await page.keyboard.press('Escape');
+        await carrito.waitFor({ state: 'hidden', timeout: 10_000 });
+      };
+      await agregar.focus();
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await avisos(page)).length === 1, 'Enter no dejó un aviso', 10_000);
+      await abrirCarrito();
+      await esperarA(async () => (await avisos(page)).length === 0, 'con el carrito abierto, el aviso no se fue', 7_000)
+        .catch(() => problemas.push(`${donde}: con el carrito abierto, el aviso que esperaba al teclado no se fue solo`));
+      await cerrarCarrito();
+
+      // B6. Si con la capa abierta se cierra con el teclado el último aviso,
+      //     el foco va a la capa y no a «Agregar al carrito», que está detrás.
+      await agregar.focus();
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await avisos(page)).length === 1, 'Enter no dejó otro aviso', 10_000);
+      await abrirCarrito();
+      await page.locator('[class*="_toastContainer_"] li:not([aria-hidden]) [data-cerrar]').last().focus();
+      await page.keyboard.press('Enter');
+      await esperarA(async () => (await avisos(page)).length === 0, 'Enter no cerró el aviso', 5_000).catch(() => {});
+      if (!(await carrito.evaluate((c) => c.contains(document.activeElement)))) {
+        problemas.push(`${donde}: al cerrar con el teclado el último aviso con el carrito abierto, el foco quedó en «${await foco(page)}», fuera del carrito`);
+      }
+      await cerrarCarrito();
+
       // B4. Agregar con el mouse: lo bueno se va solo, aunque tenga acción.
       await agregar.click();
       await page.mouse.move(2, 2);
@@ -41014,6 +41065,7 @@ await runCase(242, 'Los avisos con el dedo (tocar no los deja quietos, se desliz
   assert(problemas.length === 0, `${problemas.length} problema(s):\n  ${problemas.join('\n  ')}`);
   return 'con el dedo: tocar no lo deja quieto, 40 px de costado no lo cierra y 100 px sí, lo vertical desplaza la página; '
     + 'con el teclado: a los 6 s se llega a «Ver carrito», y al cerrar el carrito o el último aviso el foco vuelve a «Agregar al carrito»; '
+    + 'con el carrito abierto, el que esperaba al teclado se va solo y cerrar el último deja el foco en el carrito; '
     + 'con el mouse, lo bueno se va solo';
 });
 
@@ -41103,6 +41155,15 @@ await runCase(243, 'Con un error a la vista, «Publicar producto», «Continuar 
         .catch(() => problemas.push(`${donde}: tocar el centro de «Publicar producto» con el error a la vista no reintentó (${antes} pedidos antes, ${pedidos} después)`));
       await page.unroute('**/api/products');
       await page.mouse.move(2, 2);
+      // Al angostarse la pantalla con el error a la vista, el texto se
+      // reacomoda: la capa le deja el lugar que mide ahora.
+      if (medida.width === 390) {
+        await page.setViewportSize({ width: 320, height: 568 });
+        await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'), null, { timeout: 5_000 });
+        const angosta = await alCentro(page, publicar);
+        if (angosta.encima) problemas.push(`390px → 320px: con el error a la vista, en el centro de «Publicar producto» está ${angosta.encima}`);
+        await page.setViewportSize(medida);
+      }
 
       // Se descarta el formulario; el error queda.
       await vender.getByRole('button', { name: 'Cancelar' }).click();

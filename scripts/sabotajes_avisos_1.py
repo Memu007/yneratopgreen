@@ -42,6 +42,12 @@ Los de la devolución (casos 242 y 243):
                         llegado por el teclado.
   foco-al-body          Al cerrar el último aviso con el teclado, el foco se
                         pierde en la página.
+  capa-no-arranca       Con una capa abierta, el aviso que esperaba al
+                        teclado no empieza a contar: no se va nunca.
+  foco-detras           Con una capa abierta, cerrar con el teclado el último
+                        aviso manda el foco detrás de la capa.
+  sin-remedir           Al angostarse la pantalla no se vuelve a medir la
+                        pila: el error tapa «Publicar producto».
 
 Son todos de pantalla: esperan a que el servidor de desarrollo sirva el
 archivo roto, y después el sano. Necesita la API en 8000 y el frontend de
@@ -69,7 +75,7 @@ ANCHOS = ["escritorio 1440px:", "celular 390px:"]
 SABOTAJES = {
     "error-se-va": (
         AVISOS,
-        [("    if (type !== 'error' && !(opciones.accion && conTeclado.current)) {\n", "    if (type) {\n")],
+        [("    if (type === 'error') return;\n", "")],
         [f"{a} a los " for a in ANCHOS] + ["quedan 0 errores y tenía que quedar 1"],
         ["no está abajo", "se enciman", "Ver carrito", "lo que salió bien"],
     ),
@@ -147,8 +153,8 @@ SABOTAJES = {
     ),
     "teclado-se-va": (
         AVISOS,
-        [("    if (type !== 'error' && !(opciones.accion && conTeclado.current)) {\n",
-          "    if (type !== 'error') {\n")],
+        [("    if (opciones.accion && conTeclado.current) {\n",
+          "    if (false) {\n")],
         ["escritorio 1440px teclado: agregado con el teclado, el aviso se fue antes de los 6 s"],
         ["táctil", "el foco quedó"],
         242,
@@ -161,6 +167,27 @@ SABOTAJES = {
          "al cerrar con el teclado el último aviso, el foco quedó en «BODY"],
         ["táctil", "se fue antes"],
         242,
+    ),
+    "capa-no-arranca": (
+        AVISOS,
+        [("    document.addEventListener('focusin', alEnfocar);\n", "    void alEnfocar;\n")],
+        ["escritorio 1440px teclado: con el carrito abierto, el aviso que esperaba al teclado no se fue solo"],
+        ["táctil", "se fue antes"],
+        242,
+    ),
+    "foco-detras": (
+        AVISOS,
+        [("    const capa = capas[capas.length - 1];\n", "    const capa = undefined && capas[capas.length - 1];\n")],
+        ["al cerrar con el teclado el último aviso con el carrito abierto, el foco quedó en «BUTTON Agregar al carrito», fuera del carrito"],
+        ["táctil", "se fue antes", "no se fue solo"],
+        242,
+    ),
+    "sin-remedir": (
+        AVISOS,
+        [("  }, [toasts, ancho]);\n", "  }, [toasts]);\n")],
+        ["390px → 320px: con el error a la vista, en el centro de «Publicar producto» está"],
+        ["no reintentó", "no le llegó"],
+        243,
     ),
 }
 
