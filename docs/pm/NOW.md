@@ -317,6 +317,9 @@ adoptó 5 y uno era un error real (P2 de «Editar»).
 | Cobro MP publicado (prueba, 03/10) | Sonnet | 8 | 6 (+1 parcial) | 6 |
 | Sesiones publicadas (prueba, 03/10) | Opus | 7 | 4 | 4 |
 | Marcas publicadas (prueba, 03/10) | Sonnet | 7 | 6 | 6 |
+| Barrido permisos (03/10) | Sonnet | 8 | 8 | 6 |
+| Barrido archivos y registro (03/10) | Sonnet | 8 (2 repetidos) | 4 | 5 |
+| Barrido órdenes (03/10) | Opus | 7 (1 repetido) | 4 | 3 |
 
 Evidencia de la prueba: `REPRODUCCION-SUBAGENTES-2026-10-03.md`. Emi eligió
 la opción 1 (03/10): `COBRO-ESTADOS-1` y `SESIONES-SEGURAS-1` antes de lo
