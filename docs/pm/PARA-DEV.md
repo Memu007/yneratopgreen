@@ -323,7 +323,56 @@ Esfuerzo alto y los dos subagentes de `ONBOARDING-DEV.md` antes de entregar.
 
 ---
 
-## Después — SESIONES-SEGURAS-1 (apenas entregues COBRO-ESTADOS-1)
+## Después — ORDENES-TRANSFERENCIA-1 (apenas entregues COBRO-ESTADOS-1)
+
+**Decisión de Emi (03/10), opción 1.** Del barrido de PM sobre `e5d592e`,
+reproducido con `archivo/subagentes-2026-10-03/permisos.py` y `ordenes.py`
+(detalle en `REPRODUCCION-SUBAGENTES-2026-10-03.md`, segunda parte). La
+transferencia está activa en producción: el punto 1 es el más urgente de la
+cola. Esfuerzo alto y los dos subagentes antes de entregar.
+
+### Qué entra
+
+1. **El comprador no cancela una orden por transferencia ya aprobada**
+   (`PAID` o `CONFIRMED`). Hoy lo hace con `POST /orders/{id}/cancel`, el
+   stock vuelve y la plata queda en el vendedor (`permisos.py 3`). Quién
+   puede cancelar qué tiene que coincidir con la tabla de `PATCH /status` y
+   con lo que ya rige para Mercado Pago.
+2. **La misma compra dos veces no crea dos juegos de órdenes** (otra
+   pestaña, o recargar después de perder la respuesta; `ordenes.py 4`).
+3. **Una publicación con precio 0 no se compra** por API (`ordenes.py 6`):
+   lo que la pantalla ya resuelve con «Solicitar cotización» lo tiene que
+   hacer cumplir el servidor.
+4. **Entradas de texto con su tope en el esquema:** las notas del checkout y
+   el motivo de rechazo o cancelación dan 422, no 500 (`ordenes.py 7`). Con
+   Mercado Pago, un motivo largo no puede dejar el link vencido y la orden
+   abierta.
+5. **Subir el comprobante no pisa una aprobación** que llegó mientras tanto
+   (hallazgo 3 de órdenes, no reproducido por PM): demostralo forzando el
+   cruce.
+
+### Fuera de alcance
+
+- Reservar stock en las compras por transferencia y cuándo se muestra el
+  CBU: los decide Emi; si deciden antes de que empieces, se suman acá.
+- El precio que cambia entre el carrito y la confirmación: rige la decisión
+  del 12/08. Sólo decí si la pantalla muestra el total vigente antes de que
+  la persona transfiera.
+
+### Aceptación verificable
+
+Un caso por punto con su rojo sobre la base y verde después; negativos;
+suite completa desde base limpia, auditorías y puertas; la tabla de tus dos
+subagentes.
+
+### Frená y consultá
+
+Si el punto 1 deja sin salida un caso real (por ejemplo, el vendedor aprobó
+por error y el comprador nunca pagó): decí cuál y qué proponés.
+
+---
+
+## Después — SESIONES-SEGURAS-1 (apenas entregues ORDENES-TRANSFERENCIA-1)
 
 **Decisión de Emi (03/10), opción 1.** Reproducidos por PM sobre `e5d592e`
 con `archivo/subagentes-2026-10-03/sesiones.py` (casos 1 a 4). Esfuerzo alto
@@ -345,6 +394,15 @@ y los dos subagentes antes de entregar.
 4. **El administrador no restablece su propia contraseña desde el panel:**
    la API lo rechaza con un texto que mande a «Mi cuenta», y el botón no
    aparece en su fila.
+5. **Registrar el correo de otra persona no le roba la cuenta** (Emi,
+   03/10; `archivos.py 3`). Hoy el que registra elige la contraseña, y
+   cuando la dueña confirma el correo entra él. Quien confirma el correo
+   tiene que ser quien termina eligiendo la contraseña con la que se entra,
+   y una cuenta sin confirmar no puede bloquear ese correo para siempre.
+   Proponé el mecanismo antes de programarlo: es una decisión de producto.
+6. **El correo no distingue mayúsculas** (`archivos.py 4`): registro, login
+   y búsqueda. Decí cuántas cuentas de la base local quedarían duplicadas al
+   normalizar y cómo lo resolvés en producción, sin tocarla.
 
 ### Fuera de alcance
 
@@ -372,7 +430,49 @@ y los dos subagentes antes de entregar.
 
 ---
 
-## Después — CONTROLES-AUTOMATICOS-1 (apenas entregues SESIONES-SEGURAS-1)
+## Después — PERMISOS-Y-ARCHIVOS-1 (apenas entregues SESIONES-SEGURAS-1)
+
+**Decisión de Emi (03/10), opción 1.** Del mismo barrido, reproducido con
+`permisos.py` y `archivos.py`. Esfuerzo alto y los dos subagentes.
+
+### Qué entra
+
+1. **La suspensión del administrador no la deshace el vendedor**
+   (`permisos.py 2`).
+2. **Un vendedor desactivado no aparece en el Mercado ni se le puede
+   comprar** (`permisos.py 4`). Decí qué pasa con sus órdenes abiertas; no
+   las cambies sin consultar.
+3. **Los comprobantes de transferencia los ven sólo las dos partes de la
+   orden y el administrador,** no cualquiera con el enlace (`permisos.py
+   3`). Igual que las constancias: sin URL pública. Decí cómo migran los ya
+   subidos.
+4. **Una calificación por compra,** también con pedidos simultáneos
+   (`permisos.py 8`), garantizado por la base.
+5. **El transportista no ve órdenes canceladas ni rechazadas** como si
+   siguieran vigentes (`permisos.py 7`). Si ve las que esperan pago, que se
+   note el estado.
+6. **Subir imágenes:** una subida rechazada no deja archivos en disco
+   (`archivos.py 6`), el tamaño se controla antes de leer el archivo entero,
+   y el límite de imágenes por publicación vale también con pedidos
+   simultáneos.
+7. **`DOCUMENTOS_DIR` en `RAILWAY.md`,** junto a `UPLOAD_DIR`, con
+   `/data/documentos`. El valor en Railway lo verifica Emi; no lo cambies
+   vos.
+
+### Fuera de alcance
+
+- Que elegir transportista muestre su contacto sin comprar: es el diseño
+  vigente.
+- El correo con otra persona y las mayúsculas: van en `SESIONES-SEGURAS-1`.
+
+### Aceptación verificable
+
+Un caso por punto con su rojo sobre la base y verde después; negativos;
+suite completa desde base limpia, auditorías y puertas; la tabla de tus dos
+subagentes.
+
+---
+## Después — CONTROLES-AUTOMATICOS-1 (apenas entregues PERMISOS-Y-ARCHIVOS-1)
 
 **Decisión de Emi (03/10), por tu D7: sí, sólo la parte rápida.** Hoy el
 repositorio no tiene ningún control automático. Entregala por separado.
